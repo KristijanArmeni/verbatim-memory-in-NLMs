@@ -14,86 +14,66 @@ or from an ipython console:
 import numpy as np
 import pandas as pd
 import json
+import sys
 
 # own modules
-from experiment import model, tokenizer, Sampler
+from experiment import model, tokenizer, Sampler, run_perplexity
 from stimuli import prefixes_perplexity, prompts_perplexity
+
+# ===== INITIATE ===== #
+permute_second_list = bool(int(sys.argv[1]))
+print("permute_second_list == {}".format(permute_second_list))
 
 s = Sampler(model=model, tokenizer=tokenizer)
 
 # ===== DATASET ===== #
 # load the word lists
-with open("./data/toronto.json") as f:
+fname = "./data/toronto.json"
+
+with open(fname) as f:
+    print("Loading {} ...".format(fname))
     stim = json.load(f)
 
-dataS["cond"] = "sem"
-dataR["cond"] = "rnd"
-
-# code a repetition condition
-tmp = pd.DataFrame(columns=dataS.columns.tolist())
-tmp["token"] = np.repeat("cheese", 10).tolist()
-tmp['cond'] = 'rpt'
-
-data = pd.concat([dataS, dataR, tmp])
-
-# temp, redo the set index
-num_sets = 5
-data["setid"] = np.repeat(np.arange(1, num_sets+1), 10)
-data.drop(["set"], axis=1, inplace=True)
-
-# create some random word lists
-wl = {"sem": [], "rnd": [], 'rpt': []}
-for idx in data.setid.unique():
-
-    # structure the list
-    l = [s + ',' for s in data.loc[data.setid == idx, 'token'].tolist()]
-    l[0] = l[0].capitalize()         # capitalize first letter
-    l[-1] = l[-1].replace(',', '.')      # add full stop to the last item
-
-    # write sentences to the stimuli
-    wl[data.loc[data.setid == idx, 'cond'].iloc[0]].append(l)
-
-# Construct dict with inputs
-inputs = {key: {'sem': [], 'rnd': [], 'rpt': []} for key in prompts.keys()}
-codes = {key: {'sem': [], 'rnd': [], 'rpt': []} for key in prompts.keys()}
-for prompt in inputs.keys():
-    for key in inputs[prompt].keys():
-        for i in range(len(wl[key])):
-            fullstring = " ".join([pref1, " ".join(wl[key][i]), prompts[prompt], " ".join(list(reversed(wl[key]))[i])])
-            #string_code = [0 for j in pref1.split()] + [1 for e in wl[key][i]] + [2 for p in prompts[prompt].split()] + \
-            #                                                                [3 for h in wl[key][i]]
-            inputs[prompt][key].append(fullstring)
-            #codes[prompt][key].append(string_code)
+# convert word lists to strings and permute the second one if needed
+word_list1 = [", ".join(l) + "." for l in stim]
+if permute_second_list:
+    word_list2 = [", ".join(np.random.RandomState((543+j)*5).permutation(stim[j]).tolist()) + "."
+                  for j in range(len(stim))]
+else:
+    word_list2 = word_list1
 
 # ===== COMPUTE PERPLEXITY ===== #
-out = {key: {"sem": [], "rnd": [], 'rpt': []} for key in prompts.keys()}
 
-# loop over prompts
-for prompt in out.keys():
-    # loop over list conditions
-    for list_condition in out[prompt].keys():
-        # get perplexity
-        for input_string in inputs[prompt][list_condition]:
-            print("Computing ppl in condition {} prompt {}".format(prompt, list_condition))
-            a, b, c = s.ppl(input_string=input_string, context_len=1024, stride=1, device="cpu")
-            out[prompt][list_condition].append((a, b, c))
+# call the wrapper function
+output_list = run_perplexity(prefixes=prefixes_perplexity,
+                             prompts={key: prompts_perplexity[key] for key in ["sce1-1", "sce1-3", "sce1-5"]},
+                             word_list1=word_list1,
+                             word_list2=word_list2,
+                             sampler=s)
 
-# convert output to dataframe
+# convert the output to dataframe
 dfout = []
 counter = 1
-for prompt in out.keys():
-    for key in out[prompt].keys():
-        for k, tup in enumerate(out[prompt][key]):
-            # convert the last two elements of the tuple to an array
-            dftmp = pd.DataFrame(np.asarray(tup[1::]).T, columns=["ppl", "token"])
-            dftmp['cond1'] = key
-            dftmp['cond2'] = prompt
-            dftmp['id'] = counter
-            #dftmp['type'] = codes[prompt][key][k]  # list of 1, 2, 3, or 4 marking string type
-            dfout.append(dftmp)
-            counter += 1
+for k, tup in enumerate(output_list):
+    # convert the last two elements of the tuple to an array
+    dftmp = pd.DataFrame(np.asarray(tup[1:5]).T, columns=["ppl", "token", "trialID", "positionID"])
+    dftmp["ispunct"] = dftmp.token.isin([".", ":", ","])  # create punctuation info column
+    dftmp['prefix'] = tup[-2]                             # add a column of prefix labels
+    dftmp['prompt'] = tup[-1]                             # add a column of prompt labels
+    dftmp['stimID'] = counter
+
+    dfout.append(dftmp)
+    counter += 1
 
 # put into df and save
 dfout = pd.concat(dfout)
 
-dfout.to_csv("./perplexity3.txt", sep=",")
+# save output
+outname = None
+if permute_second_list:
+    outname = "./perplexity3B.txt"
+else:
+    outname = "./perplexity3.txt"
+
+print("Saving {}".format(outname))
+dfout.to_csv(outname, sep=",")
