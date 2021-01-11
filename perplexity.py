@@ -7,36 +7,62 @@ Use as:
 
 python experiment.py
 or from an ipython console:
-%run experiment.py
+%run experiment.py ""
 
 """
 
 import numpy as np
 import pandas as pd
 import json
-import sys
+import sys, os
+from argparse import ArgumentParser
 
 # own modules
+sys.path.append(os.path.join(os.getcwd(), 'data'))
 from experiment import model, tokenizer, Sampler, run_perplexity
 from stimuli import prefixes_perplexity, prompts_perplexity
 
-# ===== INITIATE ===== #
-permute_second_list = bool(int(sys.argv[1]))
-print("permute_second_list == {}".format(permute_second_list))
+# add this dir to path
 
+# ===== INITIATIONS ===== #
+# collect input arguments
+#parser = ArgumentParser(description="perplexity.py runs perplexity experiment")
+
+#parser.add_argument("--condition", type=str, help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
+#parser.add_argument("--input_filename", type=str, help="str, the name of the .json file containing word lists")
+#parser.add_argument("--output_filename", type=str, help="str, the name of the output file saving the dataframe")
+
+#argins = parser.parse_args("")
+
+condition = sys.argv[1]   # can be one of: "repeat", "permute"
+input_filename = sys.argv[2]    # the .json file to be read in
+outname = sys.argv[3]  # the name of the output data frame
+
+# uncomment this for debugging
+#condition = "permute"
+#fname = "./data/semantic_lists.json"
+#outname = "perplexity_semantic.csv"
+
+# construct output file name and check that it exists
+savedir = os.path.join(".", "output")
+assert os.path.isdir(savedir)               # check that the folder exists
+base, extension = os.path.splitext(outname)
+outpath = os.path.join(savedir, "".join([base, "_", condition, extension]))
+
+print("condition == {}".format(condition))
+
+# initiate the sampler class from experiment.py module
 s = Sampler(model=model, tokenizer=tokenizer)
 
 # ===== DATASET ===== #
-# load the word lists
-fname = "./data/toronto.json"
-
-with open(fname) as f:
-    print("Loading {} ...".format(fname))
+# load the word lists in .json files
+with open(input_filename) as f:
+    print("Loading {} ...".format(input_filename))
     stim = json.load(f)
 
 # convert word lists to strings and permute the second one if needed
 word_list1 = [", ".join(l) + "." for l in stim]
-if permute_second_list:
+if condition == "permute":
     word_list2 = [", ".join(np.random.RandomState((543+j)*5).permutation(stim[j]).tolist()) + "."
                   for j in range(len(stim))]
 else:
@@ -53,27 +79,26 @@ output_list = run_perplexity(prefixes=prefixes_perplexity,
 
 # convert the output to dataframe
 dfout = []
-counter = 1
+counter = 1  # counter for trials
+# loop over trials
 for k, tup in enumerate(output_list):
+
     # convert the last two elements of the tuple to an array
-    dftmp = pd.DataFrame(np.asarray(tup[1:5]).T, columns=["ppl", "token", "trialID", "positionID"])
+    dftmp = pd.DataFrame(np.asarray(tup[1:5]).T,
+                         columns=["ppl", "token", "trialID", "positionID"])
+
     dftmp["ispunct"] = dftmp.token.isin([".", ":", ","])  # create punctuation info column
     dftmp['prefix'] = tup[-2]                             # add a column of prefix labels
     dftmp['prompt'] = tup[-1]                             # add a column of prompt labels
     dftmp['stimID'] = counter
+    dftmp['second_list'] = condition                      # log condition of the second list
 
     dfout.append(dftmp)
     counter += 1
 
-# put into df and save
+# put into a single df and save
 dfout = pd.concat(dfout)
 
 # save output
-outname = None
-if permute_second_list:
-    outname = "./perplexity3B.txt"
-else:
-    outname = "./perplexity3.txt"
-
-print("Saving {}".format(outname))
+print("Saving {}".format(outpath))
 dfout.to_csv(outname, sep=",")
