@@ -110,6 +110,7 @@ def run_perplexity(prefixes: Dict, prompts: Dict, word_list1: List, word_list2: 
         # loop over prompts
         for prompt in prompts.keys():
 
+            # loop over trials
             for i in range(len(word_list1)):
 
                 # construct the input string
@@ -129,9 +130,9 @@ def run_perplexity(prefixes: Dict, prompts: Dict, word_list1: List, word_list2: 
                 trials = []
                 positions = []
                 for j, ids in enumerate((i1, i2, i3, i4)):
-                    tmp = np.zeros(shape=ids.shape[1], dtype=int)  # coding trial structure
+                    tmp = np.zeros(shape=ids.shape[1], dtype=int)  # code the trial structure
                     tmp[:] = j
-                    tmp2 = np.arange(ids.shape[1])  # token position index
+                    tmp2 = np.arange(ids.shape[1])                 # create token position index
                     trials.append(tmp)
                     positions.append(tmp2)
 

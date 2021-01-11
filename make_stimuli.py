@@ -14,8 +14,22 @@ import json
 # outputname = ""
 
 which = sys.argv[1]
-permute = bool(int(sys.argv[2]))
 outputname = sys.argv[2]
+
+
+# define w convenience function
+def sample_words(word_list: list, sample_size: int) -> list:
+    """
+    sample_words(word_list, sample_size) splits <word_list> in to subsets
+    of length <sample_size>
+    """
+    samples = []
+    for x in range(0, len(word_list), sample_size):
+        # append chunked list
+        samples.append(word_list[x:(x + sample_size)])
+    return samples
+
+word_lists = None
 
 # ===== PILOT DATA ===== #
 if which == "pilot":
@@ -49,33 +63,42 @@ if which == "toronto":
              dat.concreteness.to_numpy(),
              dat.k_f_freq.to_numpy()]
 
-    lengths = ()
-
     # utility function to keep same seed over several calls
     shuffle_ids = np.random.RandomState(123). \
                      permutation(np.arange(0, lists[0].size))
-
-    def sample_words(word_list: list, sample_size: int) -> list:
-        """
-        sample_words(word_list, sample_size, random_seed) splits <word_list> in to subsets
-        of length <sample_size>
-        """
-        samples = []
-        for x in range(0, len(word_list), sample_size):
-            # append chunked list
-            samples.append(word_list[x:(x+sample_size)])
-        return samples
 
     word_lists = {"list-3": [sample_words(lists[i][shuffle_ids][0:60], 3) for i in range(len(lists))],
                   "list-5": [sample_words(lists[i][shuffle_ids][60:160], 5) for i in range(len(lists))],
                   "list-10": [sample_words(lists[i][shuffle_ids][160:360], 10) for i in range(len(lists))],
                   }
 
-    out = []
-    for list_size in word_lists.keys():
-        for k, l in enumerate(word_lists[list_size][0]):
-            out.append(l.tolist())
+if which == "semantic_lists":
 
+    df = pd.read_csv("./data/nouns_categorized.txt", header=None)
+    print("Reading {} ...".format("./data/nouns_categorized.txt"))
+    a = sample_words(df.loc[:, 0].str.lower().tolist(), 32)  # create a list of len(list[0])=32 tokens
 
-    with open(outputname, "w") as f:
-        json.dump(out, f)
+    # generate lists of length 3, 5 and 10
+    word_lists = {"list-3": [l[0:3] for l in a[0:20]],
+                  "list-5": [l[3:8] for l in a[0:20]],
+                  "list-10": [l[8:18] for l in a[0:20]]}
+
+out = []
+for list_size in word_lists.keys():
+
+    # just a temporary patch, because for the non-semantic lists,
+    # I have a tuple of words and frequency ratings
+    # which is not true for the semantic lists
+    if which == "semantic_lists":
+
+        outlist = word_lists[list_size]
+
+    elif which == "toronto":
+        # here make sure to select strings, then convert numpy array to lists
+        outlist = [lst.tolist() for lst in word_lists[list_size][0]]
+
+    for k, l in enumerate(outlist):
+        out.append(l)
+
+with open(outputname, "w") as f:
+    json.dump(out, f)
