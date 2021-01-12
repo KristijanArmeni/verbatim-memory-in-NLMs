@@ -61,9 +61,10 @@ with open(input_filename) as f:
     stim = json.load(f)
 
 # convert word lists to strings and permute the second one if needed
-word_list1 = [", ".join(l) + "." for l in stim]
+# add space at the string onset
+word_list1 = [" " + ", ".join(l) + "." for l in stim]
 if condition == "permute":
-    word_list2 = [", ".join(np.random.RandomState((543+j)*5).permutation(stim[j]).tolist()) + "."
+    word_list2 = [" " + ", ".join(np.random.RandomState((543+j)*5).permutation(stim[j]).tolist()) + "."
                   for j in range(len(stim))]
 else:
     word_list2 = word_list1
@@ -101,4 +102,4 @@ dfout = pd.concat(dfout)
 
 # save output
 print("Saving {}".format(outpath))
-dfout.to_csv(outname, sep=",")
+dfout.to_csv(outpath, sep=",")

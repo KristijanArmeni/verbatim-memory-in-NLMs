@@ -17,6 +17,7 @@ class Config(object):
 
     pass
 
+
 class Sampler(object):
 
     def __init__(self, model, tokenizer):
@@ -119,14 +120,17 @@ def run_perplexity(prefixes: Dict, prompts: Dict, word_list1: List, word_list2: 
                 #               prompts[prompt] + " " + \
                 #               word_lists[i]
 
-                i1 = sampler.tokenizer.encode(prefixes[prefix_key], return_tensors="pt")  # prefix IDs
-                i2 = sampler.tokenizer.encode(word_list1[i], return_tensors="pt")        # word list IDs
-                i3 = sampler.tokenizer.encode(prompts[prompt], return_tensors="pt")      # prompt IDs
+                # tokenize strings separately to be able to construct IDs for prefix, word lists etc.
+                i1 = sampler.tokenizer.encode(prefixes[prefix_key], return_tensors="pt")  # prefix IDs, add space
+                i2 = sampler.tokenizer.encode(word_list1[i], return_tensors="pt")               # word list IDs
+                i3 = sampler.tokenizer.encode(prompts[prompt], return_tensors="pt")             # prompt IDs
                 i4 = sampler.tokenizer.encode(word_list2[i], return_tensors="pt")
 
                 # compose the input ids tensors
                 input_ids = torch.cat((i1, i2, i3, i4), dim=1)
 
+                # construct IDs for prefix, word lists and individual tokens
+                # useful for data vizualization etc.
                 trials = []
                 positions = []
                 for j, ids in enumerate((i1, i2, i3, i4)):
