@@ -18,6 +18,9 @@ text_generation = True
 with open("./data/toronto.json") as f:
     stim = json.load(f)
 
+# convert list to strings
+input_lists = [", ".join(l) + "." for l in stim]
+
 # setup the models
 models = {"gpt-2": (AutoModelForCausalLM, AutoTokenizer)}
 
@@ -42,11 +45,16 @@ else:
     num_tokens = [1, 5]
 
 lst = []
+count = 1
+total = len(input_lists)*len(prefixes.keys())*len(prompts_word_prediction.keys())
 for k in num_tokens:
     # loop over different prefixes:
     for prefix_key in prefixes.keys():
         for prompt in prompts_word_prediction.keys():
-            for l in stim:
+            for l in input_lists:
+
+                print("Trial {}/{}".format(count, total))
+
                 input_string = prefixes[prefix_key] + " " + \
                                l + " " + \
                                prompts_word_prediction[prompt]
@@ -102,27 +110,36 @@ for k in num_tokens:
                     top_p = 0.95
                     top_k = 60
 
-                    text_len = 10  # the number of tokens to be generated
+                    max_tokens = 15   # the upper bound on the number of tokens to be generated
+                    min_tokens = 5  # the lower bound on the number of tokens to be generated
 
                     inputs = s.tokenizer.encode(input_string, add_special_tokens=False, return_tensors="pt")
-                    max_len = len(inputs[0]) + text_len  # generate five tokens after the context is processed
+
+                    max_len = len(inputs[0]) + max_tokens
+
                     outputs = s.model.generate(input_ids=inputs,
                                                max_length=max_len,
-                                               do_sample=True,
-                                               num_beams=num_beams,  # setting this to 1 avoids beam search
-                                               top_p=top_p,
-                                               top_k=top_k)
+                                               min_length=len(inputs[0]) + min_tokens,
+                                               do_sample=True,              # don't do greedy search
+                                               num_beams=num_beams,         # setting this to 1 avoids beam search
+                                               bad_word_ids=[366, 1085],    # block generation of '"' and ':'
+                                               top_p=top_p,                 # restrict to tokens withing the p prob mass
+                                               top_k=top_k)                 # sample from top_k number of tokens
 
-                    # fill in the output list
-                    out_str = s.tokenizer.decode(outputs[0][-text_len::])
+                    # fill in the output list, go back -max_tokens
+                    out_str = s.tokenizer.decode(outputs[0][-max_tokens::])
+                    # grab the string generated after ":", in case it was shorter than max_tokens
+                    out_str = out_str.split(":")[-1]
 
-                    ishit = None
+                    hits = None
+                    prop = None
                     if (prompt == "cpl_any") or (prompt == "cnt"):
                         # check if any of the targets appear in the list
-                        ishit = any([t in out_str.split() for t in targets])
+                        hits = [t in out_str.split() for t in targets]
+                        prop = sum(hits)/len(hits)
                     elif prompt == "cpl_first":
                         # check if the first item appears anywhere in the output string
-                        ishit = targets[0] in out_str.split()
+                        hits = targets[0] in out_str.split()
 
                     lst.append({
                      "pref": prefix_key,
@@ -130,17 +147,19 @@ for k in num_tokens:
                      "len": len(targets),
                      "string": out_str,
                      "targets": targets,
-                     "ishit": int(ishit),
+                     "n_correct": sum(hits),
+                     "p_correct": prop,
                      "num_beams": num_beams,
                      "top_p": top_p,
                      "top_k": top_k}
                     )
 
+                count += 1
 
 dfout = pd.DataFrame(columns=list(lst[0].keys()))
 out = dfout.append(lst, ignore_index=True)
 if text_generation:
-    outname = "./output/word_prediction_{}tok.txt".format(text_len)
+    outname = "./output/word_prediction_{}tok.txt".format(max_tokens)
 else:
     outname = "./output/word_prediction_1tok.txt"
 out.to_csv(path_or_buf=outname)
