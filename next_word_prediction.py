@@ -1,9 +1,17 @@
 """
-next_word_prediction.py defines the function and the script to run the next word prediction experiment
+next_word_prediction.py is used to run the open ended text generation experiment
 
-Use as:
+Example usage:
 
-next_word_prediction.py "model_class" "config"
+%run ./next_word_prediction.py --do_sample "1" \
+                               --num_beams "4" \
+                               --temp "1" \
+                               --top_p "0.95" \
+                               --top_k "50" \
+                               --max_tokens "15" \
+                               --min_tokens "5" \
+                               --input_list "nonsemantic" \
+                               --savename "next_word_sample.csv"
 
 """
 from experiment import Sampler
@@ -23,15 +31,22 @@ text_generation = True
 # collect input arguments
 parser = argparse.ArgumentParser(description="next_word_prediction.py")
 
-parser.add_argument("--do_sample", type=int, help="")
-parser.add_argument("--num_beams", type=int, help="")
-parser.add_argument("--temp", type=float, help="")
+parser.add_argument("--do_sample", type=int,
+                    help="int, '0' or '1', converted to boolean and passed as the value of <do_sample>"
+                         "to model.generate() function from HugginFace library")
+parser.add_argument("--num_beams", type=int,
+                    help="int, the value is passed to <num_beams> input arg in the call to model.generate()  ")
+parser.add_argument("--temp", type=float,
+                    help="float, temperature parameter the value is passed as <temperature>"
+                         "input arg to model.generate()")
 parser.add_argument("--top_p", type=float, help="")
 parser.add_argument("--top_k", type=int, help="")
 parser.add_argument("--max_tokens", type=int, help="")
 parser.add_argument("--min_tokens", type=int, help="")
-parser.add_argument("--input_list", type=str, help="")
-parser.add_argument("--savename", type=str, help="")
+parser.add_argument("--input_list", type=str,
+                    help="string, used as a control flag to load in the corresponding .json file")
+parser.add_argument("--savename", type=str,
+                    help="string, specifies the name of the output file")
 
 argins = parser.parse_args()
 argins.do_sample = bool(argins.do_sample)
