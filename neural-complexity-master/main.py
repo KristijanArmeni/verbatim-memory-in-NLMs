@@ -213,6 +213,7 @@ corpus = data.SentenceCorpus(args.data_dir, args.vocab_file, args.test, args.int
                              predefined_vocab_flag=args.predefined_vocab_flag,
                              collapse_nums_flag=args.collapse_nums_flag,
                              multisentence_test_flag=args.multisentence_test,
+                             sentences_in_blocks=True, # make this args later
                              lower_flag=args.lowercase,
                              trainfname=args.trainfname,
                              validfname=args.validfname,

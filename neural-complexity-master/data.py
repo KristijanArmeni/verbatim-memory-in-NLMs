@@ -4,7 +4,7 @@ import gzip
 import os
 import torch
 
-from nltk import sent_tokenize
+from nltk import sent_tokenize, word_tokenize
 
 def isfloat(instr):
     """ Reports whether a string is floatable """
@@ -34,12 +34,14 @@ class SentenceCorpus(object):
     """ Loads train/dev/test corpora and dictionary """
     def __init__(self, path, vocab_file, test_flag=False, interact_flag=False,
                  checkpoint_flag=False, predefined_vocab_flag=False, lower_flag=False,
-                 collapse_nums_flag=False,multisentence_test_flag=False,generate_flag=False,
+                 collapse_nums_flag=False, multisentence_test_flag=False, sentences_in_blocks=False,
+                 generate_flag=False,
                  trainfname='train.txt',
                  validfname='valid.txt',
                  testfname='test.txt'):
         self.lower = lower_flag
         self.collapse_nums = collapse_nums_flag
+        self.sentences_in_blocks = sentences_in_blocks  # whether or not to allow multiple sents per line
         if not (test_flag or interact_flag or checkpoint_flag or predefined_vocab_flag or generate_flag):
             # training mode
             self.dictionary = Dictionary()
@@ -352,7 +354,15 @@ class SentenceCorpus(object):
         else:
             with open(path, 'r') as file_handle:
                 for fchunk in file_handle:
-                    for line in sent_tokenize(fchunk):
+
+                    if self.sentences_in_blocks:
+                        # treat all sentences on one line as a block of sentences
+                        blocks = [fchunk]
+                    else:
+                        # otherwise, split line content into several sentences
+                        blocks = sent_tokenize(fchunk)
+
+                    for line in blocks:
                         if line.strip() == '':
                             # Ignore blank lines
                             continue
