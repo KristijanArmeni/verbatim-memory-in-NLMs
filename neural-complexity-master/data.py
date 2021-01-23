@@ -30,6 +30,7 @@ class Dictionary(object):
     def __len__(self):
         return len(self.idx2word)
 
+
 class SentenceCorpus(object):
     """ Loads train/dev/test corpora and dictionary """
     def __init__(self, path, vocab_file, test_flag=False, interact_flag=False,
@@ -38,7 +39,9 @@ class SentenceCorpus(object):
                  generate_flag=False,
                  trainfname='train.txt',
                  validfname='valid.txt',
-                 testfname='test.txt'):
+                 testfname='test.txt',
+                 markersfname='markers.txt'):
+
         self.lower = lower_flag
         self.collapse_nums = collapse_nums_flag
         self.sentences_in_blocks = sentences_in_blocks  # whether or not to allow multiple sents per line
@@ -71,7 +74,7 @@ class SentenceCorpus(object):
                 # load from a checkpoint
                 self.train = self.tokenize_with_unks(os.path.join(path, trainfname))
                 self.valid = self.tokenize_with_unks(os.path.join(path, validfname))
-
+        self.markers = self.read_marker_file(os.path.join(path, markersfname))
 
     def save_dict(self, path):
         """ Saves dictionary to disk """
@@ -334,6 +337,20 @@ class SentenceCorpus(object):
                                     ids[token] = self.dictionary.word2idx[word]
                                 token += 1
         return ids
+
+
+    def read_marker_file(self, path):
+
+        markers = []
+
+        # read markers.txt line by line and store the contents to markers
+        with open(path, 'r') as file_handle:
+            for fchunk in file_handle:
+                # read the line containing marker values,
+                # and make it a list (e.g [0, 0, 0, 0, 1, 1, 1, 1])
+                markers.append([int(el) for el in fchunk.strip("[]\n").split(",")])
+
+        return markers
 
     def sent_tokenize_with_unks(self, path):
         """ Tokenizes a text file into sentences, adding unks if needed. """

@@ -13,6 +13,8 @@ import torch
 import torch.nn as nn
 import data
 import model
+from collections import namedtuple
+import csv, os
 
 try:
     from progress.bar import Bar
@@ -82,8 +84,14 @@ parser.add_argument('--validfname', type=str, default='valid.txt',
                     help='name of the validation file')
 parser.add_argument('--testfname', type=str, default='test.txt',
                     help='name of the test file')
+parser.add_argument('--markersfname', type=str, default='markers.txt',
+                    help='name of the .txt file containting marker values for each token')
 parser.add_argument('--collapse_nums_flag', action='store_true',
                     help='collapse number tokens into a unified <num> token')
+parser.add_argument('--csvfname', type=str,
+                    help='filename for storing complexity output')
+parser.add_argument('--output_dir', type=str,
+                    help='path where csvfname is written to (word-by-word complexity output)')
 
 # Runtime parameters
 parser.add_argument('--test', action='store_true',
@@ -213,11 +221,12 @@ corpus = data.SentenceCorpus(args.data_dir, args.vocab_file, args.test, args.int
                              predefined_vocab_flag=args.predefined_vocab_flag,
                              collapse_nums_flag=args.collapse_nums_flag,
                              multisentence_test_flag=args.multisentence_test,
-                             sentences_in_blocks=True, # make this args later
+                             sentences_in_blocks=True,   # make this args later
                              lower_flag=args.lowercase,
                              trainfname=args.trainfname,
                              validfname=args.validfname,
-                             testfname=args.testfname)
+                             testfname=args.testfname,
+                             markersfname=args.markersfname)
 
 if not args.interact:
     if args.test:
@@ -225,6 +234,9 @@ if not args.interact:
             test_data = [corpus.test]
         else:
             test_sents, test_data = corpus.test
+        if args.testfname:
+            markers = corpus.markers
+
     else:
         train_data = batchify(corpus.train, args.batch_size)
         val_data = batchify(corpus.valid, args.batch_size)
@@ -319,7 +331,7 @@ def get_guessscores(state):
     ''' Wrapper that returns top-k guesses of given vector '''
     return get_guesses(state, True)
 
-def get_complexity(state, obs, sentid):
+def get_complexity(state, obs, sentid, markers):
     ''' Generates complexity output for given state, observation, and sentid '''
     Hs = torch.log2(torch.exp(torch.squeeze(apply(get_entropy, state))))
     surps = torch.log2(torch.exp(apply(get_surps, state)))
@@ -328,7 +340,14 @@ def get_complexity(state, obs, sentid):
         guesses = apply(get_guesses, state)
         guessscores = apply(get_guessscores, state)
 
+    LMout = namedtuple(typename='LMout',
+                       field_names=["word", "sentid", "corpuspos", "marker", "wlen", "surp", "hs", "dHs"])
+
+    # variable that is returned
+    output_list = []
+
     for corpuspos, targ in enumerate(obs):
+
         word = corpus.dictionary.idx2word[int(targ)]
         if word == '<eos>':
             # don't output the complexity of EOS
@@ -360,6 +379,12 @@ def get_complexity(state, obs, sentid):
             print(args.csep.join([str(word), str(sentid), str(corpuspos), str(len(word)),
                                   str(float(surp)), str(float(Hs[corpuspos])),
                                   str(max(0, float(Hs[max(corpuspos-1, 0)])-float(Hs[corpuspos])))]))
+
+        output_list.append(LMout(word=str(word), sentid=sentid, corpuspos=corpuspos, marker=markers[sentid][corpuspos],
+                            wlen=len(word), surp=float(surp), hs=float(Hs[corpuspos]),
+                            dHs=float(Hs[max(corpuspos-1, 0)])-float(Hs[corpuspos])))
+
+    return output_list
 
 def apply(func, apply_dimension):
     ''' Applies a function along a given dimension '''
@@ -399,7 +424,7 @@ def test_get_batch(source):
     target = source[1:1+seq_len].view(-1)
     return data, target
 
-def test_evaluate(test_sentences, data_source):
+def test_evaluate(test_sentences, data_source, markers):
     """ Evaluate at test time (with adaptation, complexity output) """
     # Turn on evaluation mode which disables dropout.
     if args.adapt:
@@ -435,11 +460,20 @@ def test_evaluate(test_sentences, data_source):
             sys.stdout.write('\n')
     if PROGRESS:
         bar = Bar('Processing', max=len(data_source))
+
+    all_trials_output=[]
+
     for i in range(len(data_source)):
         sent_ids = data_source[i].to(device)
         # We predict all words but the first, so determine loss for those
         if test_sentences:
             sent = test_sentences[i]
+
+        if markers is not None:
+            assert len(data_source) == len(markers)     # check the number of trials
+            assert len(sent.split()) == len(markers[i]) # check the number of tokens
+            mark = markers[i]
+
         hidden = model.init_hidden(1) # number of parallel sentences being processed
         data, targets = test_get_batch(sent_ids)
         if args.view_layer >= 0:
@@ -487,7 +521,8 @@ def test_evaluate(test_sentences, data_source):
             total_loss += loss.item()
             if args.words:
                 # output word-level complexity metrics
-                get_complexity(output_flat, targets, i)
+                block_output = get_complexity(output_flat, targets, i, markers)
+                all_trials_output.append(block_output)
             else:
                 # output sentence-level loss
                 if test_sentences:
@@ -511,6 +546,22 @@ def test_evaluate(test_sentences, data_source):
             bar.next()
     if PROGRESS:
         bar.finish()
+
+    if args.csvfname:
+
+        # make a list of strings
+        rows_for_csv = []
+        for block in all_trials_output:
+            for row in block:
+                rows_for_csv.append([value for value in row])
+
+        output_file = open(os.path.join(args.output_dir, args.csvfname), "w", newline="")
+        writer = csv.writer(output_file)
+        writer.writerow([str(colname) for colname in block_output[0]._fields])
+        writer.writerows(rows_for_csv)
+        output_file.close()
+
+
     if args.view_layer >= 0:
         return total_loss / nwords
     else:
@@ -664,7 +715,7 @@ else:
         if args.multisentence_test:
             test_loss = test_evaluate(None, test_data)
         else:
-            test_loss = test_evaluate(test_sents, test_data)
+            test_loss = test_evaluate(test_sents, test_data, markers=markers)
         if args.adapt:
             with open(args.adapted_model, 'wb') as f:
                 torch.save(model, f)
