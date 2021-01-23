@@ -1,5 +1,11 @@
 """
 make_stimuli.py contains utility functions to generate the dataset
+
+Example usage:
+
+ipython %run make_stimuli.py --which "toronto" \
+                             --output_filename "test_filename.json"
+
 """
 
 import pandas as pd
@@ -7,14 +13,17 @@ import random
 import numpy as np
 import sys
 import json
+import argparse
 
 # uncomment this to debug
 # which = ""
 # permute = ""
 # outputname = ""
+parser = argparse.ArgumentParser()
+parser.add_argument("--which", dtype=str, help="string, one of 'toronto' or 'semantic' or 'digit', specifies which stimulus set to build")
+parser.add_argument("--output_filename", dtype=str)
 
-which = sys.argv[1]
-outputname = sys.argv[2]
+argins = parser.parse_args()
 
 
 # define w convenience function
@@ -29,10 +38,11 @@ def sample_words(word_list: list, sample_size: int) -> list:
         samples.append(word_list[x:(x + sample_size)])
     return samples
 
+
 word_lists = None
 
 # ===== PILOT DATA ===== #
-if which == "pilot":
+if argins.which == "pilot":
 
     df = pd.read_csv("subtlex_us_pos.txt", sep="\t")
 
@@ -53,7 +63,7 @@ if which == "pilot":
     out.to_csv("./data/stimuli_random.txt", index=False)
 
     # ===== MAKE WORD PREDICTION STIMULI ===== #
-if which == "toronto":
+elif argins.which == "toronto":
 
     # load in the toronto pool and rename columns to avoid blank spaces
     dat = pd.read_csv("./data/toronto_freq.txt", sep="\t", header=0). \
@@ -72,7 +82,7 @@ if which == "toronto":
                   "list-10": [sample_words(lists[i][shuffle_ids][160:360], 10) for i in range(len(lists))],
                   }
 
-if which == "semantic_lists":
+elif argins.which == "semantic_lists":
 
     df = pd.read_csv("./data/nouns_categorized.txt", header=None)
     print("Reading {} ...".format("./data/nouns_categorized.txt"))
@@ -83,22 +93,33 @@ if which == "semantic_lists":
                   "list-5": [l[3:8] for l in a[0:20]],
                   "list-10": [l[8:18] for l in a[0:20]]}
 
+
+elif argins.which == "digit":
+
+    # generate random numbers of certain lengths
+    lens = [3, 5, 10]
+
+    np.random.seed(54321)
+
+    outlist = [np.random.random_integers(0, 10, l) for l in lens]
+
 out = []
+outlist = None
 for list_size in word_lists.keys():
 
     # just a temporary patch, because for the non-semantic lists,
     # I have a tuple of words and frequency ratings
     # which is not true for the semantic lists
-    if which == "semantic_lists":
+    if argins.which == "semantic_lists":
 
         outlist = word_lists[list_size]
 
-    elif which == "toronto":
+    elif argins.which == "toronto":
         # here make sure to select strings, then convert numpy array to lists
         outlist = [lst.tolist() for lst in word_lists[list_size][0]]
 
     for k, l in enumerate(outlist):
         out.append(l)
 
-with open(outputname, "w") as f:
+with open(argins.output_filename, "w") as f:
     json.dump(out, f)
