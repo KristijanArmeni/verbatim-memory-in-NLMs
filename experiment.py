@@ -12,17 +12,15 @@ tokenizer = AutoTokenizer.from_pretrained('gpt2')
 model = AutoModelForCausalLM.from_pretrained('gpt2')
 
 
-class Config(object):
-
-    pass
-
-
 class Sampler(object):
 
-    def __init__(self, model, tokenizer):
+    def __init__(self, model, tokenizer, device):
 
         self.model = model
         self.tokenizer = tokenizer
+        self.device = device
+
+        self.model.to(device)
 
     def get_logits(self, input_string):
         
@@ -89,71 +87,71 @@ class Sampler(object):
         print("Done")
         return ppl, llh, id
 
+    def run_perplexity(self, prefixes: Dict, prompts: Dict, word_list1: List, word_list2: List, sampler) -> List:
+        """
+        experiment.run() will loop over prefixes, prompts, and word_lists and run the Sampler on them
+        It returns a list of tuples.
+        """
 
-def run_perplexity(prefixes: Dict, prompts: Dict, word_list1: List, word_list2: List, sampler) -> List:
-    """
-    experiment.run() will loop over prefixes, prompts, and word_lists and run the Sampler on them
-    It returns a list of tuples.
-    """
+        lst = []
+        count = 1
 
-    lst = []
-    count = 1
+        # quick check that the lengths match
+        assert len(word_list1) == len(word_list2)
 
-    # quick check that the lengths match
-    assert len(word_list1) == len(word_list2)
+        total = len(prefixes.keys())*len(prompts.keys())*len(word_list1)
 
-    total = len(prefixes.keys())*len(prompts.keys())*len(word_list1)
+        # loop over different prefixes:
+        for prefix_key in prefixes.keys():
 
-    # loop over different prefixes:
-    for prefix_key in prefixes.keys():
+            # loop over prompts
+            for prompt in prompts.keys():
 
-        # loop over prompts
-        for prompt in prompts.keys():
+                # loop over trials
+                for i in range(len(word_list1)):
 
-            # loop over trials
-            for i in range(len(word_list1)):
+                    # construct the input string
+                    # input_string = prefixes[prefix_key] + " " + \
+                    #               word_lists[i] + " " + \
+                    #               prompts[prompt] + " " + \
+                    #               word_lists[i]
 
-                # construct the input string
-                # input_string = prefixes[prefix_key] + " " + \
-                #               word_lists[i] + " " + \
-                #               prompts[prompt] + " " + \
-                #               word_lists[i]
+                    # tokenize strings separately to be able to construct IDs for prefix, word lists etc.
+                    i1 = self.tokenizer.encode(prefixes[prefix_key], return_tensors="pt")  # prefix IDs, add space
+                    i2 = self.tokenizer.encode(word_list1[i], return_tensors="pt")               # word list IDs
+                    i3 = self.tokenizer.encode(prompts[prompt], return_tensors="pt")             # prompt IDs
+                    i4 = self.tokenizer.encode(word_list2[i], return_tensors="pt")
 
-                # tokenize strings separately to be able to construct IDs for prefix, word lists etc.
-                i1 = sampler.tokenizer.encode(prefixes[prefix_key], return_tensors="pt")  # prefix IDs, add space
-                i2 = sampler.tokenizer.encode(word_list1[i], return_tensors="pt")               # word list IDs
-                i3 = sampler.tokenizer.encode(prompts[prompt], return_tensors="pt")             # prompt IDs
-                i4 = sampler.tokenizer.encode(word_list2[i], return_tensors="pt")
+                    # compose the input ids tensors
+                    input_ids = torch.cat((i1, i2, i3, i4), dim=1)
 
-                # compose the input ids tensors
-                input_ids = torch.cat((i1, i2, i3, i4), dim=1)
+                    # construct IDs for prefix, word lists and individual tokens
+                    # useful for data vizualization etc.
+                    trials = []
+                    positions = []
+                    for j, ids in enumerate((i1, i2, i3, i4)):
+                        tmp = np.zeros(shape=ids.shape[1], dtype=int)  # code the trial structure
+                        tmp[:] = j
+                        tmp2 = np.arange(ids.shape[1])                 # create token position index
+                        trials.append(tmp)
+                        positions.append(tmp2)
 
-                # construct IDs for prefix, word lists and individual tokens
-                # useful for data vizualization etc.
-                trials = []
-                positions = []
-                for j, ids in enumerate((i1, i2, i3, i4)):
-                    tmp = np.zeros(shape=ids.shape[1], dtype=int)  # code the trial structure
-                    tmp[:] = j
-                    tmp2 = np.arange(ids.shape[1])                 # create token position index
-                    trials.append(tmp)
-                    positions.append(tmp2)
+                    # old way: tokenize the whole string
+                    # input_ids2 = sampler.tokenizer.encode(input_string, return_tensors="pt")
 
-                # old way: tokenize the whole string
-                # input_ids2 = sampler.tokenizer.encode(input_string, return_tensors="pt")
+                    print("counter: {}/{}".format(count, total))
 
-                print("counter: {}/{}".format(count, total))
+                    # this returns surprisal (neg log ll)
+                    a, b, c = self.ppl(input_ids=input_ids.to(self.device), context_len=1024, stride=1,
+                                       device=self.device)
 
-                # this returns perplexity or neg log ll
-                a, b, c = sampler.ppl(input_ids=input_ids, context_len=1024, stride=1, device="cpu")
+                    # store the output tuple and
+                    lst.append((a, b, c,                             # perplexity output
+                                np.concatenate(trials).tolist(),     # trial structure
+                                np.concatenate(positions).tolist(),  # position index
+                                prefix_key,
+                                prompt))
 
-                # store the output tuple and
-                lst.append((a, b, c,                             # perplexity output
-                            np.concatenate(trials).tolist(),     # trial structure
-                            np.concatenate(positions).tolist(),  # position index
-                            prefix_key,
-                            prompt))
+                    count += 1  # increase counter for feedback
 
-                count += 1  # increase counter for feedback
-
-    return lst
+        return lst
