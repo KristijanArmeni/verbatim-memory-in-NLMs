@@ -46,12 +46,15 @@ if argins.which == "pilot":
 
     df = pd.read_csv("subtlex_us_pos.txt", sep="\t")
 
+    # we sample words at the top of the frequency distribution
     wfmax = df.SUBTLWF.quantile(1)
     wfmin = df.SUBTLWF.quantile(0.975)
 
+    # select nouns and apply the lower bound criterion
     sel = (df.Dom_PoS_SUBTLEX == "Noun") & (df.SUBTLWF >= wfmin)
     nouns = df.loc[sel, "Word"]
 
+    # sample randomly from the list of nouns
     random.seed(123, 2)
     wlist = np.asarray(random.sample(nouns.tolist(), 30))
 
@@ -121,5 +124,6 @@ for list_size in word_lists.keys():
     for k, l in enumerate(outlist):
         out.append(l)
 
+# now save the lists to .json files
 with open(argins.output_filename, "w") as f:
     json.dump(out, f)

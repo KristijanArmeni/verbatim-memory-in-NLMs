@@ -1,9 +1,9 @@
 """
-next_word_prediction.py is used to run the open ended text generation experiment
+generate.py is used to run the open ended text generation experiment
 
 Example usage:
 
-%run ./next_word_prediction.py --do_sample "1" \
+%run ./generate.py --do_sample "1" \
                                --num_beams "4" \
                                --temp "1" \
                                --top_p "0.95" \
@@ -29,7 +29,7 @@ import datetime
 text_generation = True
 
 # collect input arguments
-parser = argparse.ArgumentParser(description="next_word_prediction.py")
+parser = argparse.ArgumentParser(description="generate.py")
 
 parser.add_argument("--do_sample", type=int,
                     help="int, '0' or '1', converted to boolean and passed as the value of <do_sample>"

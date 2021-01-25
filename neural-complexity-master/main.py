@@ -556,11 +556,10 @@ def test_evaluate(test_sentences, data_source, markers):
                 rows_for_csv.append([value for value in row])
 
         output_file = open(os.path.join(args.output_dir, args.csvfname), "w", newline="")
-        writer = csv.writer(output_file)
-        writer.writerow([str(colname) for colname in block_output[0]._fields])
+        writer = csv.writer(output_file, delimiter="\t")
+        writer.writerow([str(colname) for colname in all_trials_output[0][0]._fields])
         writer.writerows(rows_for_csv)
         output_file.close()
-
 
     if args.view_layer >= 0:
         return total_loss / nwords

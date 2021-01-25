@@ -5,7 +5,6 @@ import torch
 from torch.nn import functional as F
 from tqdm import trange
 from typing import Dict, List
-import pandas as pd
 import numpy as np
 
 # setup the model
