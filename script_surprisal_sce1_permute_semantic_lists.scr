@@ -1,0 +1,18 @@
+#!/bin/bash
+#SBATCH --job-name=script_surprisal_sce1_permute_semantic_lists
+#SBATCH --time=48:0:0
+#SBATCH --partition=shared
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=5
+#SBATCH --mail-type=end
+#SBATCH --mail-user=karmeni1@jhu.edu
+#SBATCH --output=script_surprisal_sce1_permute_semantic_lists.log
+#SBATCH --error=script_surprisal_sce1_permute_semantic_lists.err
+
+
+ml anaconda
+
+conda activate ~/code/conda_envs/core_env
+
+python surprisal.py --condition sce1 --scenario permute --input_filename ./data/semantic_lists.json --output_path ./output --output_file surprisal_sce1_permute_semantic_lists.csv
+
