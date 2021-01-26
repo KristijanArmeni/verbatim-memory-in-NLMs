@@ -340,7 +340,7 @@ class SentenceCorpus(object):
 
     def read_marker_file(self, path):
 
-        markers = [[], []] # tuple, first place for prompt label, 1 for token markers
+        markers = [[], [], []] # tuple, first place for prompt label, 1 for token markers
 
         # read markers.txt line by line and store the contents to markers
         with open(path, 'r') as file_handle:
@@ -348,8 +348,10 @@ class SentenceCorpus(object):
                 # read the line containing marker values and prompt labels
                 # and make it a list (e.g [0, 0, 0, 0, 1, 1, 1, 1])
                 a, b = fchunk.split("\t")
+                tmp = [int(el) for el in b.strip("[]\n").split(",")]
                 markers[0].append(a)
-                markers[1].append([int(el) for el in b.strip("[]\n").split(",")])
+                markers[1].append(sum([e for e in tmp if e == 1])/2)
+                markers[2].append(tmp)
 
         return markers
 
