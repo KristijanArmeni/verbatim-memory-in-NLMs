@@ -28,7 +28,7 @@ for condition in ["repeat", "permute"]:
                   "--data_dir ./data " \
                   "--testfname {} " \
                   "--csvfname {} " \
-                  "--markersfname {}" \
+                  "--markersfname {} " \
                   "--output_dir ./output " \
                   "--lowercase --test --words" \
                   .format(model_file, test_input_file, outname, markers_fname)
