@@ -6,7 +6,7 @@ master_bash = open('run_gpt2_surprisal_scripts.sh', 'w')
 
 for scenario in ["sce1"]:
     for condition in ["repeat", "permute"]:
-        for list_type in ["random_lists.json", "semantic_lists.json"]:
+        for list_type in ["random_lists.json", "categorized_lists.json"]:
 
             outname = "surprisal_gpt2_{}_{}_{}.csv".format(scenario, condition,
                                                       list_type.split(".")[0])
