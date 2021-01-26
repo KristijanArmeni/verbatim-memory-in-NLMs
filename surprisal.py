@@ -49,7 +49,7 @@ base, extension = os.path.splitext(argins.output_filename)
 outpath = os.path.join(savedir, "".join([base, "_", argins.condition, extension]))
 
 print("condition == {}".format(argins.condition))
-print("scenario == {}".format(argins.condition))
+print("scenario == {}".format(argins.scenario))
 
 device = torch.device(argins.device if torch.cuda.is_available() else "cpu")  # declare device and paths
 
@@ -76,9 +76,9 @@ else:
 # call the wrapper function
 # this one loops over prefixes and over prompts
 output_list = s.run_perplexity(prefixes=prefixes,
-                             prompts={key: prompts[argins.scenario][key] for key in ["7"]},
-                             word_list1=word_list1,
-                             word_list2=word_list2)
+                               prompts=prompts[argins.scenario],
+                               word_list1=word_list1,
+                               word_list2=word_list2)
 
 # ===== FORMAT AND SAVE OUTPUT ===== #
 
