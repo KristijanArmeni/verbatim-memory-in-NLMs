@@ -5,7 +5,7 @@ prefixes = {
 }
 
 # define the prompts
-prompts ={
+prompts = {
 
     "sce1": {"1": "After the meeting, Mary read the list again:",
 
