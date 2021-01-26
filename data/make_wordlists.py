@@ -11,24 +11,20 @@ ipython %run make_wordlists.py --which "toronto" \
 import pandas as pd
 import random
 import numpy as np
-import sys
 import json
 import argparse
 
-# uncomment this to debug
-# which = ""
-# permute = ""
-# outputname = ""
+# input arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("--which", dtype=str,
-                    help="string, one of 'random' or 'categorized', specifies which stimulus set to build")
+parser.add_argument("--which", dtype=str, choices=["random", "categorized"],
+                    help="specifies which stimulus set to build")
 parser.add_argument("--output_filename", dtype=str)
 
 argins = parser.parse_args()
 
 
 # define w convenience function
-def sample_words(word_list: list, sample_size: int, ignore='OOV') -> list:
+def sample_words(word_list: list, sample_size: int) -> list:
     """
     sample_words(word_list, sample_size) splits <word_list> in to subsets
     of length <sample_size>
@@ -40,6 +36,7 @@ def sample_words(word_list: list, sample_size: int, ignore='OOV') -> list:
         samples.append(word_list[x:(x + sample_size)])
     return samples
 
+
 # read rnn vocab
 with open('./neural-complexity-master/vocab.txt', 'r', encoding='utf-8') as f:
     lines = f.readlines()
@@ -47,39 +44,14 @@ with open('./neural-complexity-master/vocab.txt', 'r', encoding='utf-8') as f:
 
 vocab = [line.strip("\n") for line in lines]
 
-word_lists = None
-
-
 # filtering function used downstream in filter()
 def notoov(element):
     return element != 'oov'
 
-# ===== PILOT DATA ===== #
-if argins.which == "pilot":
+word_lists = None
 
-    df = pd.read_csv("subtlex_us_pos.txt", sep="\t")
-
-    # we sample words at the top of the frequency distribution
-    wfmax = df.SUBTLWF.quantile(1)
-    wfmin = df.SUBTLWF.quantile(0.975)
-
-    # select nouns and apply the lower bound criterion
-    sel = (df.Dom_PoS_SUBTLEX == "Noun") & (df.SUBTLWF >= wfmin)
-    nouns = df.loc[sel, "Word"]
-
-    # sample randomly from the list of nouns
-    random.seed(123, 2)
-    wlist = np.asarray(random.sample(nouns.tolist(), 30))
-
-    # generate set indices
-    sets = np.repeat(np.arange(1, 4), 10)
-
-    # save it
-    out = pd.DataFrame(np.vstack((sets, wlist)).T, columns=["set", "token"])
-    out.to_csv("./data/stimuli_random.txt", index=False)
-
-    # ===== MAKE WORD PREDICTION STIMULI ===== #
-elif argins.which == "random":
+# ===== MAKE WORD PREDICTION STIMULI ===== #
+if argins.which == "random":
 
     # load in the toronto pool and rename columns to avoid blank spaces
     df = pd.read_csv("./data/toronto_freq.txt", sep="\t", header=0). \
