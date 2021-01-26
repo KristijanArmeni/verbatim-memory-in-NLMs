@@ -1,0 +1,4 @@
+sbatch script_gpt2_surprisal_sce1_repeat_random_lists.scr
+sbatch script_gpt2_surprisal_sce1_repeat_categorized_lists.scr
+sbatch script_gpt2_surprisal_sce1_permute_random_lists.scr
+sbatch script_gpt2_surprisal_sce1_permute_categorized_lists.scr
