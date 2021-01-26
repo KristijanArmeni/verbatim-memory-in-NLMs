@@ -60,7 +60,7 @@ prompts = {
                             "It was incredibly satisfying to see the joy our animal friends get when you throw them a ball.",
                             "All this diversity of people and activities made a walk in this park a truly rewarding and relaxing daily routine.",
                             "In fact, Sarah and Ryan were thinking of getting a dog.",
-                            "They haven not fully decided yet but they really wanted to spend more time outdoors",
+                            "They have not fully decided yet but they really wanted to spend more time outdoors",
                             "Mary liked dogs as well, but she was more of a cat person herself.",
                             "She and her husband had two cats.",
                             "One was two and the other four years old.",
