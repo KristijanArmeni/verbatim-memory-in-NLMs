@@ -16,9 +16,9 @@ import argparse
 
 # input arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("--which", dtype=str, choices=["random", "categorized"],
+parser.add_argument("--which", type=str, choices=["random", "categorized"],
                     help="specifies which stimulus set to build")
-parser.add_argument("--output_filename", dtype=str)
+parser.add_argument("--output_filename", type=str)
 
 argins = parser.parse_args()
 
@@ -54,6 +54,7 @@ word_lists = None
 if argins.which == "random":
 
     # load in the toronto pool and rename columns to avoid blank spaces
+    print("Reading {} ...".format("./data/toronto_freq.txt"))
     df = pd.read_csv("./data/toronto_freq.txt", sep="\t", header=0). \
           rename(columns={"k-f freq": "k_f_freq"})
 
@@ -128,4 +129,5 @@ for list_size in word_lists.keys():
 
 # now save the lists to .json files
 with open(argins.output_filename, "w") as f:
+    print("Writing {}".format(argins.output_filename))
     json.dump(out, f)
