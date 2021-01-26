@@ -23,13 +23,13 @@ for condition in ["repeat", "permute"]:
 
         # create command string
         command = "python neural-complexity-master/main.py " \
-                  "--model_file {} " \
+                  "--model_file ./rnn_models/{} " \
                   "--vocab_file ./neural-complexity-master/vocab.txt " \
                   "--data_dir ./data " \
-                  "--testfname {}" \
-                  "--csvfname {}" \
-                  "--markers_fname {}" \
-                  "--output_dir ./output" \
+                  "--testfname {} " \
+                  "--csvfname {} " \
+                  "--markersfname {}" \
+                  "--output_dir ./output " \
                   "--lowercase --test --words" \
                   .format(model_file, test_input_file, outname, markers_fname)
 
