@@ -471,8 +471,8 @@ def test_evaluate(test_sentences, data_source, markers):
             sent = test_sentences[i]
 
         if markers is not None:
-            assert len(data_source) == len(markers)     # check the number of trials
-            assert len(sent.split()) == len(markers[i]) # check the number of tokens
+            assert len(data_source) == len(markers[2])     # check the number of trials
+            assert len(sent.split()) == len(markers[2][i]) # check the number of tokens
             mark = markers[i]
 
         hidden = model.init_hidden(1) # number of parallel sentences being processed
