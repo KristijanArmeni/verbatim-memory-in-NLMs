@@ -1,5 +1,4 @@
 
-from transformers import pipeline
 from transformers import AutoModelForCausalLM, AutoTokenizer, top_k_top_p_filtering
 import torch
 from torch.nn import functional as F
@@ -87,7 +86,7 @@ class Sampler(object):
         print("Done")
         return ppl, llh, id
 
-    def run_perplexity(self, prefixes: Dict, prompts: Dict, word_list1: List, word_list2: List, sampler) -> List:
+    def run_perplexity(self, prefixes: Dict, prompts: Dict, word_list1: List, word_list2: List) -> List:
         """
         experiment.run() will loop over prefixes, prompts, and word_lists and run the Sampler on them
         It returns a list of tuples.
@@ -110,12 +109,6 @@ class Sampler(object):
                 # loop over trials
                 for i in range(len(word_list1)):
 
-                    # construct the input string
-                    # input_string = prefixes[prefix_key] + " " + \
-                    #               word_lists[i] + " " + \
-                    #               prompts[prompt] + " " + \
-                    #               word_lists[i]
-
                     # tokenize strings separately to be able to construct IDs for prefix, word lists etc.
                     i1 = self.tokenizer.encode(prefixes[prefix_key], return_tensors="pt")  # prefix IDs, add space
                     i2 = self.tokenizer.encode(word_list1[i], return_tensors="pt")               # word list IDs
@@ -135,9 +128,6 @@ class Sampler(object):
                         tmp2 = np.arange(ids.shape[1])                 # create token position index
                         trials.append(tmp)
                         positions.append(tmp2)
-
-                    # old way: tokenize the whole string
-                    # input_ids2 = sampler.tokenizer.encode(input_string, return_tensors="pt")
 
                     print("counter: {}/{}".format(count, total))
 

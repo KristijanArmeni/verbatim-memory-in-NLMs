@@ -21,7 +21,7 @@ import argparse
 sys.path.append(os.path.join(os.getcwd(), 'data'))
 from experiment import model, tokenizer, Sampler
 from stimuli import prefixes, prompts
-
+import torch
 
 # ===== INITIATIONS ===== #
 # collect input arguments
@@ -31,6 +31,8 @@ parser.add_argument("--scenario", type=str, choices=["sce1", "sce2"],
                     help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
 parser.add_argument("--condition", type=str,
                     help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
+parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
+                    help="whether to run on cpu or cuda")
 parser.add_argument("--input_filename", type=str,
                     help="str, the name of the .json file containing word lists")
 parser.add_argument("--output_dir", type=str,
@@ -39,15 +41,6 @@ parser.add_argument("--output_filename", type=str,
                     help="str, the name of the output file saving the dataframe")
 
 argins = parser.parse_args()
-
-#condition = sys.argv[1]   # can be one of: "repeat", "permute"
-#input_filename = sys.argv[2]    # the .json file to be read in
-#outname = sys.argv[3]  # the name of the output data frame
-
-# uncomment this for debugging
-#condition = "permute"
-#fname = "./data/semantic_lists.json"
-#outname = "perplexity_semantic.csv"
 
 # construct output file name and check that it exists
 savedir = os.path.join(".", argins.output_dir)
@@ -58,8 +51,10 @@ outpath = os.path.join(savedir, "".join([base, "_", argins.condition, extension]
 print("condition == {}".format(argins.condition))
 print("scenario == {}".format(argins.condition))
 
+device = torch.device(argins.device if torch.cuda.is_available() else "cpu")  # declare device and paths
+
 # initiate the sampler class from experiment.py module
-s = Sampler(model=model, tokenizer=tokenizer)
+s = Sampler(model=model, tokenizer=tokenizer, device=device)
 
 # ===== DATASET ===== #
 # load the word lists in .json files
@@ -80,11 +75,10 @@ else:
 
 # call the wrapper function
 # this one loops over prefixes and over prompts
-output_list = run_perplexity(prefixes=prefixes,
+output_list = s.run_perplexity(prefixes=prefixes,
                              prompts={key: prompts[argins.scenario][key] for key in ["7"]},
                              word_list1=word_list1,
-                             word_list2=word_list2,
-                             sampler=s)
+                             word_list2=word_list2)
 
 # ===== FORMAT AND SAVE OUTPUT ===== #
 
