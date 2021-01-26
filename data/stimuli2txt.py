@@ -18,6 +18,7 @@ markersoutname = args.json_filename.replace(".json", "_markers.txt")
 trials = {
     "string": [],
     "markers": [],
+    "prompt_len": []
 }
 
 with open(fname) as f:
@@ -57,11 +58,18 @@ for prefix_key in prefixes.keys():
 
             trials["string"].append(string)
             trials["markers"].append(str(labels_flattened))
+            trials['prompt_len'].append(prompt)
 
-for fname, values in zip((outname, markersoutname), (trials["string"], trials["markers"])):
-    # write the strings to output file name
-    print("Writing {}".format(fname))
-    outfile = open(fname, "w")
-    strings=map(lambda x:x+'\n', values)  # write newline characters
-    outfile.writelines(strings)
-    outfile.close()
+# write the strings to output file name
+print("Writing {}".format(outname))
+outfile = open(outname, "w")
+strings=map(lambda x:x+'\n', trials["string"])  # write newline characters
+outfile.writelines(strings)
+outfile.close()
+
+# write the strings to output file name
+print("Writing {}".format(markersoutname))
+outfile = open(markersoutname, "w")
+strings = map(lambda x, y:y+'\t'+x+'\n', trials["markers"], trials["prompt_len"])  # write newline characters
+outfile.writelines(strings)
+outfile.close()

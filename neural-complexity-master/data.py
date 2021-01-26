@@ -338,17 +338,18 @@ class SentenceCorpus(object):
                                 token += 1
         return ids
 
-
     def read_marker_file(self, path):
 
-        markers = []
+        markers = [[], []] # tuple, first place for prompt label, 1 for token markers
 
         # read markers.txt line by line and store the contents to markers
         with open(path, 'r') as file_handle:
             for fchunk in file_handle:
-                # read the line containing marker values,
+                # read the line containing marker values and prompt labels
                 # and make it a list (e.g [0, 0, 0, 0, 1, 1, 1, 1])
-                markers.append([int(el) for el in fchunk.strip("[]\n").split(",")])
+                a, b = fchunk.split("\t")
+                markers[0].append(a)
+                markers[1].append([int(el) for el in b.strip("[]\n").split(",")])
 
         return markers
 

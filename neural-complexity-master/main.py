@@ -341,7 +341,7 @@ def get_complexity(state, obs, sentid, markers):
         guessscores = apply(get_guessscores, state)
 
     LMout = namedtuple(typename='LMout',
-                       field_names=["word", "sentid", "corpuspos", "marker", "wlen", "surp", "hs", "dHs"])
+                       field_names=["word", "sentid", "corpuspos", "marker", "prompt_len", "wlen", "surp", "hs", "dHs"])
 
     # variable that is returned
     output_list = []
@@ -380,9 +380,10 @@ def get_complexity(state, obs, sentid, markers):
                                   str(float(surp)), str(float(Hs[corpuspos])),
                                   str(max(0, float(Hs[max(corpuspos-1, 0)])-float(Hs[corpuspos])))]))
 
-        output_list.append(LMout(word=str(word), sentid=sentid, corpuspos=corpuspos, marker=markers[sentid][corpuspos],
-                            wlen=len(word), surp=float(surp), hs=float(Hs[corpuspos]),
-                            dHs=float(Hs[max(corpuspos-1, 0)])-float(Hs[corpuspos])))
+        output_list.append(LMout(word=str(word), sentid=sentid, corpuspos=corpuspos,
+                                 marker=markers[1][sentid][corpuspos], prompt_len=markers[0][sentid],
+                                 wlen=len(word), surp=float(surp), hs=float(Hs[corpuspos]),
+                                 dHs=float(Hs[max(corpuspos-1, 0)])-float(Hs[corpuspos])))
 
     return output_list
 
