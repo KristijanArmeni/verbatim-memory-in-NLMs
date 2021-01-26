@@ -19,7 +19,7 @@ import argparse
 
 # own modules
 sys.path.append(os.path.join(os.getcwd(), 'data'))
-from experiment import model, tokenizer, Sampler, run_perplexity
+from experiment import model, tokenizer, Sampler
 from stimuli import prefixes, prompts
 
 
