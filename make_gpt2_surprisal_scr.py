@@ -15,7 +15,7 @@ for scenario in ["sce1"]:
             command = "python surprisal.py --condition {} --scenario {} " \
                       "--input_filename ./data/{} " \
                       "--output_path ./output --output_file {}"\
-                      .format(scenario, condition, list_type, outname)
+                      .format(condition, scenario, list_type, outname)
 
             scr_filename = "script_gpt2_surprisal_{}_{}_{}".format(scenario, condition,
                                                             list_type.split(".")[0])
