@@ -13,5 +13,5 @@
 ml anaconda
 conda activate ~/code/conda_envs/core_env
 
-python surprisal.py --condition repeat --scenario sce1 --input_filename ./data/categorized_lists.json --output_path ./output --output_file surprisal_gpt2_sce1_repeat_categorized_lists.csv
+python surprisal.py --condition repeat --scenario sce1 --input_filename ./data/categorized_lists.json --output_dir ./output --output_file surprisal_gpt2_sce1_repeat_categorized_lists.csv
 
