@@ -1,12 +1,13 @@
 
 
-from stimuli import prompts_perplexity, prefixes
+from stimuli import prompts, prefixes
 import json
 import argparse
 from nltk import word_tokenize
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--json_filename", type=str)
+parser.add_argument("--scenario", choices=["sce1"], type=str)
 
 args = parser.parse_args()
 
@@ -25,16 +26,19 @@ with open(fname) as f:
 
 input_lists = [", ".join(l) + "." for l in stim]
 
+# select dict with correct prompts
+prompts = prompts[args.scenario]
+
 strings = []
 for prefix_key in prefixes.keys():
-    for prompt in prompts_perplexity.keys():
+    for prompt in prompts.keys():
         for l in input_lists:
 
             # tokenize each string separately, then make strings again
             # and concatenate the strings together
             s1 = word_tokenize(prefixes[prefix_key])
             s2 = word_tokenize(l)
-            s3 = word_tokenize(prompts_perplexity[prompt])
+            s3 = word_tokenize(prompts[prompt])
             s4 = word_tokenize(l)
 
             # create coding for parts of trials
