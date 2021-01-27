@@ -4,16 +4,24 @@ from stimuli import prompts, prefixes
 import json
 import argparse
 from nltk import word_tokenize
+import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--json_filename", type=str)
 parser.add_argument("--scenario", choices=["sce1"], type=str)
+parser.add_argument("--permute", action="store_true")
 
 args = parser.parse_args()
 
 fname = args.json_filename
-outname = args.json_filename.replace(".json", ".txt")
-markersoutname = args.json_filename.replace(".json", "_markers.txt")
+
+if args.permute:
+    suffix = "permute"
+else:
+    suffix = "repeat"
+
+outname = args.json_filename.replace(".json", "_{}.txt".format(suffix))
+markersoutname = args.json_filename.replace(".json", "_{}_markers.txt".format(suffix))
 
 trials = {
     "string": [],
@@ -33,14 +41,21 @@ prompts = prompts[args.scenario]
 strings = []
 for prefix_key in prefixes.keys():
     for prompt in prompts.keys():
-        for l in input_lists:
+        for j, l in enumerate(input_lists):
+
+            l2 = None
+            if args.permute:
+                tmp = np.random.RandomState((543 + j) * 5).permutation(stim[j]).tolist()
+                l2 = ", ".join(tmp) + "."
+            else:
+                l2 = l
 
             # tokenize each string separately, then make strings again
             # and concatenate the strings together
             s1 = word_tokenize(prefixes[prefix_key])
             s2 = word_tokenize(l)
             s3 = word_tokenize(prompts[prompt])
-            s4 = word_tokenize(l)
+            s4 = word_tokenize(l2)
 
             # create coding for parts of trials
             labels = [[i]*len(tokens) for i, tokens in enumerate((s1, s2, s3, s4))]

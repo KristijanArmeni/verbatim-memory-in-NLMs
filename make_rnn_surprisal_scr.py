@@ -7,10 +7,9 @@ master_bash = open('run_rnn_surprisal_scripts.sh', 'w')
 scenario = "sce1"
 
 for condition in ["repeat", "permute"]:
-    for test_input_file in ["random_lists.txt", "categorized_lists.txt"]:
+    for list_type in ["random", "categorized"]:
 
-        outname = "surprisal_rnn_{}_{}_{}.csv".format(scenario, condition,
-                                                  test_input_file.split("_")[0])
+        outname = "surprisal_rnn_{}_{}_{}.csv".format(scenario, condition, list_type)
 
         nhidden=2     # number of hidden layers
         hiddendim=400 # dimensionality of hidden layer
@@ -19,6 +18,7 @@ for condition in ["repeat", "permute"]:
         model_file = "LSTM_{}_{}m_a_10-d0.2.pt".format(hiddendim, textgb)
 
         # create filename with markers
+        test_input_file = "{}_lists_{}.txt".format(list_type, condition)
         markers_fname = test_input_file.replace(".txt", "_markers.txt")
 
         # create command string
@@ -33,8 +33,7 @@ for condition in ["repeat", "permute"]:
                   "--lowercase --test --words" \
                   .format(model_file, test_input_file, outname, markers_fname)
 
-        scr_filename = "script_rnn_surprisal_{}_{}_{}".format(scenario, condition,
-                                                              test_input_file.split(".")[0])
+        scr_filename = "script_rnn_surprisal_{}_{}_{}_lists".format(scenario, condition, list_type)
         f = open(scr_filename + '.scr', 'w')
 
         f.write("#!/bin/bash\n")
