@@ -44,7 +44,7 @@ argins = parser.parse_args()
 
 # construct output file name and check that it exists
 savedir = os.path.join(".", argins.output_dir)
-assert os.path.isdir(savedir)               # check that the folder exists
+assert os.path.isdir(savedir)                                 # check that the folder exists
 base, extension = os.path.splitext(argins.output_filename)
 outpath = os.path.join(savedir, "".join([base, "_", argins.condition, extension]))
 
@@ -77,8 +77,8 @@ else:
 # this one loops over prefixes and over prompts
 output_list = s.run_perplexity(prefixes=prefixes,
                                prompts=prompts[argins.scenario],
-                               word_list1=word_list1,
-                               word_list2=word_list2)
+                               word_list1=word_list1[0:1],
+                               word_list2=word_list2[0:1])
 
 # ===== FORMAT AND SAVE OUTPUT ===== #
 
@@ -90,12 +90,12 @@ counter = 1  # counter for trials
 for k, tup in enumerate(output_list):
 
     # convert the last two elements of the tuple to an array
-    dftmp = pd.DataFrame(np.asarray(tup[1:5]).T,
-                         columns=["ppl", "token", "trialID", "positionID"])
+    dftmp = pd.DataFrame(np.asarray([tup.token, tup.trialID, tup.positionID, tup.surp]).T,
+                         columns=["token", "trialID", "positionID", "surp"])
 
-    dftmp["ispunct"] = dftmp.token.isin([".", ":", ","])  # create punctuation info column
-    dftmp['prefix'] = tup[-2]                             # add a column of prefix labels
-    dftmp['prompt'] = tup[-1]                             # add a column of prompt labels
+    dftmp["ispunct"] = dftmp.token.isin([".", ":", ","])     # create punctuation info column
+    dftmp['prefix'] = tup.prefix                             # add a column of prefix labels
+    dftmp['prompt'] = tup.prompt                             # add a column of prompt labels
     dftmp['stimID'] = counter
     dftmp['second_list'] = argins.condition                      # log condition of the second list
 

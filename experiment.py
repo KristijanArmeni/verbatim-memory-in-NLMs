@@ -5,6 +5,7 @@ from torch.nn import functional as F
 from tqdm import trange
 from typing import Dict, List
 import numpy as np
+from collections import namedtuple
 
 # setup the model
 tokenizer = AutoTokenizer.from_pretrained('gpt2')
@@ -95,6 +96,11 @@ class Sampler(object):
         lst = []
         count = 1
 
+        # store output in named tuple for more controle
+        Output = namedtuple(typename="Output",
+                            field_names=["ppl", "surp", "token", "trialID", "positionID", "list_len",
+                                         "prefix", "prompt"])
+
         # quick check that the lengths match
         assert len(word_list1) == len(word_list2)
 
@@ -104,7 +110,7 @@ class Sampler(object):
         for prefix_key in prefixes.keys():
 
             # loop over prompts
-            for prompt in prompts.keys():
+            for prompt in ["1"]:
 
                 # loop over trials
                 for i in range(len(word_list1)):
@@ -136,11 +142,12 @@ class Sampler(object):
                                        device=self.device)
 
                     # store the output tuple and
-                    lst.append((a, b, c,                             # perplexity output
-                                np.concatenate(trials).tolist(),     # trial structure
-                                np.concatenate(positions).tolist(),  # position index
-                                prefix_key,
-                                prompt))
+                    lst.append(Output(ppl=a, surp=b, token=c,                        # perplexity output
+                                      trialID=np.concatenate(trials).tolist(),       # trial structure
+                                      positionID=np.concatenate(positions).tolist(), # position index
+                                      list_len=len([e.strip().replace(".", "") for e in word_list1[i].split(",")]),
+                                      prefix=prefix_key,
+                                      prompt=prompt))
 
                     count += 1  # increase counter for feedback
 
