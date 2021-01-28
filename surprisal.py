@@ -96,6 +96,7 @@ for k, tup in enumerate(output_list):
     dftmp["ispunct"] = dftmp.token.isin([".", ":", ","])     # create punctuation info column
     dftmp['prefix'] = tup.prefix                             # add a column of prefix labels
     dftmp['prompt'] = tup.prompt                             # add a column of prompt labels
+    dftmp["list_len"] = tup.list_len                         # add list length
     dftmp['stimID'] = counter
     dftmp['second_list'] = argins.condition                      # log condition of the second list
 
