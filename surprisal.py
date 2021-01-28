@@ -75,7 +75,7 @@ else:
 
 # call the wrapper function
 # this one loops over prefixes and over prompts
-output_list = s.run_perplexity(prefixes=prefixes,
+output_list = s.run_perplexity(prefixes=prefixes[argins.scenario],
                                prompts=prompts[argins.scenario],
                                word_list1=word_list1,
                                word_list2=word_list2)
