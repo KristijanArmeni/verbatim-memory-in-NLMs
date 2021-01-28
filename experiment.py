@@ -110,7 +110,7 @@ class Sampler(object):
         for prefix_key in prefixes.keys():
 
             # loop over prompts
-            for prompt in prompts.keys():
+            for prompt_key in prompts.keys():
 
                 # loop over trials
                 for i in range(len(word_list1)):
@@ -118,7 +118,7 @@ class Sampler(object):
                     # tokenize strings separately to be able to construct IDs for prefix, word lists etc.
                     i1 = self.tokenizer.encode(prefixes[prefix_key], return_tensors="pt")  # prefix IDs, add space
                     i2 = self.tokenizer.encode(word_list1[i], return_tensors="pt")               # word list IDs
-                    i3 = self.tokenizer.encode(prompts[prompt], return_tensors="pt")             # prompt IDs
+                    i3 = self.tokenizer.encode(prompts[prompt_key], return_tensors="pt")             # prompt IDs
                     i4 = self.tokenizer.encode(word_list2[i], return_tensors="pt")
 
                     # compose the input ids tensors
