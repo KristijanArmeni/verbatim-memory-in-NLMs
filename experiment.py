@@ -147,7 +147,7 @@ class Sampler(object):
                                       positionID=np.concatenate(positions).tolist(),     # position index
                                       list_len=len([e.strip().replace(".", "") for e in word_list1[i].split(",")]),
                                       prefix=prefix_key,
-                                      prompt=prompt))
+                                      prompt=prompt_key))
 
                     count += 1  # increase counter for feedback
 
