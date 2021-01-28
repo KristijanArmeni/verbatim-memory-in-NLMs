@@ -77,8 +77,8 @@ else:
 # this one loops over prefixes and over prompts
 output_list = s.run_perplexity(prefixes=prefixes,
                                prompts=prompts[argins.scenario],
-                               word_list1=word_list1[0:1],
-                               word_list2=word_list2[0:1])
+                               word_list1=word_list1,
+                               word_list2=word_list2)
 
 # ===== FORMAT AND SAVE OUTPUT ===== #
 

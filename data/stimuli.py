@@ -1,7 +1,7 @@
 
 # define prefixes
 prefixes = {
-    "sce1": "Before the meeting, Mary wrote down the following list of words:",
+    "sce1": {"1": "Before the meeting, Mary wrote down the following list of words:"},
 }
 
 # define the prompts

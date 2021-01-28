@@ -142,9 +142,9 @@ class Sampler(object):
                                        device=self.device)
 
                     # store the output tuple and
-                    lst.append(Output(ppl=a, surp=b, token=c,                        # perplexity output
-                                      trialID=np.concatenate(trials).tolist(),       # trial structure
-                                      positionID=np.concatenate(positions).tolist(), # position index
+                    lst.append(Output(ppl=a, surp=b, token=c,                            # perplexity output
+                                      trialID=np.concatenate(trials).tolist(),           # trial structure
+                                      positionID=np.concatenate(positions).tolist(),     # position index
                                       list_len=len([e.strip().replace(".", "") for e in word_list1[i].split(",")]),
                                       prefix=prefix_key,
                                       prompt=prompt))
