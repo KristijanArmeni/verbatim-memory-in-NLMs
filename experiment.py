@@ -110,7 +110,7 @@ class Sampler(object):
         for prefix_key in prefixes.keys():
 
             # loop over prompts
-            for prompt in ["1"]:
+            for prompt in prompts.keys():
 
                 # loop over trials
                 for i in range(len(word_list1)):
