@@ -42,11 +42,10 @@ parser.add_argument("--output_filename", type=str,
 
 argins = parser.parse_args()
 
-# construct output file name and check that it exists
+# construct output file name and check that it existst
 savedir = os.path.join(".", argins.output_dir)
 assert os.path.isdir(savedir)                                 # check that the folder exists
-base, extension = os.path.splitext(argins.output_filename)
-outpath = os.path.join(savedir, "".join([base, "_", argins.condition, extension]))
+outpath = os.path.join(savedir, argins.output_filename)
 
 print("condition == {}".format(argins.condition))
 print("scenario == {}".format(argins.scenario))

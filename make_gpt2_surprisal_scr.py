@@ -6,7 +6,7 @@ master_bash = open('run_gpt2_surprisal_scripts.sh', 'w')
 
 for scenario in ["sce1"]:
     for condition in ["repeat", "permute"]:
-        for list_type in ["random_lists.json", "categorized_lists.json"]:
+        for list_type in ["random", "categorized"]:
 
             outname = "surprisal_gpt2_{}_{}_{}.csv".format(scenario, condition,
                                                       list_type.split(".")[0])
@@ -15,7 +15,7 @@ for scenario in ["sce1"]:
             command = "python surprisal.py --condition {} --scenario {} " \
                       "--input_filename ./data/{} " \
                       "--output_dir ./output --output_file {}"\
-                      .format(condition, scenario, list_type, outname)
+                      .format(condition, scenario, "{}_lists.json".format(list_type), outname)
 
             scr_filename = "script_gpt2_surprisal_{}_{}_{}".format(scenario, condition,
                                                             list_type.split(".")[0])
@@ -34,8 +34,8 @@ for scenario in ["sce1"]:
 
             f.write("ml anaconda\n")
 
-            f.write("conda activate ~/code/conda_envs/core_env\n\n") # load environment with pytorch 1.6
-            f.write(command + "\n\n")  # write the python command to be executed
+            f.write("conda activate ~/code/conda_envs/core_env\n\n")    # load environment with pytorch 1.6
+            f.write(command + "\n\n")                                   # write the python command to be executed
             f.close()
 
             master_bash.write("sbatch " + scr_filename + ".scr\n")
