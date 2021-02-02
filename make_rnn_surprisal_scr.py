@@ -33,7 +33,7 @@ for condition in ["repeat", "permute", "control"]:
                   "--lowercase --test --words" \
                   .format(model_file, test_input_file, outname, markers_fname)
 
-        scr_filename = "script_rnn_surprisal_{}_{}_{}_lists".format(scenario, condition, list_type)
+        scr_filename = "script_rnn_surprisal_{}_{}_{}".format(scenario, condition, list_type)
         f = open(scr_filename + '.scr', 'w')
 
         f.write("#!/bin/bash\n")
