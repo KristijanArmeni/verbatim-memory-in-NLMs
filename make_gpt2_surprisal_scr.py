@@ -5,11 +5,11 @@ script for construcing bash commands to be send as jubs to MARCC cluster
 master_bash = open('run_gpt2_surprisal_scripts.sh', 'w')
 
 for scenario in ["sce1"]:
-    for condition in ["repeat", "permute"]:
+    for condition in ["repeat", "permute", "control"]:
         for list_type in ["random", "categorized"]:
 
             outname = "surprisal_gpt2_{}_{}_{}.csv".format(scenario, condition,
-                                                      list_type.split(".")[0])
+                                                      list_type)
 
             # create command string
             command = "python surprisal.py --condition {} --scenario {} " \
@@ -18,7 +18,7 @@ for scenario in ["sce1"]:
                       .format(condition, scenario, "{}_lists.json".format(list_type), outname)
 
             scr_filename = "script_gpt2_surprisal_{}_{}_{}".format(scenario, condition,
-                                                            list_type.split(".")[0])
+                                                            list_type)
             f = open(scr_filename + '.scr', 'w')
 
             f.write("#!/bin/bash\n")

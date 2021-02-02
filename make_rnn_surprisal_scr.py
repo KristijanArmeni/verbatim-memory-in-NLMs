@@ -6,7 +6,7 @@ master_bash = open('run_rnn_surprisal_scripts.sh', 'w')
 
 scenario = "sce1"
 
-for condition in ["repeat", "permute"]:
+for condition in ["repeat", "permute", "control"]:
     for list_type in ["random", "categorized"]:
 
         outname = "surprisal_rnn_{}_{}_{}.csv".format(scenario, condition, list_type)
