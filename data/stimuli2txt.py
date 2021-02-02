@@ -8,15 +8,15 @@ import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--json_filename", type=str)
-parser.add_argument("--scenario", choices=["sce1"], type=str)
+parser.add_argument("--scenario", choices=["sce1", "rpt"], type=str)
 parser.add_argument("--condition", choices=["repeat", "permute", "control"], type=str)
 
 args = parser.parse_args()
 
 fname = args.json_filename
 
-outname = args.json_filename.replace(".json", "_{}.txt".format(args.condition))
-markersoutname = args.json_filename.replace(".json", "_{}_markers.txt".format(args.condition))
+outname = args.json_filename.replace(".json", "_{}_{}.txt".format(args.scenario, args.condition))
+markersoutname = args.json_filename.replace(".json", "_{}_{}_markers.txt".format(args.scenario, args.condition))
 
 trials = {
     "string": [],
