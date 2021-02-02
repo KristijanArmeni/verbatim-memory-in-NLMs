@@ -9,19 +9,14 @@ import numpy as np
 parser = argparse.ArgumentParser()
 parser.add_argument("--json_filename", type=str)
 parser.add_argument("--scenario", choices=["sce1"], type=str)
-parser.add_argument("--permute", action="store_true")
+parser.add_argument("--condition", choices=["repeat", "permute", "control"], type=str)
 
 args = parser.parse_args()
 
 fname = args.json_filename
 
-if args.permute:
-    suffix = "permute"
-else:
-    suffix = "repeat"
-
-outname = args.json_filename.replace(".json", "_{}.txt".format(suffix))
-markersoutname = args.json_filename.replace(".json", "_{}_markers.txt".format(suffix))
+outname = args.json_filename.replace(".json", "_{}.txt".format(args.condition))
+markersoutname = args.json_filename.replace(".json", "_{}_markers.txt".format(args.condition))
 
 trials = {
     "string": [],
@@ -33,10 +28,22 @@ with open(fname) as f:
     print("Loading {}".format(fname))
     stim = json.load(f)
 
+stim_reversed = None
+if args.condition == "control":
+
+    print("Creating reverse control condition...")
+    print("Assuming input list can be evenly split into 3 lists each of len(list)==20!")
+    len3 = stim[0:20]
+    len5 = stim[20:40]
+    len10 = stim[40::]
+    stim_reversed = [l for lst in (len3, len5, len10)
+                       for l in reversed(lst)]
+
 input_lists = [", ".join(l) + "." for l in stim]
 
-# select dict with correct prompts
+# select dict with correct prompts and prefixes
 prompts = prompts[args.scenario]
+prefixes = prefixes[args.scenario]
 
 strings = []
 for prefix_key in prefixes.keys():
@@ -44,9 +51,11 @@ for prefix_key in prefixes.keys():
         for j, l in enumerate(input_lists):
 
             l2 = None
-            if args.permute:
+            if args.condition == "permute":
                 tmp = np.random.RandomState((543 + j) * 5).permutation(stim[j]).tolist()
                 l2 = ", ".join(tmp) + "."
+            elif args.condition == "control":
+                l2 = ", ".join(stim_reversed[j]) + "."
             else:
                 l2 = l
 

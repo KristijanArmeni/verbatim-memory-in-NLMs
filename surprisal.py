@@ -65,10 +65,30 @@ with open(argins.input_filename) as f:
 # add space at the string onset
 word_list1 = [" " + ", ".join(l) + "." for l in stim]
 if argins.condition == "permute":
+
+    # This condition test for the effect of word order
+    # Lists have the same words, but the word order is permuted
+    # int the second one
+
     word_list2 = [" " + ", ".join(np.random.RandomState((543+j)*5).permutation(stim[j]).tolist()) + "."
                   for j in range(len(stim))]
+
+elif argins.condition == "control":
+
+    # This serves as a control conditions
+    # Here list length is the only common factor between two lists
+
+    print("Creating reverse control condition...")
+    print("Assuming input list can be evenly split into 3 lists each of len(list)==20!")
+    len3 = stim[0:20]
+    len5 = stim[20:40]
+    len10 = stim[40::]
+    word_list2 = [" " + ", ".join(l) + "." for lst in (len3, len5, len10)
+                              for l in reversed(lst)]
+
 else:
     word_list2 = word_list1
+
 
 # ===== COMPUTE PERPLEXITY ===== #
 
