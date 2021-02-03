@@ -1,0 +1,21 @@
+name: core_env
+dependencies:
+  - python=3.7
+  - matplotlib
+  - scipy
+  - numpy
+  - scikit-learn
+  - nltk=3.4.4
+  - plotly
+  - seaborn
+  - jupyterlab
+  - pytorch::pytorch=1.6=*cuda9.2*
+  - transformers=4.2.2
+  - spyder
+  - nb_conda_kernels
+  - au-eoed::gnu-parallel
+  - h5py
+  - pip
+  - pip:
+    - sphinx
+
