@@ -2,23 +2,38 @@
 script for construcing bash commands to be send as jubs to MARCC cluster
 """
 
-master_bash = open('run_surprisal_scripts.sh', 'w')
+master_bash = open('run_generate_scripts.sh', 'w')
 
 for scenario in ["sce1"]:
-    for condition in ["repeat", "permute"]:
-        for list_type in ["toronto.json", "semantic_lists.json"]:
+    for strategy in ["beam", "sample"]:
+        for list_type in ["random", "categorized"]:
 
-            outname = "surprisal_{}_{}_{}.csv".format(scenario, condition,
+            num_beams, do_sample = None, None
+            if strategy == "beam":
+                num_beams = "--num_beams 4"
+                do_sample = ""
+            elif strategy == "sample":
+                num_beams = ""  #
+                do_sample = "--do_sample "
+
+            outname = "surprisal_{}_{}_{}.csv".format(scenario, strategy,
                                                       list_type.split(".")[0])
 
-            # create command string
-            command = "python surprisal.py --condition {} --scenario {} " \
-                      "--input_filename ./data/{} " \
-                      "--output_path ./output --output_file {}"\
-                      .format(scenario, condition, list_type, outname)
+            list_filename = "{}_lists.json".format(list_type)
 
-            scr_filename = "script_surprisal_{}_{}_{}".format(scenario, condition,
-                                                            list_type.split(".")[0])
+            # create command string
+            command = "python generate.py --scenario {} " \
+                      "--input_list ./data/{} " \
+                      "--savename {} " \ 
+                      "{} " \
+                      "--min_tokens 10" \
+                      "--max_tokens 25" \
+                      "--num_beams {}" \
+                      "--top_p 0.9 " \
+                      "--top_k 100 " \
+                      "--output_path ./output".format(scenario, list_filename, outname, do_sample, num_beams)
+
+            scr_filename = "script_gpt2_generate_{}_{}_{}".format(scenario, strategy, list_type)
             f = open(scr_filename + '.scr', 'w')
 
             f.write("#!/bin/bash\n")

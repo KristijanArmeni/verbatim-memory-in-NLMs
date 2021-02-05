@@ -336,17 +336,26 @@ def get_complexity(state, obs, sentid, markers):
     Hs = torch.log2(torch.exp(torch.squeeze(apply(get_entropy, state))))
     surps = torch.log2(torch.exp(apply(get_surps, state)))
 
+    keys2 = []
+    outputguesskeys = []
+
     if args.guess:
         guesses = apply(get_guesses, state)
         guessscores = apply(get_guessscores, state)
 
-    LMout = namedtuple(typename='LMout',
-                       field_names=["word", "sentid", "corpuspos", "marker", "prompt_len", "list_len", "wlen", "surp", "hs", "dHs"])
+        # construct keys for output
+        keys2 = ["guess{}".format(j) for j in range(args.guessn)]
+        outputguesskeys = ["guesscore{}".format(jj) for jj in range(args.guessn)]
+
+    keys1 = ["word", "sentid", "corpuspos", "marker", "prompt_len", "list_len", "wlen", "surp", "hs", "dHs"]
 
     # variable that is returned
     output_list = []
 
     for corpuspos, targ in enumerate(obs):
+
+        # declare the dict
+        LMout = {key: None for key in keys1 + keys2 + outputguesskeys}
 
         word = corpus.dictionary.idx2word[int(targ)]
         if word == '<eos>':
@@ -370,20 +379,34 @@ def get_complexity(state, obs, sentid, markers):
                     # ideally it'd normalize to probs before getting the N-best
                     outputguesses.append("{:.3f}".format(
                         math.exp(float(nn.functional.log_softmax(guessscores[corpuspos], dim=0)[guess_ix]))))
-            outputguesses = args.csep.join(outputguesses)
+
             print(args.csep.join([str(word), str(sentid), str(corpuspos), str(len(word)),
                                   str(float(surp)), str(float(Hs[corpuspos])),
                                   str(max(0, float(Hs[max(corpuspos-1, 0)])-float(Hs[corpuspos]))),
-                                  str(outputguesses)]))
+                                  str(args.csep.join(outputguesses))]))
         else:
             print(args.csep.join([str(word), str(sentid), str(corpuspos), str(len(word)),
                                   str(float(surp)), str(float(Hs[corpuspos])),
                                   str(max(0, float(Hs[max(corpuspos-1, 0)])-float(Hs[corpuspos])))]))
 
-        output_list.append(LMout(word=str(word), sentid=sentid, corpuspos=corpuspos,
-                                 marker=markers[2][sentid][corpuspos], prompt_len=markers[0][sentid], list_len=markers[1][sentid],
-                                 wlen=len(word), surp=float(surp), hs=float(Hs[corpuspos]),
-                                 dHs=float(Hs[max(corpuspos-1, 0)])-float(Hs[corpuspos])))
+        # Populate output dict
+        new_key_value_pairs = [("word", word), ("sentid", sentid), ("corpuspos", corpuspos),
+                               ("marker", markers[2][sentid][corpuspos]), ("prompt_len", markers[0][sentid]),
+                               ("list_len", int(markers[1][sentid])), ("wlen", len(word)), ("surp", float(surp)),
+                               ("hs", float(Hs[corpuspos])), ("dHs", float(Hs[max(corpuspos-1, 0)])-float(Hs[corpuspos]))]
+
+            # additionally populate
+        guesstuples, guessscoretuples = None, None
+        if args.guess:
+            guesstuples = [(key, outputguesses[0::2][h]) for h, key in enumerate(keys2)]
+        if args.guessscores:
+            guessscoretuples = [(key, float(outputguesses[1::2][hh])) for hh, key in enumerate(outputguesskeys)]
+
+        # update dict fields
+        for key, value in (new_key_value_pairs + guesstuples + guessscoretuples):
+            LMout[key] = value
+
+        output_list.append(LMout)
 
     return output_list
 
@@ -552,12 +575,12 @@ def test_evaluate(test_sentences, data_source, markers):
         # make a list of strings
         rows_for_csv = []
         for block in all_trials_output:
-            for row in block:
-                rows_for_csv.append([value for value in row])
+            for rowdict in block:
+                rows_for_csv.append([value for value in rowdict.values()])
 
         output_file = open(os.path.join(args.output_dir, args.csvfname), "w", newline="")
         writer = csv.writer(output_file, delimiter="\t")
-        writer.writerow([str(colname) for colname in all_trials_output[0][0]._fields])
+        writer.writerow([str(colname) for colname in all_trials_output[0][0].keys()])
         writer.writerows(rows_for_csv)
         output_file.close()
 

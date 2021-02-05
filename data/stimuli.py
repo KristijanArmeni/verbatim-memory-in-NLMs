@@ -2,6 +2,7 @@
 # define prefixes
 prefixes = {
     "sce1": {"1": "Before the meeting, Mary wrote down the following list of words:"},
+    "rpt": {"1": "Before the meeting, Mary wrote down the following list list of words:"}
 }
 
 # define the prompts
@@ -73,6 +74,13 @@ prompts = {
                             "When she got back, she read the list again:"])
     },
 
-    "sce2": {}
+    "sce2": {},
+
+    "rpt":  {"1": " ".join(["After the meeting, she went for a walk.",
+                            "It was a sunny day. It was warm outside.",
+                            "A sunny day sunny day sunny day sunny day.",
+                            "There were no clouds and the sky was blue,",
+                            "A warm sunny day a warm sunny day a warm sunny day,",
+                            "A sunny day, sunny day, sunny day, sunny day."])}
 
 }
