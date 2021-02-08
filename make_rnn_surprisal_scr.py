@@ -54,8 +54,8 @@ for scenario in ["sce1", "sce1rnd"]:
             f.write(command + "\n\n")  # write the python command to be executed
             f.close()
 
-        print("Writing {}".format(scr_filename))
-        master_bash.write("sbatch " + scr_filename + ".scr\n")
+            print("Writing {}".format(scr_filename))
+            master_bash.write("sbatch " + scr_filename + ".scr\n")
 
 master_bash.close()
 
