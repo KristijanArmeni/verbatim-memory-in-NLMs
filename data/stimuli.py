@@ -7,6 +7,7 @@ rng = np.random.RandomState(12345)
 # define prefixes
 prefixes = {
     "sce1": {"1": "Before the meeting, Mary wrote down the following list of words:"},
+    "sce1rnd": {"1": "Before the meeting, Mary wrote down the following list of words:"},
     "rpt": {"1": "Before the meeting, Mary wrote down the following list list of words:"}
 }
 
@@ -115,7 +116,7 @@ rpt = {
 }
 
 prompts = {
-"sce1": sce1,
-"sce1rnd": sce1rnd,
-"rpt": rpt
+    "sce1": sce1,
+    "sce1rnd": sce1rnd,
+    "rpt": rpt
 }

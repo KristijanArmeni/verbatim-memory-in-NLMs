@@ -8,7 +8,7 @@ import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--json_filename", type=str)
-parser.add_argument("--scenario", choices=["sce1", "rpt"], type=str)
+parser.add_argument("--scenario", choices=["sce1", "sce1rnd", "rpt"], type=str)
 parser.add_argument("--condition", choices=["repeat", "permute", "control"], type=str)
 
 args = parser.parse_args()
@@ -87,7 +87,7 @@ for prefix_key in prefixes.keys():
 # write the strings to output file name
 print("Writing {}".format(outname))
 outfile = open(outname, "w")
-strings=map(lambda x:x+'\n', trials["string"])  # write newline characters
+strings = map(lambda x:x+'\n', trials["string"])  # write newline characters
 outfile.writelines(strings)
 outfile.close()
 
