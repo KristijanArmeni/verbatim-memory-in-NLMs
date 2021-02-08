@@ -1,3 +1,8 @@
+import numpy as np
+from nltk import word_tokenize
+
+# set random seed
+rng = np.random.RandomState(12345)
 
 # define prefixes
 prefixes = {
@@ -6,9 +11,7 @@ prefixes = {
 }
 
 # define the prompts
-prompts = {
-
-    "sce1": {"1": "After the meeting, Mary read the list again:",
+sce1 = {"1": "After the meeting, Mary read the list again:",
 
              "2": " ".join(["After the meeting, Mary went for a walk. It was a busy day and she needed a break.",
                             "Outside was really beautiful and warm and the flowers in the park were blooming.",
@@ -72,15 +75,47 @@ prompts = {
                             "Mary said she had time over the weekend.",
                             "After they said goodbye, Mary started walking towards home.",
                             "When she got back, she read the list again:"])
-    },
+    }
 
-    "sce2": {},
+# create randomized version of sce1 by permuting prompts on a word level
+sce1rnd = {
+            "1": " ".join(rng.permutation(word_tokenize(sce1["1"])).tolist())
+                    .replace(" :", ":")
+                    .replace(" ,", ",")
+                    .replace(" .", "."),
 
-    "rpt":  {"1": " ".join(["After the meeting, she went for a walk.",
+            "2": " ".join(rng.permutation(word_tokenize(sce1["2"])).tolist())
+                    .replace(" :", ":")
+                    .replace(" ,", ",")
+                    .replace(" .", "."),
+
+            "3": " ".join(rng.permutation(word_tokenize(sce1["3"])).tolist())
+                    .replace(" :", ":")
+                    .replace(" ,", ",")
+                    .replace(" .", "."),
+
+            "4": " ".join(rng.permutation(word_tokenize(sce1["4"])).tolist())
+                    .replace(" :", ":")
+                    .replace(" ,", ",")
+                    .replace(" .", "."),
+
+            "5": " ".join(rng.permutation(word_tokenize(sce1["5"])).tolist())
+                    .replace(" :", ":")
+                    .replace(" ,", ",")
+                    .replace(" .", "."),
+}
+
+rpt = {
+    "1": " ".join(["After the meeting, she went for a walk.",
                             "It was a sunny day. It was warm outside.",
                             "A sunny day sunny day sunny day sunny day.",
                             "There were no clouds and the sky was blue,",
-                            "A warm sunny day a warm sunny day a warm sunny day,",
-                            "A sunny day, sunny day, sunny day, sunny day."])}
+                            "a warm sunny day, a warm sunny day, a warm sunny day,",
+                            "a sunny day, sunny day, sunny day, sunny day."])
+}
 
+prompts = {
+"sce1": sce1,
+"sce1rnd": sce1rnd,
+"rpt": rpt
 }

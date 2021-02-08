@@ -396,7 +396,7 @@ def get_complexity(state, obs, sentid, markers):
                                ("hs", float(Hs[corpuspos])), ("dHs", float(Hs[max(corpuspos-1, 0)])-float(Hs[corpuspos]))]
 
             # additionally populate
-        guesstuples, guessscoretuples = None, None
+        guesstuples, guessscoretuples = [], []
         if args.guess:
             guesstuples = [(key, outputguesses[0::2][h]) for h, key in enumerate(keys2)]
         if args.guessscores:
