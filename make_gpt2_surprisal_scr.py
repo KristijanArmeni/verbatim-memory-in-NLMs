@@ -4,7 +4,7 @@ script for construcing bash commands to be send as jubs to MARCC cluster
 
 master_bash = open('run_gpt2_surprisal_scripts.sh', 'w')
 
-for scenario in ["sce1"]:
+for scenario in ["sce1", "sce1rnd"]:
     for condition in ["repeat", "permute", "control"]:
         for list_type in ["random", "categorized"]:
 
@@ -38,6 +38,7 @@ for scenario in ["sce1"]:
             f.write(command + "\n\n")                                   # write the python command to be executed
             f.close()
 
+            print("Writing {}".format(scr_filename))
             master_bash.write("sbatch " + scr_filename + ".scr\n")
 
 master_bash.close()
