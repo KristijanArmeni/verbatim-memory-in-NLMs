@@ -1,4 +1,0 @@
-sbatch script_surprisal_sce1_repeat_toronto.scr
-sbatch script_surprisal_sce1_repeat_semantic_lists.scr
-sbatch script_surprisal_sce1_permute_toronto.scr
-sbatch script_surprisal_sce1_permute_semantic_lists.scr
