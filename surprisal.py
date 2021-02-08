@@ -27,7 +27,7 @@ import torch
 # collect input arguments
 parser = argparse.ArgumentParser(description="surprisal.py runs perplexity experiment")
 
-parser.add_argument("--scenario", type=str, choices=["sce1", "sce2"],
+parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd"],
                     help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
 parser.add_argument("--condition", type=str,
                     help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
