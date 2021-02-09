@@ -13,5 +13,5 @@
 ml anaconda
 conda activate ~/code/conda_envs/lmpytorch1.3
 
-python neural-complexity-master/main.py --model_file ./rnn_models/LSTM_400_40m_a_10-d0.2.pt --vocab_file ./neural-complexity-master/vocab.txt --data_dir ./data --testfname random_lists_permute.txt --csvfname surprisal_rnn_sce1rnd_permute_random.csv --markersfname random_lists_permute_markers.txt --output_dir ./output --lowercase --test --words
+python neural-complexity-master/main.py --model_file ./rnn_models/LSTM_400_40m_a_10-d0.2.pt --vocab_file ./neural-complexity-master/vocab.txt --data_dir ./data --testfname random_lists_sce1rnd_permute.txt --csvfname surprisal_rnn_sce1rnd_permute_random.csv --markersfname random_lists_sce1rnd_permute_markers.txt --output_dir ./output --lowercase --test --words
 
