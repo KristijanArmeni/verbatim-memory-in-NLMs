@@ -12,13 +12,16 @@ tokenizer = AutoTokenizer.from_pretrained('gpt2')
 model = AutoModelForCausalLM.from_pretrained('gpt2')
 
 
-class Sampler(object):
-
-    def __init__(self, model, tokenizer, device):
+class Exp(object):
+    """
+    Exp() class contains wrapper methods to run experiments with transformer models.
+    """
+    def __init__(self, model, tokenizer, device, config):
 
         self.model = model
         self.tokenizer = tokenizer
         self.device = device
+        self.context_len = config["context_len"]
 
         self.model.to(device)
 
@@ -53,9 +56,13 @@ class Sampler(object):
 
     # loop over input list
     def ppl(self, input_ids, context_len, stride, device):
+        """
+        method for computing token-by-token negative log likelihood on input_ids
+        taken from: https://huggingface.co/transformers/perplexity.html
+        """
 
-        llh = []
-        id = []
+        llh = []  # variable storing token-by-token neg ll
+        id = []   # variable storing token strings to have along with -ll in the output
 
         for i in trange(0, input_ids.size(1), stride, desc="Computing perplexity: "):
 
@@ -115,7 +122,7 @@ class Sampler(object):
                 # loop over trials
                 for i in range(len(word_list1)):
 
-                    # tokenize strings separately to be able to construct IDs for prefix, word lists etc.
+                    # tokenize strings separately to be able to construct markers for prefix, word lists etc.
                     i1 = self.tokenizer.encode(prefixes[prefix_key], return_tensors="pt")  # prefix IDs, add space
                     i2 = self.tokenizer.encode(word_list1[i], return_tensors="pt")               # word list IDs
                     i3 = self.tokenizer.encode(prompts[prompt_key], return_tensors="pt")             # prompt IDs
@@ -138,7 +145,7 @@ class Sampler(object):
                     print("counter: {}/{}".format(count, total))
 
                     # this returns surprisal (neg log ll)
-                    a, b, c = self.ppl(input_ids=input_ids.to(self.device), context_len=1024, stride=1,
+                    a, b, c = self.ppl(input_ids=input_ids.to(self.device), context_len=self.context_len, stride=1,
                                        device=self.device)
 
                     # store the output tuple and
