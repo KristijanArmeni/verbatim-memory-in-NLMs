@@ -55,7 +55,8 @@ print("scenario == {}".format(argins.scenario))
 device = torch.device(argins.device if torch.cuda.is_available() else "cpu")  # declare device and paths
 
 # initiate the sampler class from experiment.py module
-exp = Exp(model=model, tokenizer=tokenizer, device=device)
+exp = Exp(model=model, tokenizer=tokenizer, device=device,
+          config={"context_len": 1024})
 
 # ===== DATASET ===== #
 # load the word lists in .json files
