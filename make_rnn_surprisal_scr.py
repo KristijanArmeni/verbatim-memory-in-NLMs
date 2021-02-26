@@ -19,11 +19,7 @@ for scenario in ["sce1", "sce2", "sce1rnd"]:
             model_file = "LSTM_{}_{}m_a_10-d0.2.pt".format(hiddendim, textgb)
 
             # create filename with markers
-            # TEMP: sce1 was not included in filename strings, for now solve this with if then sorting
-            if scenario in ["sce1rnd", "sce2"]:
-                test_input_file = "{}_lists_{}_{}.txt".format(list_type, scenario, condition)
-            elif scenario == "sce1":
-                test_input_file = "{}_lists_{}.txt".format(list_type, condition)
+            test_input_file = "{}_lists_{}_{}.txt".format(list_type, scenario, condition)
 
             markers_fname = test_input_file.replace(".txt", "_markers.txt")
 

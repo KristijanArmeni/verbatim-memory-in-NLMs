@@ -19,7 +19,13 @@ files_gpt = [
     "surprisal_gpt2_sce1_control_categorized.csv",
     "surprisal_gpt2_sce1_permute_random.csv",
     "surprisal_gpt2_sce1_repeat_random.csv",
-    "surprisal_gpt2_sce1_control_random.csv"
+    "surprisal_gpt2_sce1_control_random.csv",
+    "surprisal_gpt2_sce2_permute_categorized.csv",
+    "surprisal_gpt2_sce2_repeat_categorized.csv",
+    "surprisal_gpt2_sce2_control_categorized.csv",
+    "surprisal_gpt2_sce2_permute_random.csv",
+    "surprisal_gpt2_sce2_repeat_random.csv",
+    "surprisal_gpt2_sce2_control_random.csv"
 ]
 
 files_rnn = [
@@ -35,6 +41,12 @@ files_rnn = [
     "surprisal_rnn_sce1rnd_repeat_random.csv",
     "surprisal_rnn_sce1rnd_control_categorized.csv",
     "surprisal_rnn_sce1rnd_control_random.csv",
+    "surprisal_rnn_sce2_permute_categorized.csv",
+    "surprisal_rnn_sce2_repeat_categorized.csv",
+    "surprisal_rnn_sce2_permute_random.csv",
+    "surprisal_rnn_sce2_repeat_random.csv",
+    "surprisal_rnn_sce2_control_categorized.csv",
+    "surprisal_rnn_sce2_control_random.csv",
 ]
 
 
@@ -129,6 +141,7 @@ rnn.prompt_len = rnn.prompt_len.map(prompt_len_map)
 scenario_map = {
     "sce1": "intact",
     "sce1rnd": "scrambled",
+    "sce2": "incongruent",
 }
 
 gpt.scenario = gpt.scenario.map(scenario_map)
