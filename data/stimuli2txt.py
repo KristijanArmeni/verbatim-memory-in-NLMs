@@ -8,7 +8,7 @@ import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--json_filename", type=str)
-parser.add_argument("--scenario", choices=["sce1", "sce1rnd", "rpt"], type=str)
+parser.add_argument("--scenario", choices=["sce1", "sce1rnd", "sce2", "rpt"], type=str)
 parser.add_argument("--condition", choices=["repeat", "permute", "control"], type=str)
 
 args = parser.parse_args()

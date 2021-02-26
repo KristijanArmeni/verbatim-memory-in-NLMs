@@ -4,7 +4,7 @@ script for construcing bash commands to be send as jubs to MARCC cluster
 
 master_bash = open('run_gpt2_surprisal_scripts.sh', 'w')
 
-for scenario in ["sce1", "sce1rnd"]:
+for scenario in ["sce1", "sce1rnd", "sce2"]:
     for condition in ["repeat", "permute", "control"]:
         for list_type in ["random", "categorized"]:
 

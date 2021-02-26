@@ -6,7 +6,7 @@ master_bash = open('run_rnn_surprisal_scripts.sh', 'w')
 
 scenario = "sce1"
 
-for scenario in ["sce1", "sce1rnd"]:
+for scenario in ["sce1", "sce2", "sce1rnd"]:
     for condition in ["repeat", "permute", "control"]:
         for list_type in ["random", "categorized"]:
 
@@ -20,7 +20,7 @@ for scenario in ["sce1", "sce1rnd"]:
 
             # create filename with markers
             # TEMP: sce1 was not included in filename strings, for now solve this with if then sorting
-            if scenario == "sce1rnd":
+            if scenario in ["sce1rnd", "sce2"]:
                 test_input_file = "{}_lists_{}_{}.txt".format(list_type, scenario, condition)
             elif scenario == "sce1":
                 test_input_file = "{}_lists_{}.txt".format(list_type, condition)

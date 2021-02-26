@@ -19,7 +19,7 @@ import argparse
 
 # own modules
 sys.path.append(os.path.join(os.getcwd(), 'data'))
-from experiment import model, tokenizer, Sampler
+from experiment import model, tokenizer, Exp
 from stimuli import prefixes, prompts
 import torch
 
@@ -27,10 +27,12 @@ import torch
 # collect input arguments
 parser = argparse.ArgumentParser(description="surprisal.py runs perplexity experiment")
 
-parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd"],
-                    help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
+parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2"],
+                    help="str, which scenario to use")
 parser.add_argument("--condition", type=str,
                     help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
+parser.add_argument("--context_len", type=int, default=1024,
+                    help="length of context window in tokens for transformers")
 parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
                     help="whether to run on cpu or cuda")
 parser.add_argument("--input_filename", type=str,
@@ -53,7 +55,7 @@ print("scenario == {}".format(argins.scenario))
 device = torch.device(argins.device if torch.cuda.is_available() else "cpu")  # declare device and paths
 
 # initiate the sampler class from experiment.py module
-s = Sampler(model=model, tokenizer=tokenizer, device=device)
+exp = Exp(model=model, tokenizer=tokenizer, device=device)
 
 # ===== DATASET ===== #
 # load the word lists in .json files
@@ -92,12 +94,16 @@ else:
 
 # ===== COMPUTE PERPLEXITY ===== #
 
+# set mlflow business
+#mlflow.set_experiment(experiment_name="surprisal")
+
+#with mlflow.start_run():
 # call the wrapper function
 # this one loops over prefixes and over prompts
-output_list = s.run_perplexity(prefixes=prefixes[argins.scenario],
-                               prompts=prompts[argins.scenario],
-                               word_list1=word_list1,
-                               word_list2=word_list2)
+output_list = exp.run_perplexity(prefixes=prefixes[argins.scenario],
+                                 prompts=prompts[argins.scenario],
+                                 word_list1=word_list1,
+                                 word_list2=word_list2)
 
 # ===== FORMAT AND SAVE OUTPUT ===== #
 
