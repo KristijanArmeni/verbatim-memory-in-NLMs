@@ -16,7 +16,7 @@ import argparse
 
 # input arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("--which", type=str, choices=["random", "categorized"],
+parser.add_argument("--which", type=str, choices=["random", "categorized", "ngrams-random"],
                     help="specifies which stimulus set to build")
 parser.add_argument("--output_filename", type=str)
 
@@ -109,6 +109,37 @@ elif argins.which == "categorized":
                   "list-5": [l[3:8] for l in toks[0:20]],
                   "list-10": [l[8:18] for l in toks[0:20]]}
 
+if argins.which == "ngrams-random":
+
+    # load in the toronto pool and rename columns to avoid blank spaces
+    print("Reading {} ...".format("./data/toronto_freq.txt"))
+    df = pd.read_csv("./data/toronto_freq.txt", sep="\t", header=0). \
+        rename(columns={"k-f freq": "k_f_freq"})
+
+    # filter possible oovs
+    df['in_vocab'] = df['word'].str.lower().isin(vocab)  # determine whether a token is in vocabulary
+    to_drop = df.loc[~df.in_vocab].index
+    df.drop(to_drop, inplace=True)
+
+    lists = [df.word.str.lower().to_numpy(),
+             df.concreteness.to_numpy(),
+             df.k_f_freq.to_numpy()]
+
+    # utility function to keep same seed over several calls
+    shuffle_ids = np.random.RandomState(123). \
+        permutation(np.arange(0, lists[0].size))
+
+
+    word_lists_tmp = {"list-3": [sample_words(lists[i][shuffle_ids][0:60], 3) for i in range(len(lists))],
+                      "list-5": [sample_words(lists[i][shuffle_ids][60:160], 5) for i in range(len(lists))],
+                      "list-10": [sample_words(lists[i][shuffle_ids][160:360], 10) for i in range(len(lists))],
+                    }
+
+    word_lists = {"2-gram": [np.tile(l[0:2], reps=5) for l in word_lists_tmp["list-3"][0]],
+                  "3-gram": [np.tile(l[0:3], reps=5) for l in word_lists_tmp["list-5"][0]],
+                  "5-gram": [np.tile(l[0:5], reps=5) for l in word_lists_tmp["list-10"][0]],
+                  }
+
 out = []
 outlist = None
 for list_size in word_lists.keys():
@@ -123,6 +154,10 @@ for list_size in word_lists.keys():
     elif argins.which == "random":
         # here make sure to select strings, then convert numpy array to lists
         outlist = [lst.tolist() for lst in word_lists[list_size][0]]
+
+    elif argins.which == "ngrams-random":
+        # here make sure to select strings, then convert numpy array to lists
+        outlist = [lst.tolist() for lst in word_lists[list_size]]
 
     for k, l in enumerate(outlist):
         out.append(l)
