@@ -1,1 +1,1 @@
-sbatch script_rnn_surprisal_sce1_repeat_ngram_random.scr
+sbatch script_rnn_surprisal_sce1_repeat_ngram-random.scr
