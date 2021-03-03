@@ -6,7 +6,7 @@ master_bash = open('run_rnn_surprisal_ngramex_scripts.sh', 'w')
 
 for scenario in ["sce1"]:
     for condition in ["repeat"]:
-        for list_type in ["ngram_random"]:
+        for list_type in ["ngram-random"]:
 
             outname = "surprisal_rnn_{}_{}_{}.csv".format(scenario, condition, list_type)
 
