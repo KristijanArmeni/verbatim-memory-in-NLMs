@@ -1,0 +1,1 @@
+sbatch script_gpt2_surprisal_sce1_repeat_ngram-random.scr
