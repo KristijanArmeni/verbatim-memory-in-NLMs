@@ -54,6 +54,15 @@ class Exp(object):
 
         return token_prob, token_ids
 
+    def uniform_att(self, model):
+
+        # access transformer blocks
+        for block in self.model.transformer.h:
+
+            Q, K, V = block.attn.c_attn.weight
+
+        return model
+
     # loop over input list
     def ppl(self, input_ids, context_len, stride, device):
         """
@@ -78,11 +87,14 @@ class Exp(object):
             target_ids = sel_input_ids.clone()
             target_ids[:, :-trg_len] = -100  # ignore the tokens that were used for context when computing the loss
 
+            # set model to evaluation mode
+            self.model.eval()
+
             # get model output
             with torch.no_grad():
 
                # compute log likelihood
-               outputs = model(sel_input_ids, labels=target_ids)  # this returns avg log likelihood over sequence
+               outputs = self.model(sel_input_ids, labels=target_ids)  # this returns avg log likelihood over sequence
                log_likelihood = outputs[0] * trg_len  # not sure about this multiplication here (undoing averaging?)
 
                llh.append(log_likelihood.tolist())
@@ -90,7 +102,8 @@ class Exp(object):
                id.append(toks)  # store the last token (target_id)
 
         # compute perplexity, divide by the lenth of the sequence
-        ppl = torch.exp(torch.tensor(llh).sum() / end_loc)
+        # use np.nansum as token at position 0 will have -LL of nan
+        ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc)
         print("Done")
         return ppl, llh, id
 
@@ -123,10 +136,10 @@ class Exp(object):
                 for i in range(len(word_list1)):
 
                     # tokenize strings separately to be able to construct markers for prefix, word lists etc.
-                    i1 = self.tokenizer.encode(prefixes[prefix_key], return_tensors="pt")  # prefix IDs, add space
-                    i2 = self.tokenizer.encode(word_list1[i], return_tensors="pt")               # word list IDs
-                    i3 = self.tokenizer.encode(prompts[prompt_key], return_tensors="pt")             # prompt IDs
-                    i4 = self.tokenizer.encode(word_list2[i], return_tensors="pt")
+                    i1 = self.tokenizer.encode("<|endoftext|> " + prefixes[prefix_key], return_tensors="pt")   # prefix IDs, add eos token
+                    i2 = self.tokenizer.encode(word_list1[i], return_tensors="pt")                             # word list IDs
+                    i3 = self.tokenizer.encode(prompts[prompt_key], return_tensors="pt")                       # prompt IDs
+                    i4 = self.tokenizer.encode(word_list2[i] + " <|endoftext|>", return_tensors="pt")
 
                     # compose the input ids tensors
                     input_ids = torch.cat((i1, i2, i3, i4), dim=1)
