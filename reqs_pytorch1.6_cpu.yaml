@@ -1,0 +1,25 @@
+name: core_env
+channels:
+  - plotly
+  - conda-forge
+  - pytorch
+  - defaults
+  - huggingface
+dependencies:
+  - python=3.7
+  - matplotlib
+  - scipy
+  - numpy
+  - scikit-learn
+  - nltk=3.4.4
+  - plotly
+  - seaborn
+  - jupyterlab
+  - pytorch::pytorch=1.6
+  - huggingface::transformers=4.2.2
+  - nb_conda_kernels
+  - h5py
+  - pip
+  - pip:
+    - sphinx
+
