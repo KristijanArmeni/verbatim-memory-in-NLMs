@@ -25,7 +25,8 @@ files_gpt = [
     "surprisal_gpt2_sce2_control_categorized.csv",
     "surprisal_gpt2_sce2_permute_random.csv",
     "surprisal_gpt2_sce2_repeat_random.csv",
-    "surprisal_gpt2_sce2_control_random.csv"
+    "surprisal_gpt2_sce2_control_random.csv",
+    "surprisal_gpt2_sce1_repeat_ngram-random.csv",
 ]
 
 files_rnn = [
@@ -47,6 +48,7 @@ files_rnn = [
     "surprisal_rnn_sce2_repeat_random.csv",
     "surprisal_rnn_sce2_control_categorized.csv",
     "surprisal_rnn_sce2_control_random.csv",
+    "surprisal_rnn_sce1_repeat_ngram-random.csv",
 ]
 
 
