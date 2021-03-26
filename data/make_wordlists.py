@@ -72,8 +72,8 @@ if argins.which == "random":
                      permutation(np.arange(0, lists[0].size))
 
     word_lists = {"list-3": [sample_words(lists[i][shuffle_ids][0:60], 3) for i in range(len(lists))],
-                  "list-5": [sample_words(lists[i][shuffle_ids][60:160], 5) for i in range(len(lists))],
-                  "list-10": [sample_words(lists[i][shuffle_ids][160:360], 10) for i in range(len(lists))],
+                  "list-5": [sample_words(lists[i][shuffle_ids][0:100], 5) for i in range(len(lists))],
+                  "list-10": [sample_words(lists[i][shuffle_ids][0:200], 10) for i in range(len(lists))],
                   }
 
 elif argins.which == "categorized":
@@ -89,7 +89,7 @@ elif argins.which == "categorized":
 
     # count number of misses per list
     df['n_valid'] = df.groupby(['set_id']).in_vocab.transform('sum')
-    df['valid_set'] = df.n_valid > 17           # make sure there are at least 17 in vocabulary tokens
+    df['valid_set'] = df.n_valid > 15           # make sure there are at least 17 in vocabulary tokens
     df['token_oov'] = df.token                  # add column with oov strings
     df.loc[~df.in_vocab, 'token_oov'] = 'oov'   # add oov tokens
 
@@ -102,12 +102,12 @@ elif argins.which == "categorized":
     # drop oov's and then grab 20 tokens from the list
     toks = []
     for v in df.loc[df.valid_set, 'set_id'].unique():
-        toks.append(list(filter(notoov, df.loc[df.set_id == v, 'token'].to_list()))[0:20])
+        toks.append(list(filter(notoov, df.loc[df.set_id == v, 'token_oov'].to_list()))[0:20])
 
     # generate lists of length 3, 5 and 10
     word_lists = {"list-3": [l[0:3] for l in toks[0:20]],
-                  "list-5": [l[3:8] for l in toks[0:20]],
-                  "list-10": [l[8:18] for l in toks[0:20]]}
+                  "list-5": [l[0:5] for l in toks[0:20]],
+                  "list-10": [l[0:10] for l in toks[0:20]]}
 
 if argins.which == "ngrams-random":
 
@@ -131,8 +131,8 @@ if argins.which == "ngrams-random":
 
 
     word_lists_tmp = {"list-3": [sample_words(lists[i][shuffle_ids][0:60], 3) for i in range(len(lists))],
-                      "list-5": [sample_words(lists[i][shuffle_ids][60:160], 5) for i in range(len(lists))],
-                      "list-10": [sample_words(lists[i][shuffle_ids][160:360], 10) for i in range(len(lists))],
+                      "list-5": [sample_words(lists[i][shuffle_ids][0:100], 5) for i in range(len(lists))],
+                      "list-10": [sample_words(lists[i][shuffle_ids][0:200], 10) for i in range(len(lists))],
                     }
 
     word_lists = {"2-gram": [np.tile(l[0:2], reps=5) for l in word_lists_tmp["list-3"][0]],
