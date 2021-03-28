@@ -59,9 +59,16 @@ input_lists = [", ".join(l) + "." for l in stim]
 prompts = prompts[args.scenario_key]
 prefixes = prefixes[args.scenario_key]
 
+all_prefixes = prefixes.keys()
+all_prompts = prompts.keys()
+
+if "ngram" in args.json_filename:
+    all_prefixes = list(prefixes.keys())[0:1]
+    all_prompts = list(prompts.keys())[0:1]
+
 strings = []
-for prefix_key in prefixes.keys():
-    for prompt in prompts.keys():
+for prefix_key in all_prefixes:
+    for prompt in all_prompts:
         for j, l in enumerate(input_lists):
 
             l2 = None
@@ -75,17 +82,13 @@ for prefix_key in prefixes.keys():
 
             # tokenize words and then join the list back to a string with spaces
             # apparently neural-complexity-master/main.py is used with tokenized input.
-
             s1 = word_tokenize(prefixes[prefix_key])
             s2 = word_tokenize(l)
             s3 = word_tokenize(prompts[prompt])
             s4 = word_tokenize(l2)
 
             # make exception for n-gram experiment
-            if args.list_only:
-                subparts = (s1, s2)  # use only word list, no prefixes ets
-            else:
-                subparts = (s1, s2, s3, s4)
+            subparts = (s1, s2, s3, s4)
             
             # create coding for parts of trials
             labels = [[i]*len(tokens) for i, tokens in enumerate(subparts)]
@@ -93,11 +96,6 @@ for prefix_key in prefixes.keys():
             
             # construct the string
             string = " ".join([" ".join(part) for part in subparts])
-            
-            #string = " ".join(s1) + " " + \
-            #         " ".join(s2) + " " + \
-            #         " ".join(s3) + " " + \
-            #         " ".join(s4)
 
             # quick check that all matches when spliting
             assert len(string.split()) == len(labels_flattened)
