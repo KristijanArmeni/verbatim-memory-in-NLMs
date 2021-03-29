@@ -7,6 +7,7 @@ import os
 # this is git versioned repo:
 root_dir=os.path.expanduser("~/code/lm-mem")
 scripts_dir = os.path.join(root_dir, "marcc_scripts")
+log_dir = os.path.join(root_dir, 'logs')
 
 master_bash = open(os.path.join(scripts_dir, 'run_rnn_surprisal_scripts.sh'), 'w')
 
@@ -79,8 +80,8 @@ for model_id in model_ids:
                 f.write("#SBATCH --ntasks-per-node=5\n")
                 f.write("#SBATCH --mail-type=end\n")
                 f.write("#SBATCH --mail-user=karmeni1@jhu.edu\n")
-                f.write("#SBATCH --output=" + scr_filename + ".log\n")
-                f.write("#SBATCH --error=" + scr_filename + ".err\n\n\n")
+                f.write("#SBATCH --output=" + os.path.join(log_dir, scr_filename) + ".log\n")
+                f.write("#SBATCH --error=" + os.path.join(log_dir, scr_filename) + ".err\n\n\n")
     
                 f.write("ml anaconda\n")
     

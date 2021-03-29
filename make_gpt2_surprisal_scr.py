@@ -7,6 +7,7 @@ import os
 # this is git versioned repo:
 root_dir=os.path.expanduser("~/code/lm-mem")
 scripts_dir = os.path.join(root_dir, "marcc_scripts")
+log_dir = os.path.join(root_dir, 'logs')
 
 master_bash = open(os.path.join(scripts_dir, 'run_gpt2_surprisal_scripts.sh'), 'w')
 
@@ -22,12 +23,14 @@ for model_id in ["a-10"]:
                 
                 input_fname_path = os.path.join(root_dir, "data", "{}_lists.json".format(list_type))
                 output_path = os.path.join(root_dir, "output")
+                python_file = os.path.join(root_dir, "surprisal.py")
                 
                 # create command string
-                command = "python surprisal.py --condition {} --scenario {} " \
+                command = "python {} --condition {} --scenario {} " \
                           "--input_filename {} " \
                           "--output_dir {} --output_file {}"\
-                          .format(condition, 
+                          .format(python_file,
+                                  condition, 
                                   scenario, 
                                   input_fname_path, 
                                   output_path,
@@ -47,8 +50,8 @@ for model_id in ["a-10"]:
                 f.write("#SBATCH --ntasks-per-node=5\n")
                 f.write("#SBATCH --mail-type=end\n")
                 f.write("#SBATCH --mail-user=karmeni1@jhu.edu\n")
-                f.write("#SBATCH --output=" + scr_filename + ".log\n")
-                f.write("#SBATCH --error=" + scr_filename + ".err\n\n\n")
+                f.write("#SBATCH --output=" + os.path.join(log_dir, scr_filename) + ".log\n")
+                f.write("#SBATCH --error=" + os.path.join(log_dir, scr_filename) + ".err\n\n\n")
     
                 f.write("ml anaconda\n")
     
