@@ -6,7 +6,7 @@ import os
 
 # home directory on marcc compute cluster
 # this is git versioned repo:
-root_dir="~/code/lm-mem"
+root_dir=os.path.expanduser("~/code/lm-mem")
 scripts_dir = os.path.join(root_dir, "marcc_scripts")
 
 master_bash = open(os.path.join(root_dir, 'run_gpt2_surprisal_ngramex_scripts.sh', 'w'))
