@@ -11,7 +11,7 @@ scripts_dir = os.path.join(root_dir, "marcc_scripts")
 
 master_bash = open(os.path.join(root_dir, 'run_gpt2_surprisal_ngramex_scripts.sh'), 'w')
 
-for model_id in ["a-1"]:
+for model_id in ["a-10"]:
     for scenario in ["sce1"]:
         for condition in ["repeat"]:
             for list_type in ["ngram-random"]:
