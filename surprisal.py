@@ -1,6 +1,6 @@
 """
 surprisal.py is used to run the perplexity experiment with GPT-2
-it relies on the Sampler() class which is just a class with wrapper methods
+it relies on the Experiment() class which is just a class with wrapper methods
 around the Transformers library.
 
 Use as:
@@ -52,7 +52,8 @@ outpath = os.path.join(savedir, argins.output_filename)
 print("condition == {}".format(argins.condition))
 print("scenario == {}".format(argins.scenario))
 
-device = torch.device(argins.device if torch.cuda.is_available() else "cpu")  # declare device and paths
+ # declare device and paths
+device = torch.device(argins.device if torch.cuda.is_available() else "cpu") 
 
 # initiate the sampler class from experiment.py module
 exp = Exp(model=model, tokenizer=tokenizer, device=device,
@@ -96,7 +97,14 @@ else:
 # ===== COMPUTE PERPLEXITY ===== #
 
 # set mlflow business
-#mlflow.set_experiment(experiment_name="surprisal")
+# mlflow.set_experiment(experiment_name="surprisal")
+
+# if n-gram experiment modify prompt and prefix dicts, recreate them on the fly
+# to only contain a single prompt
+if "ngram" in argins.input_filename:
+    # grab only the first prefix and prompt
+    prefixes = {argins.scenario: {list(prefixes[argins.scenario].keys())[0] : list(prefixes[argins.scenario].values())[0]}}
+    prompts = {argins.scenario: {list(prompts[argins.scenario].keys())[0] : list(prompts[argins.scenario].values())[0]}}
 
 #with mlflow.start_run():
 # call the wrapper function
