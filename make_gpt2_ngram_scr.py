@@ -9,7 +9,7 @@ import os
 root_dir=os.path.expanduser("~/code/lm-mem")
 scripts_dir = os.path.join(root_dir, "marcc_scripts")
 
-master_bash = open(os.path.join(root_dir, 'run_gpt2_surprisal_ngramex_scripts.sh', 'w'))
+master_bash = open(os.path.join(root_dir, 'run_gpt2_surprisal_ngramex_scripts.sh'), 'w')
 
 for model_id in ["a-1"]:
     for scenario in ["sce1"]:
