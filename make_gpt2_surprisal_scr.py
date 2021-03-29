@@ -37,7 +37,7 @@ for model_id in ["a-1"]:
                                                                      scenario, 
                                                                      condition,
                                                                      list_type)
-                f = open(scr_filename + '.scr', 'w')
+                f = open(os.path.join(scripts_dir, scr_filename) + '.scr', 'w')
     
                 f.write("#!/bin/bash\n")
                 f.write("#SBATCH --job-name=" + scr_filename + "\n")
