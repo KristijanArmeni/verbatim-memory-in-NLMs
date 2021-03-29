@@ -6,8 +6,8 @@
 #SBATCH --ntasks-per-node=5
 #SBATCH --mail-type=end
 #SBATCH --mail-user=karmeni1@jhu.edu
-#SBATCH --output=script_surp_rnn_b-11_sce1rnd_repeat_categorized.log
-#SBATCH --error=script_surp_rnn_b-11_sce1rnd_repeat_categorized.err
+#SBATCH --output=/home-3/karmeni1@jhu.edu/code/lm-mem/logs/script_surp_rnn_b-11_sce1rnd_repeat_categorized.log
+#SBATCH --error=/home-3/karmeni1@jhu.edu/code/lm-mem/logs/script_surp_rnn_b-11_sce1rnd_repeat_categorized.err
 
 
 ml anaconda
