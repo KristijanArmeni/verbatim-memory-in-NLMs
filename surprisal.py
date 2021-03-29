@@ -18,7 +18,7 @@ import sys, os
 import argparse
 
 # own modules
-sys.path.append(os.path.join(os.getcwd(), 'data'))
+sys.path.append(os.path.join(os.environ['HOME'], 'code', 'lm-mem', 'data'))
 from experiment import model, tokenizer, Exp
 from stimuli import prefixes, prompts
 import torch
