@@ -5,7 +5,7 @@ import os
 
 # home directory on marcc compute cluster
 # this is git versioned repo:
-root_dir="~/code"
+root_dir="~/code/lm-mem"
 scripts_dir = os.path.join(root_dir, "marcc_scripts")
 
 master_bash = open(os.path.join(scripts_dir, 'run_rnn_surprisal_scripts.sh'), 'w')
@@ -19,7 +19,10 @@ for model_id in model_ids:
         for condition in ["repeat", "permute", "control"]:
             for list_type in ["random", "categorized"]:
     
-                outname = "surprisal_rnn_{}_{}_{}_{}.csv".format(model_id, scenario, condition, list_type)
+                outname = "surprisal_rnn_{}_{}_{}_{}.csv".format(model_id, 
+                                                                 scenario, 
+                                                                 condition, 
+                                                                 list_type)
                 
                 # select a pretrained model from Van Schijndel et al (10.18653/v1/D19-1592)
                 # these hyperparameters made the most significant improvement in loss
@@ -61,7 +64,10 @@ for model_id in model_ids:
                                   output_dir)
                 
                 # construct script filename, open it and write commands
-                scr_filename = "script_rnn_{}_surprisal_{}_{}_{}".format(model_id, scenario, condition, list_type)
+                scr_filename = "script_surp_rnn_{}_{}_{}_{}".format(model_id, 
+                                                                    scenario, 
+                                                                    condition, 
+                                                                    list_type)
 
                 f = open(os.path.join(scripts_dir, scr_filename) + '.scr', 'w')
     
