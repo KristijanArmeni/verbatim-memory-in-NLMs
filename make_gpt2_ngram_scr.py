@@ -17,8 +17,10 @@ for model_id in ["a-10"]:
         for condition in ["repeat"]:
             for list_type in ["ngram-random"]:
     
-                outname = "surprisal_gpt2_{}_{}_{}.csv".format(scenario, condition,
-                                                          list_type)
+                outname = "surprisal_gpt2_{}_{}_{}_{}.csv".format(model_id,
+                                                                 scenario, 
+                                                                 condition,
+                                                                 list_type)
                 
                 input_fname_path = os.path.join(root_dir, "data", "{}_lists.json".format(list_type))
                 output_path = os.path.join(root_dir, "output")
