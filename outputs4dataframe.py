@@ -2,54 +2,16 @@
 import os
 import pandas as pd
 import numpy as np
+import glob
 
-output_folder = "./output"
+
+output_folder = os.path.join(os.environ['homepath'], "project", "lm-mem", 
+                             "src", "output")
 
 # file naming syntax:
 # metric_model_scenario_condition_list-type
-files_gpt = [
-    "surprisal_gpt2_sce1rnd_permute_categorized.csv",
-    "surprisal_gpt2_sce1rnd_repeat_categorized.csv",
-    "surprisal_gpt2_sce1rnd_control_categorized.csv",
-    "surprisal_gpt2_sce1rnd_permute_random.csv",
-    "surprisal_gpt2_sce1rnd_repeat_random.csv",
-    "surprisal_gpt2_sce1rnd_control_random.csv",
-    "surprisal_gpt2_sce1_permute_categorized.csv",
-    "surprisal_gpt2_sce1_repeat_categorized.csv",
-    "surprisal_gpt2_sce1_control_categorized.csv",
-    "surprisal_gpt2_sce1_permute_random.csv",
-    "surprisal_gpt2_sce1_repeat_random.csv",
-    "surprisal_gpt2_sce1_control_random.csv",
-    "surprisal_gpt2_sce2_permute_categorized.csv",
-    "surprisal_gpt2_sce2_repeat_categorized.csv",
-    "surprisal_gpt2_sce2_control_categorized.csv",
-    "surprisal_gpt2_sce2_permute_random.csv",
-    "surprisal_gpt2_sce2_repeat_random.csv",
-    "surprisal_gpt2_sce2_control_random.csv",
-    "surprisal_gpt2_sce1_repeat_ngram-random.csv",
-]
-
-files_rnn = [
-    "surprisal_rnn_sce1_permute_categorized.csv",
-    "surprisal_rnn_sce1_repeat_categorized.csv",
-    "surprisal_rnn_sce1_permute_random.csv",
-    "surprisal_rnn_sce1_repeat_random.csv",
-    "surprisal_rnn_sce1_control_categorized.csv",
-    "surprisal_rnn_sce1_control_random.csv",
-    "surprisal_rnn_sce1rnd_permute_categorized.csv",
-    "surprisal_rnn_sce1rnd_repeat_categorized.csv",
-    "surprisal_rnn_sce1rnd_permute_random.csv",
-    "surprisal_rnn_sce1rnd_repeat_random.csv",
-    "surprisal_rnn_sce1rnd_control_categorized.csv",
-    "surprisal_rnn_sce1rnd_control_random.csv",
-    "surprisal_rnn_sce2_permute_categorized.csv",
-    "surprisal_rnn_sce2_repeat_categorized.csv",
-    "surprisal_rnn_sce2_permute_random.csv",
-    "surprisal_rnn_sce2_repeat_random.csv",
-    "surprisal_rnn_sce2_control_categorized.csv",
-    "surprisal_rnn_sce2_control_random.csv",
-    "surprisal_rnn_sce1_repeat_ngram-random.csv",
-]
+files_gpt = glob.glob(os.path.join(output_folder, "surprisal_gpt2_?-*.csv"))
+files_rnn = glob.glob(os.path.join(output_folder, "surprisal_rnn_?-*.csv"))
 
 
 def load_and_preproc_csv(output_folder, filenames):
@@ -71,10 +33,13 @@ def load_and_preproc_csv(output_folder, filenames):
         dftmp["list"] = file.split("_")[-1].split(".")[0]  # add column on list composition
         dftmp["second_list"] = file.split("_")[-2]  # store information on second list
         dftmp["scenario"] = file.split("_")[-3]
+        dftmp["model_id"] = file.split("_")[-4]
 
         # remove punctuation prior to creating token index
         # filter out punctuation
         if arc == "gpt2":
+            
+            #drop punctuation
             dftmp = dftmp.loc[~dftmp.ispunct, :]
 
             # rename some columns to avoid the need for if/else lower
@@ -158,11 +123,11 @@ rnn.rename(columns={"scenario": "context"}, inplace=True)
 gpt.drop(["Unnamed: 0"], axis=1, inplace=True)
 
 # save back to csv (waste of memory but let's stick to this for now)
-fname = os.path.join(output_folder, "output_gpt2.csv")
+fname = os.path.join(output_folder, "output_gpt2_.csv")
 print("Saving {}".format(fname))
 gpt.to_csv(fname, sep="\t")
 
-fname = os.path.join(output_folder, "output_rnn.csv")
+fname = os.path.join(output_folder, "output_rnn_.csv")
 print("Saving {}".format(fname))
 rnn.to_csv(fname, sep="\t")
 
