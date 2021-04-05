@@ -11,6 +11,7 @@ import argparse
 import os
 import time
 from datetime import timedelta
+from tqdm import tqdm
 import numpy as np
 import torch
 from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel, AdamW, get_cosine_schedule_with_warmup
@@ -203,7 +204,7 @@ class Experiment(object):
         loss = 0
         
         # loop over training samples
-        for batch_idx in list(range(0, n_batches)):
+        for batch_idx in tqdm(range(0, n_batches), desc="train set", unit="batch"):
             
             batch_loss = self.train_step(x_batch=x[:, batch_idx, :])
             loss += batch_loss.cpu().numpy()
@@ -249,7 +250,8 @@ class Experiment(object):
             loss = 0
             
             # loop over training samples
-            for batch_idx in list(range(0, n_batches)):
+            for batch_idx in tqdm(range(0, n_batches), desc="validation set:",
+                                  unit="batch"):
                 
                 x_batch = x[:, batch_idx, :]
                 
