@@ -13,20 +13,34 @@ import time
 from datetime import timedelta
 import numpy as np
 import torch
-from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel, AdamW, get_cosine_schedule_with_warmup
 
 
-
 # ============================= #
-# ===== DATASET MANAGMENT ===== #
+# ===== DATASET FUNCTIONS ===== #
 # ============================= #
 
+def load_dataset(path):
+    
+    with open(path, "r", encoding="utf-8") as file_handle:
+        
+        lines = file_handle.readlines()
+        file_handle.close()
+
+    return lines
 
 # split dataset into chunks of 1024 tokens
 def chunk(l, n, equal_len=True, bos=None, eos=None):
+    
     n = max(1, n)
-
+    
+    if (bos is not None) and (eos is not None):
+        
+        # if bos and eos need to be added adjust selected n to not exceed
+        # the allowed maximum
+        print("Adding bos and eos setting {} to {}".format(n, n-2))
+        n -= 2
+    
     if equal_len:
         total_len = (len(l)//n)*n
     else:
@@ -54,13 +68,24 @@ def batchify(x, bs):
     
     return np.reshape(a=xtmp, newshape=newshape)
 
+# wrapper for resizing
+def resize(toks, n_tokens):
+    
+    if n_tokens < len(toks):
+        
+        out = toks[0:n_tokens]
+    else:
+        raise ValueError("Cannot resize, new size larger than existing size")
+    
+    return out
+
 
 # ============================ #
 # ===== TRAINING CLASSES ===== #
 # ============================ #
 
 
-# create config dicts
+# create helper config classes
 class TrainConfig(object):
     
     def __init__(self, max_epochs, bs):
@@ -80,10 +105,8 @@ class EvalConfig(object):
 class Experiment(object):
     
     """
-    attributes:
-        
-        .x_train: batched training inputs, 
-                  shape = (batch_size, batch_id, sequence_length)
+    Main high-level class holding all necessary components for training (model, train_ds etc.)
+    and associated methods (.train(), evaluate(), .savecheckpoint() etc.)
     """
     
     def __init__(self,
@@ -108,6 +131,7 @@ class Experiment(object):
         self.log = {
             "train_loss": [],
             "eval_loss": [],
+            "test_ppl": None,
             }
         
     def start(self, do_test=False):
@@ -127,8 +151,8 @@ class Experiment(object):
             start_time = time.perf_counter()
 
             # run .train and .evaluate routines
-            train_loss = self.train(x=self.x_train, labels=self.x_train)
-            val_loss = self.evaluate(x=self.x_eval, labels=self.x_eval)
+            _ = self.train(x=self.x_train)
+            val_loss = self.evaluate(x=self.x_eval)
             
             # check if best loss is reached and save model weights if so
             early_stopping.check(epoch_id=n, 
@@ -158,12 +182,13 @@ class Experiment(object):
             
             print("Evaluating model on test set ...")
             
-            test_loss = self.evaluate(x=self.test_ds, labels=self.test_ds)
+            test_loss = self.evaluate(x=self.test_ds)
+            self.log["test_ppl": np.exp(test_loss)]
 
         
-    def train(self, x, labels):
+    def train(self, x):
         """
-        .train(x, labels, x_eval, labels_eval) calls .train_step() on all 
+        .train(input_dataset) calls .train_step() on all 
         batches in the training dataset (x).
         """            
         
@@ -171,7 +196,8 @@ class Experiment(object):
         self.model.train()
         
         # assume batch id is in second dimension
-        n_batches = x.shape[1]  # shape = (batch_size, batch_id, sequence_len)
+        # shape = (batch_size, batch_id, sequence_len)
+        n_batches = x.shape[1]  
         
         # set loss to 0 at the start of the epoch
         loss = 0
@@ -193,21 +219,24 @@ class Experiment(object):
         <labels> and returns language modeling loss for the sequence 
         (accessible in output.loss).
         """
-        # compute predictions for all tokens in a chunk
+        # compute predictions for all sequences in a batch
         output = self.model(input_ids=x_batch, labels=x_batch)
         
-        # do the backprop
+        # compute gradients
         output.loss.backward()
         
-        # weight update
+        # update weights
         self.optimizer.step()
+        
+        # change learning rate according to chosen scheduler
+        self.scheduler.step()
         
         # clear the gradients
         self.model.zero_grad()
         
         return output.loss.cpu()
         
-    def evaluate(self, x, labels):
+    def evaluate(self, x):
         
         self.model.eval()
         
@@ -230,14 +259,19 @@ class Experiment(object):
                 
                 self.log["eval_loss"].append(loss)
 
-    def save_checkpoint(self):
-         
-        full_fname = os.path.join(self.savedir, self.model_name)
+    def save_checkpoint(self, savename=None):
         
-        print("Saving checkpoint as:\n{}".format(full_fname))
+        if savename is None:
+            savename = os.path.join(self.savedir, self.model_name)
+        
+        print("Saving checkpoint as:\n{}".format(savename))
         
         torch.save(self.model.cpu().state_dict(), 
-                   full_fname)
+                   savename)
+
+    def save_configs(self, full_filename):
+        
+        pass
 
     def EarlyStopping(object):
         
@@ -266,41 +300,34 @@ class Experiment(object):
             <current_eval_loss> has not decreased in <EarlyStopping().patience>
             consecutive epochs.
             """
+                
+            # check if lowest loss was reached and log it
+            if (self.best_score is None) or (self.best_score > current_val_loss):
+                
+                self.best = current_val_loss # log current loss as best
+                self.counter = 0             # start counting again
+                self.improvement = True
+                self.save_checkpoint()
             
-            while self.counter <= self.patience:
+            # if not, increase counter and check for early stopping condition
+            elif (self.best < current_val_loss):
                 
-                # check if lowest loss was reached
-                if (self.best_score is None) or (self.best_score > current_val_loss):
+                self.counter += 1
+                self.improvement = False
+                
+                # check if there's we've reached the threshold of no improvement
+                if self.counter >= self.patience:
                     
-                    self.best=current_val_loss # log current loss as best
-                    self.counter = 0           # start counting again
-                    self.improvement = True
-                    self.save_checkpoint()
-                
-                # check if loss decreased relative from previous epoch, but
-                # has not yet beaten the best loss
-                elif (self.previous > current_val_loss) & (self.best < current_val_loss):
-                
-                    self.counter = 0 # reset counter and keep monitoring
-                    self.improvement = True
-                    
-                elif (self.best < current_val_loss) & (self.previous < current_val_loss):
-                    
-                    self.counter += 1 # current_loss has increased, start counting
-                    self.improvement = False
-                
-                # print some feedback
-                print("Epoch {}".format(epoch_id))
-                print("Current loss: {}".format(current_val_loss))
-                print("Best loss: {}".format(self.best))
-                print("Continuing training ...")
-                
-                # store current loss for next round check
-                self.previous = current_val_loss
+                    # setting this to True halts Experiment().start()
+                    # routine
+                    self.stop = True
+                    self.when = epoch_id
             
-            self.when=epoch_id
-            
-            return self.counter
+            # print some feedback
+            print("Epoch: {}".format(epoch_id))
+            print("Current loss: {}".format(current_val_loss))
+            print("Best loss: {}".format(self.best))
+            print("Counter: {}".format(self.counter))
 
 
 # ======================== #
@@ -324,12 +351,18 @@ def runtime_code():
                         help="seed used in torch.manual_seed() for reproducibility")
     parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
                         help="device used for training")
-    parser.add_argument("--batch_size", type=int,
-                        help="batch size to use in training")
+    parser.add_argument("--train_batch_size", type=int,
+                        help="batch size to use in training ddataset")
+    parser.add_argument("--eval_batch_size", type=int,
+                        help="batch size to use in evaluation dataset")
+    parser.add_argument("--test_batch_size", type=int,
+                        help="batch size to use in evaluation dataset")
     parser.add_argument("--max_epochs", type=int,
                         help="maximum number of trainin epochs (iterations)")
     parser.add_argument("--lr", type=int,
                         help="starting learning rate")
+    parser.add_argument("--betas", type=tuple,
+                        help="betas parameter for Adam optimizer")
     parser.add_argument("--num_lr_warmup_steps", type=int,
                         help="number of consecutive epochs for which learning" 
                         "rate is increased linearly")
@@ -349,40 +382,69 @@ def runtime_code():
 
     # ===== PREPARE DATASET ===== #
     
-    # uncomment this for development
-    inp = os.path.join("C:\\", "users", "karmeni1", "project", "lm-mem", "data",
-                            "wikitext-103", "wiki.test.tokens")
+    start_time = time.perf_counter()
     
-    with open(inp, "r", encoding="utf-8") as file_handle:
-        
-        lines = file_handle.readlines()
-        file_handle.close()
+    # datasets are already split into words/pre-tokenized (but not for GPT-2)
+    print("Loading datasets")
+    wiki_train = load_dataset(path=args.train_ds)
+    wiki_val = load_dataset(path=args.val_ds)
+    wiki_test = load_dataset(path=args.test_ds)
     
     # initialize tokenizer
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
     
-    # define dataset size
+    # join the read in lines (they're separated by \n so joining with empty 
+    # strings is fine)
+    train_toks = tokenizer.tokenize("".join(wiki_train))
+    val_toks = tokenizer.tokenize("".join(wiki_val))
+    test_toks = tokenizer.tokenize("".join(wiki_test))
     
-    # text is already tokenized so spliting at empty spaces should work
-    toks = tokenizer.tokenize("".join(lines))
+    # resize train set to selected nr of tokens
+    train_toks = resize(toks=train_toks, n_tokens=args.train_set_size)
     
-    
-    inputs=list(chunk(toks, 1024, equal_len=True))
+    # split into chunks of equal lengths, pad at the end and at the beginning
+    # with eos
+    eos = "|<endoftext>|"
+    train_toks_chunked = list(chunk(train_toks, 1024, equal_len=True,
+                           eos=eos, bos=eos))
+    val_toks_chunked = list(chunk(val_toks, 1024, equal_len=True,
+                         eos=eos, bos=eos))
+    test_toks_chunked = list(chunk(test_toks, 1024, equal_len=True,
+                         eos=eos, bos=eos))
     
     # create input indices
-    input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in inputs]
+    train_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in train_toks_chunked]
+    val_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in val_toks_chunked]
+    test_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in test_toks_chunked]
     
-    # now create the labels 
+    # clear for memory (vars no longer needed)
+    wiki_train, wiki_val, wiki_test = None, None, None
+    train_toks, val_toks, test_toks = None, None, None
+    train_toks_chunked, val_toks_chunked, test_toks_chunked = None, None, None
+    
+    # batch the data into new shape: 
     # shape = (batch_size, batch_id, sequence_length)
-    train_ds = torch.tensor(data=batchify(np.asarray(input_ids), bs=5),
+    train_ds = torch.tensor(data=batchify(np.asarray(train_input_ids), 
+                                          bs=args.train_batch_size),
                             dtype=torch.long)
-    train_ds.to(device)
 
-    eval_ds = None
-
-    test_ds = None
+    val_ds = torch.tensor(data=batchify(np.asarray(val_input_ids), 
+                                         bs=args.val_batch_size),
+                           dtype=torch.long)
     
-    # ==== INITIALIZE CONFIG AND EXPERIMENT CLASSES ===== #
+    # keep batch size 1 for testing
+    test_ds = torch.tensor(data=batchify(np.asarray(test_input_ids), 
+                                         bs=args.test_batch_size),
+                           dtype=torch.long)
+    
+    end_time = time.perf_counter()
+    
+    # print some timing feedback
+    elapsed = str(timedelta(seconds=round(end_time-start_time)))
+    print("Dataset preparation took {} (HH:MM:SS)".format(elapsed))
+    
+    
+    # ==== INITIALIZE MODEL, CONFIG AND EXPERIMENT CLASSES ===== #
     
     # initialize model with default config and move to device
     torch.manual_seed(args.seed)
@@ -391,7 +453,7 @@ def runtime_code():
     # declare optimizer
     optimizer=AdamW(params=model.parameters(), 
                     lr=args.lr, 
-                    betas=(0.9, 0.999))
+                    betas=args.betas)
     
     # initilize learning rate scheduler
     scheduler = get_cosine_schedule_with_warmup(optimizer=optimizer, 
@@ -400,22 +462,25 @@ def runtime_code():
                                                 num_cycles=0.5,
                                                 last_epoch=-1)
     
-    exp = Experiment(model=model.to(device),
-                     train_ds=None,
-                     eval_ds=None,
-                     test_ds=None,
-                     train_config=TrainConfig(bs=args.batch_size,
-                                              n_epochs=args.n_epochs),
-                     eval_config=EvalConfig(bs=args.batch_size,
-                                            patience=args.es_patience),
-                     optimizer=optimizer,
-                     lr_scheduler=scheduler,
-                     model_name=args.model_name,
-                     savedir=args.savedir,
-                     logdir=args.logdir)
+    experiment = Experiment(model=model,
+                            train_ds=train_ds.to(device),
+                            eval_ds=val_ds.to(device),
+                            test_ds=test_ds.to(device),
+                            train_config=TrainConfig(bs=args.batch_size,
+                                                     n_epochs=args.n_epochs),
+                            eval_config=EvalConfig(bs=args.batch_size,
+                                                   patience=args.es_patience),
+                            optimizer=optimizer,
+                            lr_scheduler=scheduler,
+                            model_name=args.model_name,
+                            savedir=args.savedir,
+                            logdir=args.logdir)
     
-    # ===== TRAINING ROUTINE =====#
-    exp.start(do_test=True)
+    
+    # ===== RUN EXPERIMENT =====#
+    
+    experiment.start(do_test=True)
+    experiment.saveconfigs()
 
 if __name__ == "__main__":
 
