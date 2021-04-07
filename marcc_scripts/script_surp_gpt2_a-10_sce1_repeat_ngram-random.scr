@@ -13,5 +13,5 @@
 ml anaconda
 conda activate ~/code/conda_envs/core_env
 
-python /home-3/karmeni1@jhu.edu/code/lm-mem/surprisal.py --condition repeat --scenario sce1 --input_filename /home-3/karmeni1@jhu.edu/code/lm-mem/data/ngram-random_lists.json --output_dir /home-3/karmeni1@jhu.edu/code/lm-mem/output --output_file surprisal_gpt2_sce1_repeat_ngram-random.csv
+python /home-3/karmeni1@jhu.edu/code/lm-mem/surprisal.py --condition repeat --scenario sce1 --input_filename /home-3/karmeni1@jhu.edu/code/lm-mem/data/ngram-random_lists.json --output_dir /home-3/karmeni1@jhu.edu/code/lm-mem/output --output_file surprisal_gpt2_a-10_sce1_repeat_ngram-random.csv
 
