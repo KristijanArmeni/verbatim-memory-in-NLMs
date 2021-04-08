@@ -7,10 +7,11 @@ prefixes = {
     "sce1": {"1": "Before the meeting, Mary wrote down the following list of words:"},
     "sce1rnd": {"1": "Before the meeting, Mary wrote down the following list of words:"},
     "sce2": {"1": "Before the meeting, Mary wrote down the following list of words:"},
-    "rpt": {"1": "Before the meeting, Mary wrote down the following list list of words:"}
+    "sce3": {"1": "Before the meeting, Mary wrote down the following lists of words. One was:"}
 }
 
 # ===== MARY SCENARIO =====#
+
 a1 = ["After the meeting, she took a break and had a cup of coffee."]
 
 a2 = ["After the meeting, Mary went for a walk.",
@@ -51,7 +52,8 @@ a5 = ["It was not a big park by any means, but it offered a quiet refuge where o
      "Mary said she had time over the weekend.",
      "After they said goodbye, Mary started walking towards home."]
 
-# ===== OCEAN SCENARIO ====#
+# ===== OCEAN SCENARIO ==== #
+
 b1 = ["There is a voice in the waters of the great sea. It calls to man continually."]
 
 b2 = ["Sometimes it thunders in the tempest, when the waves leap high and strong and the wild winds shriek and roar.",
@@ -85,6 +87,9 @@ b5 = ["Near the equator, the great heat carries up a larger proportion of water 
      "After having gladdened the heart of man by driving his mills and causing his food to grow, "
      "it finds its way again into the sea: and thus the good work goes on with ceaseless regularity."]
 
+# ===== SHORTER SCENARIO ===== #
+
+c1 = ["And the other:"]
 
 def add_sections(chunks, skip_last_item=True):
 
@@ -176,14 +181,9 @@ sce2 = {
     "5": " ".join(add_sections((a2, b3, b4, b5), skip_last_item=False))
 }
 
-rpt = {
-    "1": " ".join(["After the meeting, she went for a walk.",
-                   "It was a sunny day. It was warm outside.",
-                   "A sunny day sunny day sunny day sunny day.",
-                   "There were no clouds and the sky was blue,",
-                   "a warm sunny day, a warm sunny day, a warm sunny day,",
-                   "a sunny day, sunny day, sunny day, sunny day."])
-}
+sce3 = {
+        "1": c1[0],
+        }
 
 # Join the context and the prompt
 prompt_string = "When she got back, she read the list again:"
@@ -191,9 +191,10 @@ for scen in (sce1, sce1rnd, sce2):
     for key in scen.keys():
         scen[key] = scen[key] + " " + prompt_string
 
+
 prompts = {
     "sce1": sce1,
     "sce1rnd": sce1rnd,
     "sce2": sce2,
-    "rpt": rpt
+    "sce3": sce3,
 }
