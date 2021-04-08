@@ -135,9 +135,11 @@ if argins.which == "ngrams-random":
                       "list-10": [sample_words(lists[i][shuffle_ids][0:200], 10) for i in range(len(lists))],
                     }
 
-    word_lists = {"2-gram": [np.tile(l[0:2], reps=5) for l in word_lists_tmp["list-3"][0]],
-                  "3-gram": [np.tile(l[0:3], reps=5) for l in word_lists_tmp["list-5"][0]],
-                  "5-gram": [np.tile(l[0:5], reps=5) for l in word_lists_tmp["list-10"][0]],
+    word_lists = {"2-gram": [np.tile(l[0:2], reps=6) for l in word_lists_tmp["list-3"][0]],
+                  "3-gram": [np.tile(l[0:3], reps=6) for l in word_lists_tmp["list-5"][0]],
+                  "5-gram": [np.tile(l[0:5], reps=6) for l in word_lists_tmp["list-10"][0]],
+                  "7-gram": [np.tile(l[0:7], reps=6) for l in word_lists_tmp["list-10"][0]],
+                  "10-gram": [np.tile(l[0:10], reps=6) for l in word_lists_tmp["list-10"][0]]
                   }
 
 out = []
