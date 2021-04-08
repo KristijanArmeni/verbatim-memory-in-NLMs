@@ -23,6 +23,9 @@ from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel, AdamW, get_
 
 def load_dataset(path):
     
+    # make sure it handles "~" in path string correctly
+    path = os.path.expanduser(path)
+    
     with open(path, "r", encoding="utf-8") as file_handle:
         
         lines = file_handle.readlines()
@@ -361,7 +364,7 @@ def runtime_code():
                         help="batch size to use in evaluation dataset")
     parser.add_argument("--max_epochs", type=int,
                         help="maximum number of trainin epochs (iterations)")
-    parser.add_argument("--lr", type=int,
+    parser.add_argument("--lr", type=float,
                         help="starting learning rate")
     parser.add_argument("--betas", type=tuple,
                         help="betas parameter for Adam optimizer")
