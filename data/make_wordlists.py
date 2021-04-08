@@ -9,7 +9,6 @@ ipython %run make_wordlists.py --which "toronto" \
 """
 
 import pandas as pd
-import random
 import numpy as np
 import json
 import argparse

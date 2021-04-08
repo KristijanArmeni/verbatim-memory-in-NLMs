@@ -38,7 +38,7 @@ stim_reversed = None
 if args.condition == "control":
 
     print("Creating reverse control condition...")
-    print("Assuming input list can be evenly split into 3 lists each of len(list)==20!")
+    print("Assuming there are 3 levels of input lists can be evenly split into 3 lists each of len(list)==20!")
     
     # test that we can divide by 3, 
     # otherwise we sth has changed in the input lists
@@ -62,10 +62,12 @@ prefixes = prefixes[args.scenario_key]
 all_prefixes = prefixes.keys()
 all_prompts = prompts.keys()
 
+# if ngram experiment only use one scenario level
 if "ngram" in args.json_filename:
     all_prefixes = list(prefixes.keys())[0:1]
     all_prompts = list(prompts.keys())[0:1]
 
+# ===== CREATE RNN INPUT STRINGS ===== #
 strings = []
 for prefix_key in all_prefixes:
     for prompt in all_prompts:
