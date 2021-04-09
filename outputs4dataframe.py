@@ -109,6 +109,7 @@ scenario_map = {
     "sce1": "intact",
     "sce1rnd": "scrambled",
     "sce2": "incongruent",
+    "sce3": "short"
 }
 
 gpt.scenario = gpt.scenario.map(scenario_map)
