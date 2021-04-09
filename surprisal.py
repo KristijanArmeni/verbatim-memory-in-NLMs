@@ -23,7 +23,7 @@ from tqdm import trange
 from typing import List
 
 # own modules
-sys.path.append(os.path.join(os.environ['HOME'], 'code', 'lm-mem', 'data'))
+sys.path.append(os.path.join(os.environ['homepath'], 'code', 'lm-mem', 'data'))
 
 
 # ===== WRAPPER FOR DATASET CONSTRUCTION ===== #
@@ -82,7 +82,7 @@ def concat_and_tokenize_inputs(prefixes, prompts, word_list1, word_list2,
                 metadata["prefix"].append(prefix_key)
                 metadata["prompt"].append(prompt_key)
                 
-                return input_ids, metadata
+    return input_seqs_tokenized, metadata
 
 # ===== EXPERIMENT CLASS ===== #
 
@@ -148,7 +148,8 @@ class Experiment(object):
 
         llh = []  # variable storing token-by-token neg ll
         tokens = []   # variable storing token strings to have along with -ll in the output
-
+        
+        # loop over tokens in input sequence
         for i in trange(0, input_ids.size(1), stride, desc="Computing perplexity: "):
 
             # define the start and endpoints of input indices for current loop
@@ -180,7 +181,6 @@ class Experiment(object):
         # compute perplexity, divide by the lenth of the sequence
         # use np.nansum as token at position 0 will have -LL of nan
         ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc)
-        print("Done")
         return ppl, llh, tokens
     
     def run_perplexity(self, input_sequences_ids) -> List:
@@ -197,8 +197,8 @@ class Experiment(object):
             }
 
         # loop over trials (input sequences)
-        for input_ids in trange(len(input_sequences_ids)):
-
+        for input_ids in input_sequences_ids:
+            
             # this returns surprisal (neg log ll)
             ppl, surp, toks = self.ppl(input_ids=input_ids.to(self.device), 
                                        context_len=self.context_len, 
@@ -208,7 +208,7 @@ class Experiment(object):
             # store the output tuple and
             outputs["sequence_ppl"].append(ppl)
             outputs["surp"].append(surp)
-            outputs["tokens"].append(toks)
+            outputs["token"].append(toks)
 
         return outputs
 
@@ -223,7 +223,7 @@ def runtime_code():
     # collect input arguments
     parser = argparse.ArgumentParser(description="surprisal.py runs perplexity experiment")
     
-    parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2"],
+    parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3"],
                         help="str, which scenario to use")
     parser.add_argument("--condition", type=str,
                         help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
@@ -290,29 +290,31 @@ def runtime_code():
         prefixes = {argins.scenario: {list(prefixes[argins.scenario].keys())[0] : list(prefixes[argins.scenario].values())[0]}}
         prompts = {argins.scenario: {list(prompts[argins.scenario].keys())[0] : list(prompts[argins.scenario].values())[0]}}   
     
+    print(word_list1)
+    
      # declare device and paths
     device = torch.device(argins.device if torch.cuda.is_available() else "cpu") 
-    
-    # construct input sequences
-    input_sequences = concat_and_tokenize_inputs(prompts=prompts, prefixes=prefixes, 
-                                                 word_list1=word_list1, 
-                                                 word_list2=word_list2)
-    
         
     # setup the model
     tokenizer = AutoTokenizer.from_pretrained('gpt2')
     model = AutoModelForCausalLM.from_pretrained('gpt2')
     
+    # construct input sequences
+    input_sequences, meta_data = concat_and_tokenize_inputs(prompts=prompts[argins.scenario], 
+                                                            prefixes=prefixes[argins.scenario], 
+                                                            word_list1=word_list1, 
+                                                            word_list2=word_list2,
+                                                            tokenizer=tokenizer)
     
     # ===== INITIATE EXPERIMENT CLASS ===== #
     
     experiment = Experiment(model=model, tokenizer=tokenizer, 
                             input_sequences=input_sequences,
-                            context_len=1024,
+                            context_len=argins.context_len,
                             device=device)
     
     # run experiment
-    output_list = experiment.run_perplexity(input_sequences)
+    output_dict = experiment.run_perplexity(input_sequences)
     
     # ===== FORMAT AND SAVE OUTPUT ===== #
     
@@ -320,18 +322,22 @@ def runtime_code():
     dfout = []
     counter = 1  # counter for trials
     
-    # loop over trials
-    for k, outdict in enumerate(output_list):
+    n_sequences = len(output_dict["surp"])
     
+    # loop over trials
+    for i in range(0, n_sequences):
+        
         # convert the last two elements of the tuple to an array
-        dftmp = pd.DataFrame(np.asarray([outdict["token"], outdict["trialID"], 
-                                         outdict["positionID"], outdict["surp"]]).T,
+        dftmp = pd.DataFrame(np.asarray([output_dict["token"][i], 
+                                         meta_data["trialID"][i], 
+                                         meta_data["positionID"][i], 
+                                         output_dict["surp"][i]]).T,
                              columns=["token", "trialID", "positionID", "surp"])
     
         dftmp["ispunct"] = dftmp.token.isin([".", ":", ","])     # create punctuation info column
-        dftmp['prefix'] = outdict["prefix"]                      # add a column of prefix labels
-        dftmp['prompt'] = outdict["prompt"]                      # add a column of prompt labels
-        dftmp["list_len"] = outdict["list_len"]                  # add list length
+        dftmp['prefix'] = meta_data["prefix"][i]               # add a column of prefix labels
+        dftmp['prompt'] = meta_data["prompt"][i]               # add a column of prompt labels
+        dftmp["list_len"] = meta_data["list_len"][i]               # add list length
         dftmp['stimID'] = counter
         dftmp['second_list'] = argins.condition                  # log condition of the second list
     
