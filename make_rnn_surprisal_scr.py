@@ -16,7 +16,7 @@ master_bash = open(os.path.join(scripts_dir, 'run_rnn_surprisal_scripts.sh'), 'w
 model_ids = ["a-10", "b-11", "c-12", "d-13", "e-14"]
 
 for model_id in model_ids:
-    for scenario in ["sce1", "sce2", "sce1rnd"]:
+    for scenario in ["sce1", "sce2", "sce1rnd", "sce3"]:
         for condition in ["repeat", "permute", "control"]:
             for list_type in ["random", "categorized"]:
     
