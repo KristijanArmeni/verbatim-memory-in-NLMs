@@ -6,7 +6,7 @@ import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--json_filename", type=str)
-parser.add_argument("--scenario_key", choices=["sce1", "sce1rnd", "sce2", "rpt"], 
+parser.add_argument("--scenario_key", choices=["sce1", "sce1rnd", "sce2", "sce3"], 
                     default="sce1", type=str)
 parser.add_argument("--condition", choices=["repeat", "permute", "control"],
                     default="repeat", type=str)
