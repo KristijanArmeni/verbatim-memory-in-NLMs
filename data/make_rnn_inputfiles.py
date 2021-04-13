@@ -243,16 +243,18 @@ elif args.paradigm == "repeated-ngrams":
                         trials[marker_keys[3]].append(dst_size.strip("n"))
 
 
+outdir = os.path.join(input_dir, "rnn_input_files")
+
 # write the strings to output file name
-print("Writing {}".format(outname))
-outfile = open(outname, "w")
+print("Writing {}".format(os.path.join(outdir, outname)))
+outfile = open(os.path.join(outdir, outname), "w")
 strings = map(lambda x:x+'\n', trials["string"])  # write newline characters
 outfile.writelines(strings)
 outfile.close()
 
 # write the strings to output file name
-print("Writing {}".format(markersoutname))
-outfile = open(markersoutname, "w")
+print("Writing {}".format(os.path.join(outdir, markersoutname)))
+outfile = open(os.path.join(outdir, markersoutname), "w")
 
 header = "\t".join([marker_keys[1] , marker_keys[2], marker_keys[3]]) + "\n"
 outfile.write(header)
