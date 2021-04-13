@@ -10,6 +10,11 @@ prefixes = {
     "sce3": {"1": "Before the meeting, Mary wrote down the following lists of words. One was:"}
 }
 
+# define prefixes for the n-gram experiment
+prefixes_repeated_ngrams = {
+    "sce1": {"1": "In the newspaper, somebody wrote the following words:"},
+}
+
 # ===== MARY SCENARIO =====#
 
 a1 = ["After the meeting, she took a break and had a cup of coffee."]
