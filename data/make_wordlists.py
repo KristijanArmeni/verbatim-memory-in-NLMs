@@ -164,7 +164,7 @@ if argins.which == "ngram-distractors" or argins.which == "ngram-random":
 # ===== CREATE WORD LISTS AND N-GRAM SUBSETS ===== #
 lists_of_tokens = load_and_sample_noun_pool(path=path, 
                                             n_items=10, 
-                                            n_lists=26,
+                                            n_lists=23,
                                             which=which, 
                                             model_vocab=rnn_vocab, 
                                             seed=12345)
@@ -174,7 +174,7 @@ lists_of_tokens = load_and_sample_noun_pool(path=path,
 subsets = [3, 5, 7, 10]
 
 # first sample angain the random noun pool
-out_dict = {"{}-gram".format(n_items): [alist[0:n_items] for alist in lists_of_tokens]
+out_dict = {"n{}".format(n_items): [alist[0:n_items] for alist in lists_of_tokens]
             for n_items in subsets
             }
 
@@ -186,8 +186,8 @@ if argins.which=="ngram-random" or argins.which=="ngram-distractors":
     n_reps = 5
     
     # sample repeated ngram sequences from the lists of 10 items
-    tmp = {"{}-gram".format(n_gram): [np.tile(alist[0:n_gram], reps=n_reps).tolist() 
-                                      for alist in out_dict["10-gram"]]
+    tmp = {"{}gram".format(n_gram): [list(chunk(np.tile(alist[0:n_gram], reps=n_reps).tolist(), n_gram, n_gram)) 
+                                      for alist in out_dict["n10"]]
                                       for n_gram in n_grams}
     
     out_dict = tmp
@@ -214,8 +214,8 @@ if argins.which=="ngram-random" or argins.which=="ngram-distractors":
         max_size = 7
         
         # sample repeated ngram sequences from the lists of 10 items
-        out_dict = {"n-{}".format(size): list(chunk(thelist[0:(n_reps_distractors*7)], size, 7)) 
-                                                   for thelist in [distractor_set]
+        out_dict = {"n{}".format(size): [list(chunk(thelist[0:(n_reps_distractors*7)], size, 7)) 
+                                                   for thelist in [distractor_set]]
                                                    for size in [2, 3, 5, 7]}
         
 
@@ -223,7 +223,9 @@ if argins.which=="ngram-random" or argins.which=="ngram-distractors":
 out = []
 outlist = None
 
-out = [l for key in out_dict.keys() for l in out_dict[key]]
+# store dict keys for ngram-distractors to be able to loop over them
+if argins.which == "ngram-distractors" or argins.which == "ngram-random":
+    out = out_dict
 
 # now save the lists to .json files
 with open(argins.output_filename, "w") as f:
