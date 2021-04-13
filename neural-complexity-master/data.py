@@ -340,18 +340,24 @@ class SentenceCorpus(object):
 
     def read_marker_file(self, path):
 
-        markers = [[], [], []] # tuple, first place for prompt label, 1 for token markers
-
         # read markers.txt line by line and store the contents to markers
         with open(path, 'r') as file_handle:
-            for fchunk in file_handle:
+            
+            # read variable names from header (first row)
+            # we are currently assuming at least three columns below
+            colnames = file_handle.readline().strip("\n").split("\t")
+            markers = {key: [] for key in colnames}
+            
+            for line in file_handle:
                 # read the line containing marker values and prompt labels
                 # and make it a list (e.g [0, 0, 0, 0, 1, 1, 1, 1])
-                a, b = fchunk.split("\t")
-                tmp = [int(el) for el in b.strip("[]\n").split(",")]
-                markers[0].append(a)
-                markers[1].append(sum([e for e in tmp if e == 1])/2)
-                markers[2].append(tmp)
+                # first (markers, condition_label1, condition_label2)
+                row_values = line.strip("\n").split("\t")
+                
+                tmp = [int(el) for el in row_values[0].strip("[]").split(",")]
+                markers[colnames[0]].append(tmp) #these are the markers
+                markers[colnames[1]].append(row_values[1])  # this codes ex. condition
+                markers[colnames[2]].append(row_values[2])  # this codes ex. condition
 
         return markers
 
