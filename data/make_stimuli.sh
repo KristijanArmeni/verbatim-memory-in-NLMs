@@ -6,7 +6,8 @@ do
     do
         for l in "random" "categorized";
         do
-            python ./data/stimuli2txt.py --json_filename "./data/"$l"_lists.json" --condition $cond --scenario_key $sce
+            python ./data/make_rnn_inputfiles.py --json_filename
+            "./data/"$l"_lists.json" --paradigm "with-context" --condition $cond --scenario_key $sce
         done
     done
 done
