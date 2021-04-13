@@ -219,15 +219,9 @@ if argins.which=="ngram-random" or argins.which=="ngram-distractors":
                                                    for size in [2, 3, 5, 7]}
         
 
-# ===== SAVE OUTPUT ===== #
-out = []
-outlist = None
-
-# store dict keys for ngram-distractors to be able to loop over them
-if argins.which == "ngram-distractors" or argins.which == "ngram-random":
-    out = out_dict
+# ===== SAVE .JSON OUTPUT ===== #
 
 # now save the lists to .json files
 with open(argins.output_filename, "w") as f:
     print("Writing {}".format(argins.output_filename))
-    json.dump(out, f)
+    json.dump(out_dict, f)
