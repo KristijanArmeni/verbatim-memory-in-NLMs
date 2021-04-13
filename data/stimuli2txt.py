@@ -27,11 +27,14 @@ else:
 outname = args.json_filename.replace(".json", "_{}_{}.txt".format(scenario, args.condition))
 markersoutname = args.json_filename.replace(".json", "_{}_{}_markers.txt".format(scenario, args.condition))
 
-trials = {
-    "string": [],
-    "markers": [],
-    "prompt_len": []
-}
+# use different marker labels for two experiments
+
+if args.paradigm == "repeated-ngrams":
+    marker_keys = ["string", "markers", "list_len", "dist_len"]
+elif args.paradigm == "with-context":
+    marker_keys = ["string", "markers", "list_len", "prompt_len"]
+
+trials = { key: [] for key in marker_keys}
 
 # ==== LOAD .JSON FILES WITH WORD LISTS ==== #
 
@@ -60,20 +63,8 @@ stim_reversed = None
 if args.condition == "control":
 
     print("Creating reverse control condition...")
-    print("Assuming there are 3 levels of input lists can be evenly split into 3 lists each of len(list)==20!")
     
-    # test that we can divide by 3, 
-    # otherwise we sth has changed in the input lists
-    assert len(stim) % 3 == 0
-    
-    list_len = len(stim)//3
-    
-    len3 = stim[0:list_len]
-    len5 = stim[list_len:list_len*2]
-    len10 = stim[list_len*2::]
-    
-    stim_reversed = [l for lst in (len3, len5, len10)
-                       for l in reversed(lst)]
+    stim_reversed = {key: list(reversed(stim[key])) for key in stim.keys()}
 
  
 # select dict with correct prompts and prefixes
@@ -90,45 +81,70 @@ if "ngram" in args.json_filename:
 
 # ===== CREATE RNN INPUT STRINGS ===== #
 
+def tokenize_and_concat(prefix, list1, context, list2):
+    
+    """
+    tokenize_and_concat() is just a wrapper function to make
+    the loop below slightly more readable.
+    
+    """
+    
+    # tokenize words and then join the list back to a string with spaces
+    # apparently neural-complexity-master/main.py is used with tokenized input.
+    s1 = word_tokenize(prefix)
+    s2 = word_tokenize(list1)
+    s3 = word_tokenize(context)
+    s4 = word_tokenize(list2)
+
+    # make exception for n-gram experiment
+    subparts = (s1, s2, s3, s4)
+    
+    # create coding for parts of trials
+    codes = [[i]*len(tokens) for i, tokens in enumerate(subparts)]
+    codes_flattened = [item for sublist in codes for item in sublist]
+    
+    # construct the string
+    string = " ".join([" ".join(part) for part in subparts])
+
+    # quick check that all matches when spliting
+    assert len(string.split()) == len(codes_flattened)
+    
+    return string, codes_flattened
+
+
 if args.paradigm == "with-context":
 
     strings = []
     for prefix_key in all_prefixes:
-        for prompt in all_prompts:
-            for j, l in enumerate(input_lists):
-    
-                l2 = None
-                if args.condition == "permute":
-                    tmp = np.random.RandomState((543 + j) * 5).permutation(stim[j]).tolist()
-                    l2 = ", ".join(tmp) + "."
-                elif args.condition == "control":
-                    l2 = ", ".join(stim_reversed[j]) + "."
-                else:
-                    l2 = l
-    
-                # tokenize words and then join the list back to a string with spaces
-                # apparently neural-complexity-master/main.py is used with tokenized input.
-                s1 = word_tokenize(prefixes[prefix_key])
-                s2 = word_tokenize(l)
-                s3 = word_tokenize(prompts[prompt])
-                s4 = word_tokenize(l2)
-    
-                # make exception for n-gram experiment
-                subparts = (s1, s2, s3, s4)
+        for prompt_key in all_prompts:
+            for list_size in stim.keys():
                 
-                # create coding for parts of trials
-                labels = [[i]*len(tokens) for i, tokens in enumerate(subparts)]
-                labels_flattened = [item for sublist in labels for item in sublist]
+                current_list = stim[list_size]
+                curr_list_rev = stim_reversed[list_size]
                 
-                # construct the string
-                string = " ".join([" ".join(part) for part in subparts])
-    
-                # quick check that all matches when spliting
-                assert len(string.split()) == len(labels_flattened)
-    
-                trials["string"].append(string)
-                trials["markers"].append(str(labels_flattened))
-                trials['prompt_len'].append(prompt)
+                for j, l in enumerate(current_list):
+                    
+                    l1 = ", ".join(current_list[j]) + "."
+                    
+                    # modify list 2 as specified in args.condition
+                    l2 = None
+                    if args.condition == "permute":
+                        tmp = np.random.RandomState((543 + j) * 5).permutation(current_list[j]).tolist()
+                        l2 = ", ".join(tmp) + "."
+                    elif args.condition == "control":
+                        l2 = ", ".join(curr_list_rev[j]) + "."
+                    else:
+                        l2 = l1
+        
+                    string, markers = tokenize_and_concat(prefix=prefixes[prefix_key], 
+                                                          list1=l1, 
+                                                          context=prompts[prompt_key], 
+                                                          list2=l2)
+        
+                    trials[marker_keys[0]].append(string)
+                    trials[marker_keys[1]].append(str(markers))
+                    trials[marker_keys[2]].append(str(list_size.strip("n")))
+                    trials[marker_keys[3]].append(prompt_key)
 
 
 elif args.paradigm == "repeated-ngrams":
@@ -154,7 +170,8 @@ elif args.paradigm == "repeated-ngrams":
         assert ngram_diff == n_dst_toks
         
         # this process generates 1 ngram code too much, drop it
-        del codes[-n_dst_toks:]
+        if n_dst_toks != 0:
+            del codes[-n_dst_toks:]
         assert len(codes) == len(tokens)
         
         return codes
@@ -163,7 +180,7 @@ elif args.paradigm == "repeated-ngrams":
     prefixes = prefixes_repeated_ngrams[args.scenario_key]
     
     ngram_sizes = list(stim.keys())
-    distractor_sizes = list(dist.keys())
+    distractor_sizes = ["n0"] + list(dist.keys()) # conde the non-interleaved condition as well
     
     # massive loops
     for prefix_key in prefixes:
@@ -173,15 +190,23 @@ elif args.paradigm == "repeated-ngrams":
             for dst_size in distractor_sizes:
                 
                 targets = stim[ngram]
-                distractors = dist[dst_size]
+                distractors = [None]
+                if dst_size != "n0":
+                    distractors = dist[dst_size]
+                
                 
                 # loop over ngram chunks for each a trial
                 for trg in targets:
                     
                     for dst in distractors:
                         
-                        interleaved = interleave(trg=trg, dst=dst)   
-                        trial = ", ".join([", ".join(e) for e in filter(None, interleaved)]) + "."
+                        nouns = trg
+                        
+                        # if there are distractors, interleave them
+                        if dst is not None:
+                            nouns = interleave(trg=trg, dst=dst) 
+                        
+                        trial = ", ".join([", ".join(e) for e in filter(None, nouns)]) + "."
                         
                         # tokenize words and then join the list back to a string with spaces
                         # apparently neural-complexity-master/main.py is used with tokenized input.
@@ -197,7 +222,7 @@ elif args.paradigm == "repeated-ngrams":
                         # create coding for parts of trials
                         # assume every token in ngram has punctuation
                         len_ngram_with_punct = int(ngram.split("-")[0])*2
-                        len_dst_with_punct = int(dst_size.split("-")[-1])*2
+                        len_dst_with_punct = int(dst_size.strip("n"))*2
                         
                         codes = code_tokens(tokens=s2, markers=[1, 2],
                                             n_target_toks=len_ngram_with_punct,
@@ -212,9 +237,10 @@ elif args.paradigm == "repeated-ngrams":
                         # quick check that all matches when spliting
                         assert len(string.split()) == len(labels_flattened)
             
-                        trials["string"].append(string)
-                        trials["markers"].append(str(labels_flattened))
-                        trials['prompt_len'].append(ngram.split("-")[0])
+                        trials[marker_keys[0]].append(string)
+                        trials[marker_keys[1]].append(str(labels_flattened))
+                        trials[marker_keys[2]].append(ngram.split("-")[0])
+                        trials[marker_keys[3]].append(dst_size.strip("n"))
 
 
 # write the strings to output file name
@@ -227,6 +253,12 @@ outfile.close()
 # write the strings to output file name
 print("Writing {}".format(markersoutname))
 outfile = open(markersoutname, "w")
-strings = map(lambda x, y:y+'\t'+x+'\n', trials["markers"], trials["prompt_len"])  # write newline characters
-outfile.writelines(strings)
+
+header = "\t".join([marker_keys[1] , marker_keys[2], marker_keys[3]]) + "\n"
+outfile.write(header)
+
+joinstrings = lambda x, y, z: x + '\t' + y + '\t' + z + '\n'
+rows = map(joinstrings,
+           trials[marker_keys[1]], trials[marker_keys[2]], trials[marker_keys[3]])  # write newline characters
+outfile.writelines(rows)
 outfile.close()
