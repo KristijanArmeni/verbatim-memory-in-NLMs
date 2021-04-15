@@ -28,6 +28,7 @@ for model_id in ["a-10"]:
                 
                 # create command string
                 command = "python {} --condition {} --scenario {} " \
+                          "--paradigm repeated-ngrams" \
                           "--input_filename {} " \
                           "--output_dir {} --output_file {}"\
                           .format(python_file,
