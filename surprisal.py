@@ -21,15 +21,59 @@ import torch
 from torch.nn import functional as F
 from tqdm import trange
 from typing import List
+from string import punctuation
 
 # own modules
 sys.path.append(os.path.join(os.environ['homepath'], 'code', 'lm-mem', 'data'))
 
 
-# ===== WRAPPER FOR DATASET CONSTRUCTION ===== #
+# ===== WRAPPERS FOR DATASET CONSTRUCTION ===== #
 
-def concat_and_tokenize_inputs(prefixes, prompts, word_list1, word_list2,
-                               tokenizer):
+def mark_subtoken_splits(tokens):
+    """
+    function to keep track of whether or not a token was subplit into
+    """
+    ids = []
+    count = 0
+    for i in range(len(tokens)):
+        
+        if "Ġ" in tokens[i]:
+            count += 1
+        
+        if tokens[i] in punctuation:
+            ids.append(-1)
+        elif tokens[i] == "<|endoftext|>":
+            ids.append(-2)
+        else:
+            ids.append(count)
+    
+    return ids
+
+def assign_subtokens_to_groups(subtoken_splits, markers, ngram1_size, ngram2_size, n_repet):
+    
+    # this assumes both targets and interleaved groups are repated 5 times
+    # we correct for this below
+    codes = list(np.tile(np.repeat(markers, [ngram1_size, ngram2_size]), n_repet))
+    
+    # drop the last ngram as ngram2 is only repeated 5-1 times
+    if ngram2_size != 0:
+        del codes[-ngram2_size:]
+    
+    n_toks_no_punct = np.unique(subtoken_splits)[np.unique(subtoken_splits)>0]
+    assert len(n_toks_no_punct) == len(codes)
+    
+    out = subtoken_splits.copy()
+    
+    punct_and_eos_codes = [-1, -2] # we leave these as they are
+    for i, el in enumerate(subtoken_splits):
+        
+        if el not in punct_and_eos_codes:
+            out[i] = codes[subtoken_splits[i]-1]
+
+    return out
+
+def concat_and_tokenize_inputs(prefixes=None, prompts=None, word_list1=None, word_list2=None,
+                               tokenizer=None):
         
     """
     function that concatenates and tokenizes
@@ -38,6 +82,7 @@ def concat_and_tokenize_inputs(prefixes, prompts, word_list1, word_list2,
     metadata = {
         "trialID": [],
         "positionID": [],
+        "subtok": [],
         "list_len": [],
         "prefix": [],
         "prompt": [],
@@ -53,10 +98,10 @@ def concat_and_tokenize_inputs(prefixes, prompts, word_list1, word_list2,
 
             # loop over trials
             for i in range(len(word_list1)):
-
+                
                 # tokenize strings separately to be able to construct markers for prefix, word lists etc.
                 i1 = tokenizer.encode("<|endoftext|> " + prefixes[prefix_key], return_tensors="pt")   # prefix IDs, add eos token
-                i2 = tokenizer.encode(word_list1[i], return_tensors="pt")                             # word list IDs
+                i2 = tokenizer.encode(word_list1[i], return_tensors="pt") 
                 i3 = tokenizer.encode(prompts[prompt_key], return_tensors="pt")                       # prompt IDs
                 i4 = tokenizer.encode(word_list2[i] + "<|endoftext|>", return_tensors="pt")
 
@@ -69,20 +114,170 @@ def concat_and_tokenize_inputs(prefixes, prompts, word_list1, word_list2,
                 # useful for data vizualization etc.
                 trials = []
                 positions = []
+                split_ids = []
+                
                 for j, ids in enumerate((i1, i2, i3, i4)):
                     tmp = np.zeros(shape=ids.shape[1], dtype=int)  # code the trial structure
                     tmp[:] = j
                     tmp2 = np.arange(ids.shape[1])                 # create token position index
                     trials.append(tmp)
                     positions.append(tmp2)
+                    split_ids.append(mark_subtoken_splits(tokenizer.convert_ids_to_tokens(ids[0])))
                 
                 metadata["trialID"].append(np.concatenate(trials).tolist())
                 metadata["positionID"].append(np.concatenate(positions).tolist())
+                metadata["subtok"].append(np.concatenate(split_ids).tolist())
                 metadata["list_len"].append(len([e.strip().replace(".", "") for e in word_list1[i].split(",")]))
                 metadata["prefix"].append(prefix_key)
                 metadata["prompt"].append(prompt_key)
                 
     return input_seqs_tokenized, metadata
+
+
+def concat_and_tokenize_inputs2(prefixes=None, ngram_sets=None, ngram_size=None, ngram_sets_codes=None,
+                               tokenizer=None):
+        
+    """
+    function that concatenates and tokenizes
+    """
+        
+    metadata = {
+        "trialID": [],
+        "positionID": [],
+        "subtok": [],
+        "subtok_markers": [],
+        "list_len": [],
+        "prefix": [],
+        "prompt": [],
+        }
+    
+    input_seqs_tokenized = []
+    
+    # loop over different prefixes:
+    for prefix_key in prefixes.keys():
+
+        # loop over prompts
+        for dst_size in ngram_sets.keys():
+            
+            input_lists = ngram_sets[dst_size]
+            
+            # loop over trials
+            for i in range(len(input_lists)):
+                
+                # tokenize strings separately to be able to construct markers for prefix, word lists etc.
+                i1 = tokenizer.encode("<|endoftext|> " + prefixes[prefix_key], return_tensors="pt")   # prefix IDs, add eos token
+                i2 = tokenizer.encode(input_lists[i] + "<|endoftext|>", return_tensors="pt") 
+
+                # compose the input ids tensors
+                input_ids = torch.cat((i1, i2), dim=1)
+                
+                input_seqs_tokenized.append(input_ids)
+
+                # construct IDs for prefix, word lists and individual tokens
+                # useful for data vizualization etc.
+                trials = []
+                positions = []
+                split_ids = []
+                split_ids_markers = []
+                
+                for j, ids in enumerate((i1, i2)):
+                    
+                    tmp = np.zeros(shape=ids.shape[1], dtype=int)  # code the trial structure
+                    tmp[:] = j
+                    tmp2 = np.arange(ids.shape[1])                 # create token position index
+                    trials.append(tmp)
+                    positions.append(tmp2)
+                    split_ids.append(mark_subtoken_splits(tokenizer.convert_ids_to_tokens(ids[0])))
+                    
+                    if j == 0:
+                        prefix_toks = np.unique(split_ids[j])[np.unique(split_ids[j]) > 0]
+                        markers, ngram1_size, ngram2_size, n_repet = [0, 0], 1, 0, len(prefix_toks)
+                    elif j == 1:
+                        markers, ngram1_size, ngram2_size, n_repet = [1, 2], ngram_size, int(dst_size.strip("n")), 5
+                    
+                    split_ids_markers.append(assign_subtokens_to_groups(subtoken_splits=split_ids[j], 
+                                                                        markers=markers, 
+                                                                        ngram1_size=ngram1_size, 
+                                                                        ngram2_size=ngram2_size,
+                                                                        n_repet=n_repet))
+                
+                metadata["trialID"].append(np.concatenate(trials).tolist())
+                metadata["positionID"].append(np.concatenate(positions).tolist())
+                metadata["subtok"].append(np.concatenate(split_ids).tolist())
+                metadata["subtok_markers"].append(np.concatenate(split_ids_markers).tolist())
+                metadata["list_len"].append(ngram_size)
+                metadata["prefix"].append(prefix_key)
+                metadata["prompt"].append(dst_size.strip("n"))
+                
+    return input_seqs_tokenized, metadata
+
+
+def interleave(items1, items2):
+    
+    items2.append("") # add a dummy element at the end
+    return [val for pair in zip(items1, items2) for val in pair]
+    
+def code_intereleaved_tokens(tokens=None, markers=[1, 2], n_target_toks=None, n_dst_toks=None, repetitions=5):
+    
+    codes = list(np.tile(np.repeat(markers, [n_target_toks, n_dst_toks]), repetitions))
+    
+    # compute effective list length
+    len_effect = len(tokens)
+    len_full = (n_target_toks*repetitions) + ((n_dst_toks)*(repetitions))
+    
+    # there should always be just one distractor ngram too much, 
+    # make sure it checks
+    ngram_diff = len_full - len_effect
+    assert ngram_diff == n_dst_toks
+    
+    # this process generates 1 ngram code too much, drop it
+    if n_dst_toks != 0:
+        del codes[-n_dst_toks:]
+    assert len(codes) == len(tokens)
+    
+    return codes
+
+def interleave_targets_and_distractors(word_list, distractors):
+
+    distractor_sizes = ["n0"] + list(distractors.keys()) # conde the non-interleaved condition as well
+
+    out = {key: [] for key in distractor_sizes}
+    out2 = {key: [] for key in distractor_sizes}
+    
+    for dst_size in distractor_sizes:
+        
+        distractor_list = [None]
+        
+        if dst_size != "n0":
+            distractor_list = distractors[dst_size]
+        
+        # loop over ngram chunks for each a trial
+        for targets in word_list:
+            
+            # construct target codes
+            target_codes = [list(np.ones(len(e), dtype=str)) for e in targets]
+            
+            for dst in distractor_list:
+                
+                if dst is not None:
+                    dst_codes = [list(np.full(len(e), fill_value=2, dtype=str)) for e in dst]
+                
+                nouns = targets
+                nouns_codes = target_codes
+                
+                # if there are distractors, interleave them
+                if dst is not None:
+                    nouns = interleave(items1=targets, items2=dst)
+                    nouns_codes = interleave(items1=target_codes, items2=dst_codes)
+                
+                trial = ", ".join([", ".join(e) for e in filter(None, nouns)]) + "."
+                trial_codes = ", ".join([", ".join(e) for e in filter(None, nouns_codes)]) + "."
+                
+                out[dst_size].append(" " + trial)
+                out2[dst_size].append(" " + trial_codes)
+
+    return out, out2
+
 
 # ===== EXPERIMENT CLASS ===== #
 
@@ -92,12 +287,11 @@ class Experiment(object):
     Exp() class contains wrapper methods to run experiments with transformer models.
     """
     
-    def __init__(self, model, tokenizer, input_sequences, context_len, device):
+    def __init__(self, model, tokenizer, context_len, device):
 
         self.model = model
         self.tokenizer = tokenizer
         self.device = device
-        self.input_sequences = input_sequences
         self.context_len = context_len
         self.model.to(device)
 
@@ -216,10 +410,11 @@ class Experiment(object):
 
 def runtime_code(): 
     
-    from stimuli import prefixes, prompts
+    from stimuli import prefixes, prompts, prefixes_repeated_ngrams
     
     
     # ===== INITIATIONS ===== #
+    
     # collect input arguments
     parser = argparse.ArgumentParser(description="surprisal.py runs perplexity experiment")
     
@@ -227,6 +422,8 @@ def runtime_code():
                         help="str, which scenario to use")
     parser.add_argument("--condition", type=str,
                         help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
+    parser.add_argument("--paradigm", type=str, choices=["with-context", "repeated-ngrams"],
+                        help="whether or not to permute the second word list")
     parser.add_argument("--context_len", type=int, default=1024,
                         help="length of context window in tokens for transformers")
     parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
@@ -253,19 +450,28 @@ def runtime_code():
     
     # load the word lists in .json files
     with open(argins.input_filename) as f:
+        
         print("Loading {} ...".format(argins.input_filename))
         stim = json.load(f)
     
-    # convert word lists to strings and permute the second one if needed
-    # add space at the string onset
-    word_list1 = [" " + ", ".join(l) + "." for l in stim]
+        # convert word lists to strings and permute the second one if needed
+        # add space at the string onset
+        word_lists1 = stim
+    
+    if argins.paradigm == "repeated-ngrams":
+        
+        print("Loading {} ...".format("./data/ngram-distractors.json"))
+        with open("./data/ngram-distractors.json") as f:
+            distractors = json.load(f)
+    
     if argins.condition == "permute":
     
         # This condition test for the effect of word order
         # Lists have the same words, but the word order is permuted
         # int the second one
-        word_list2 = [" " + ", ".join(np.random.RandomState((543+j)*5).permutation(stim[j]).tolist()) + "."
-                      for j in range(len(stim))]
+        word_lists2 = {key: [" " + ", ".join(np.random.RandomState((543+j)*5).permutation(stim[key][j]).tolist()) + "."
+                      for j in range(len(stim[key]))]
+                      for key in stim.keys()}
     
     elif argins.condition == "control":
     
@@ -273,76 +479,114 @@ def runtime_code():
         # Here list length is the only common factor between two lists
     
         print("Creating reverse control condition...")
-        print("Assuming input list can be evenly split into 3 lists each of len(list)==20!")
-        len3 = stim[0:20]
-        len5 = stim[20:40]
-        len10 = stim[40::]
-        word_list2 = [" " + ", ".join(l) + "." for lst in (len3, len5, len10)
-                                  for l in reversed(lst)]
+        word_lists2 = {key: list(reversed(stim[key])) for key in stim.keys()}
     
     else:
-        word_list2 = word_list1
+        word_lists2 = word_lists1
     
     # if n-gram experiment modify prompt and prefix dicts, recreate them on the fly
     # to only contain a single prompt
-    if "ngram" in argins.input_filename:
+    if "ngram" in argins.input_filename and argins.paradigm == "with-context":
         # grab only the first prefix and prompt
         prefixes = {argins.scenario: {list(prefixes[argins.scenario].keys())[0] : list(prefixes[argins.scenario].values())[0]}}
         prompts = {argins.scenario: {list(prompts[argins.scenario].keys())[0] : list(prompts[argins.scenario].values())[0]}}   
     
-    print(word_list1)
     
-     # declare device and paths
+    # ===== INITIATE EXPERIMENT CLASS ===== #
+    
+    # declare device and paths
     device = torch.device(argins.device if torch.cuda.is_available() else "cpu") 
         
     # setup the model
     tokenizer = AutoTokenizer.from_pretrained('gpt2')
     model = AutoModelForCausalLM.from_pretrained('gpt2')
     
-    # construct input sequences
-    input_sequences, meta_data = concat_and_tokenize_inputs(prompts=prompts[argins.scenario], 
-                                                            prefixes=prefixes[argins.scenario], 
-                                                            word_list1=word_list1, 
-                                                            word_list2=word_list2,
-                                                            tokenizer=tokenizer)
-    
-    # ===== INITIATE EXPERIMENT CLASS ===== #
-    
     experiment = Experiment(model=model, tokenizer=tokenizer, 
-                            input_sequences=input_sequences,
                             context_len=argins.context_len,
                             device=device)
     
-    # run experiment
-    output_dict = experiment.run_perplexity(input_sequences)
-    
-    # ===== FORMAT AND SAVE OUTPUT ===== #
-    
-    # convert the output to dataframe
-    dfout = []
-    counter = 1  # counter for trials
-    
-    n_sequences = len(output_dict["surp"])
-    
-    # loop over trials
-    for i in range(0, n_sequences):
+    # run the experiment for all possible word lists
+    # construct input sequences
+    for n_words in list(word_lists1.keys())[-2:-1]:
         
-        # convert the last two elements of the tuple to an array
-        dftmp = pd.DataFrame(np.asarray([output_dict["token"][i], 
-                                         meta_data["trialID"][i], 
-                                         meta_data["positionID"][i], 
-                                         output_dict["surp"][i]]).T,
-                             columns=["token", "trialID", "positionID", "surp"])
-    
-        dftmp["ispunct"] = dftmp.token.isin([".", ":", ","])     # create punctuation info column
-        dftmp['prefix'] = meta_data["prefix"][i]               # add a column of prefix labels
-        dftmp['prompt'] = meta_data["prompt"][i]               # add a column of prompt labels
-        dftmp["list_len"] = meta_data["list_len"][i]               # add list length
-        dftmp['stimID'] = counter
-        dftmp['second_list'] = argins.condition                  # log condition of the second list
-    
-        dfout.append(dftmp)
-        counter += 1
+        if argins.paradigm == "with-context":
+            
+            # this routing loops over prompts and prefixes
+            # it keeps track of that in meta_data
+            input_sequences, meta_data = concat_and_tokenize_inputs(prompts=prompts[argins.scenario], 
+                                                                    prefixes=prefixes[argins.scenario], 
+                                                                    word_list1=word_lists1[n_words], 
+                                                                    word_list2=word_lists2[n_words],
+                                                                    tokenizer=tokenizer)
+            
+        elif argins.paradigm == "repeated-ngrams":
+
+            word_lists, codes = interleave_targets_and_distractors(word_lists1[n_words], distractors)
+            
+                        
+            input_sequences, meta_data = concat_and_tokenize_inputs2(prefixes=prefixes_repeated_ngrams[argins.scenario],
+                                                                     ngram_sets=word_lists,
+                                                                     ngram_size=n_words.split("-")[0],
+                                                                     ngram_sets_codes=codes,
+                                                                     tokenizer=tokenizer)
+            
+        
+        # loop over conditions
+        output_dict = experiment.run_perplexity(input_sequences)
+        
+        
+        # ===== FORMAT AND SAVE OUTPUT ===== #
+        
+        # convert the output to dataframe
+        if argins.paradigm == "with-context":
+            
+            meta_cols = ["trialID", "positionID", "subtok"]
+            colnames = ["token"] + meta_cols + ["surp"]
+            arrays = [output_dict["token"], 
+                      meta_data["trialID"], 
+                      meta_data["positionID"],
+                      meta_data["subtok"],
+                      output_dict["surp"]]
+        
+        # this paradigm one has one extra meta column
+        elif argins.paradigm == "repeated-ngrams":
+            
+            meta_cols = ["trialID", "positionID", "subtok", "subtok_markers"]
+            colnames = ["token"] + meta_cols + ["surp"]
+            arrays = [output_dict["token"], 
+                      meta_data["trialID"], 
+                      meta_data["positionID"],
+                      meta_data["subtok"],
+                      meta_data["subtok_markers"],
+                      output_dict["surp"]]
+        
+        dfout = []
+        counter = 1  # counter for trials
+        n_sequences = len(output_dict["surp"])
+        
+        # make a new single dict with all rows for the df below
+        dfrows = {key_arr[0]: key_arr[1] for i, key_arr in enumerate(zip(colnames, arrays))}
+        
+        # loop over trials
+        for i in range(0, n_sequences):
+            
+            # a list of lists (row values) for this sequence
+            row_values = [dfrows[key][i] for key in dfrows.keys()]
+            
+            # convert the last two elements of the tuple to an array
+            dftmp = pd.DataFrame(np.asarray(row_values).T,
+                                 columns=colnames)
+        
+            # now add the constant values for the current sequence rows
+            dftmp["ispunct"] = dftmp.token.isin([".", ":", ","])    # create punctuation info column
+            dftmp['prefix'] = meta_data["prefix"][i]                # add a column of prefix labels
+            dftmp['prompt'] = meta_data["prompt"][i]                # add a column of prompt labels
+            dftmp["list_len"] = meta_data["list_len"][i]            # add list length
+            dftmp['stimID'] = counter                               # track sequence id
+            dftmp['second_list'] = argins.condition                 # log condition of the second list
+        
+            dfout.append(dftmp)
+            counter += 1
     
     # put into a single df and save
     dfout = pd.concat(dfout)
