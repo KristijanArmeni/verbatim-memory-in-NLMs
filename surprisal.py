@@ -409,7 +409,7 @@ def runtime_code():
     
     parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3"],
                         help="str, which scenario to use")
-    parser.add_argument("--condition", type=str,
+    parser.add_argument("--condition", type=str, choices=["repeat", "permute", "control"],
                         help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
     parser.add_argument("--paradigm", type=str, choices=["with-context", "repeated-ngrams"],
                         help="whether or not to permute the second word list")
