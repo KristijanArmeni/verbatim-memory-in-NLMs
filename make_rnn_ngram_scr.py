@@ -36,9 +36,9 @@ for model_id in model_ids:
                 model_path = os.path.join(root_dir, "rnn_models", model_file)
                 
                 # create absolute paths
-                python_script = os.path.join(root_dir, "neural-complexity-master", "main.py")
+                python_script = os.path.join(root_dir, "rnn", "main.py")
                 data_dir = os.path.join(root_dir, "data")
-                vocab_path = os.path.join(root_dir, "neural-complexity-master", "vocab.txt")
+                vocab_path = os.path.join(root_dir, "rnn", "vocab.txt")
                 test_input_file = "{}_lists_{}_{}.txt".format(list_type, scenario, condition)
                 markers_fname = test_input_file.replace(".txt", "_markers.txt")
                 output_dir = os.path.join(root_dir, "output")
