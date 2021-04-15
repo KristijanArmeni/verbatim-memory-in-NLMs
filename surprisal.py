@@ -24,8 +24,7 @@ from typing import List
 from string import punctuation
 
 # own modules
-sys.path.append(os.path.join(os.environ['homepath'], 'code', 'lm-mem', 'data'))
-
+sys.path.append(os.path.join(os.environ['HOME'], 'code', 'lm-mem', 'data'))
 
 # ===== WRAPPERS FOR DATASET CONSTRUCTION ===== #
 
@@ -431,6 +430,8 @@ def runtime_code():
     assert os.path.isdir(savedir)                                 # check that the folder exists
     outpath = os.path.join(savedir, argins.output_filename)
     
+    data_dir = os.path.join(os.environ["HOME"], "code", "lm-mem", "data")
+
     print("condition == {}".format(argins.condition))
     print("scenario == {}".format(argins.scenario))
     
@@ -449,8 +450,9 @@ def runtime_code():
     
     if argins.paradigm == "repeated-ngrams":
         
-        print("Loading {} ...".format("./data/ngram-distractors.json"))
-        with open("./data/ngram-distractors.json") as f:
+        fname = os.path.join(data_dir, "ngram-distractors.json")
+        print("Loading {} ...".format(fname))
+        with open(fname) as f:
             distractors = json.load(f)
     
     if argins.condition == "permute":
@@ -496,7 +498,7 @@ def runtime_code():
     
     # run the experiment for all possible word lists
     # construct input sequences
-    for n_words in list(word_lists1.keys())[-2:-1]:
+    for n_words in list(word_lists1.keys()):
         
         if argins.paradigm == "with-context":
             
