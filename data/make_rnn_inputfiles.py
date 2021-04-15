@@ -17,7 +17,8 @@ parser.add_argument("--list_only", action="store_true")
 args = parser.parse_args()
 
 fname = args.json_filename
-input_dir = os.path.join(os.environ["homepath"], "project", "lm-mem", "src", "data")
+
+input_dir = os.path.join(os.environ["HOME"], "code", "lm-mem", "data")
 
 if args.list_only: 
     scenario = "nosce" 
@@ -49,6 +50,7 @@ if args.paradigm == "with-context":
     
 elif args.paradigm == "repeated-ngrams":
     
+    fname = os.path.join(input_dir, "ngram-random.json")
     with open(fname) as f:
         print("Loading {}".format(fname))
         stim = json.load(f)
