@@ -134,7 +134,7 @@ def concat_and_tokenize_inputs(prefixes=None, prompts=None, word_list1=None, wor
     return input_seqs_tokenized, metadata
 
 
-def concat_and_tokenize_inputs2(prefixes=None, ngram_sets=None, ngram_size=None, ngram_sets_codes=None,
+def concat_and_tokenize_inputs2(prefixes=None, ngram_sets=None, ngram_size=None,
                                tokenizer=None):
         
     """
@@ -242,7 +242,6 @@ def interleave_targets_and_distractors(word_list, distractors):
     distractor_sizes = ["n0"] + list(distractors.keys()) # conde the non-interleaved condition as well
 
     out = {key: [] for key in distractor_sizes}
-    out2 = {key: [] for key in distractor_sizes}
     
     for dst_size in distractor_sizes:
         
@@ -254,29 +253,19 @@ def interleave_targets_and_distractors(word_list, distractors):
         # loop over ngram chunks for each a trial
         for targets in word_list:
             
-            # construct target codes
-            target_codes = [list(np.ones(len(e), dtype=str)) for e in targets]
-            
             for dst in distractor_list:
                 
-                if dst is not None:
-                    dst_codes = [list(np.full(len(e), fill_value=2, dtype=str)) for e in dst]
-                
                 nouns = targets
-                nouns_codes = target_codes
                 
                 # if there are distractors, interleave them
                 if dst is not None:
                     nouns = interleave(items1=targets, items2=dst)
-                    nouns_codes = interleave(items1=target_codes, items2=dst_codes)
                 
                 trial = ", ".join([", ".join(e) for e in filter(None, nouns)]) + "."
-                trial_codes = ", ".join([", ".join(e) for e in filter(None, nouns_codes)]) + "."
                 
                 out[dst_size].append(" " + trial)
-                out2[dst_size].append(" " + trial_codes)
 
-    return out, out2
+    return out
 
 
 # ===== EXPERIMENT CLASS ===== #
@@ -521,13 +510,12 @@ def runtime_code():
             
         elif argins.paradigm == "repeated-ngrams":
 
-            word_lists, codes = interleave_targets_and_distractors(word_lists1[n_words], distractors)
+            word_lists = interleave_targets_and_distractors(word_lists1[n_words], distractors)
             
                         
             input_sequences, meta_data = concat_and_tokenize_inputs2(prefixes=prefixes_repeated_ngrams[argins.scenario],
                                                                      ngram_sets=word_lists,
                                                                      ngram_size=n_words.split("-")[0],
-                                                                     ngram_sets_codes=codes,
                                                                      tokenizer=tokenizer)
             
         
