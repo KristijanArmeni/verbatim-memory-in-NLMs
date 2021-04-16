@@ -178,24 +178,19 @@ d.rename(columns={"list": "list structure", "second_list": "condition"}, inplace
 # %% wrapper function
 
 
-def make_plot(data, nouns):
+def plot_timecourse(data, nouns):
     
     p = sns.relplot(kind="line", data=data, x="marker_pos_rel", y="surp", style="condition", col="model", 
                     estimator=np.mean, ci=95.0, err_style="bars",
                     markers=True, style_order=["repeated", "permuted", "novel"],
                     legend="auto", linewidth=1)
-    #p.fig.set_size_inches(14, 4)
+
     p.fig.subplots_adjust(top=0.85)
     p.set_titles(col_template="{col_name}")
     p.set_axis_labels("token position in list" , "mean surprisal\n[95% ci]")
-    #p._legend.set_title("condition")
+
     p.fig.suptitle("LM word list ({} nouns) recognition memory".format(nouns))
 
-    # set informative tick labels
-    #labs = data.loc[(data.marker==2) & (data.marker_pos_rel.isin(list(range(-4, 0)))) & (data.sentid==160)] \
-    #               .token[0:4].tolist() \
-    #               + list(range(0, 10))
-    #labs = [str(e) for e in labs]
 
     p.set(xticks=list(range(-4,10)))
     #p.set_xticklabels(rotation=20)
@@ -203,51 +198,35 @@ def make_plot(data, nouns):
     return p
 
 
-# In[45]:
-
+# %% plot arbitrary nouns first
 
 nouns = "arbitrary"
-p = make_plot(d.loc[d["list structure"] == nouns], nouns=nouns)
+p = plot_timecourse(d.loc[d["list structure"] == nouns], nouns=nouns)
 p.fig.set_size_inches(w=w_disp, h=h_disp)
 
-
-# In[46]:
-
-
+# save
 if savefigs:
     p.fig.set_size_inches(w=w, h=h)
     p.savefig(os.path.join(savedir, "word_order_{}_nouns.pdf".format(nouns)), transparent=True, bbox_inches="tight")
     p.savefig(os.path.join(savedir, "word_order_{}_nouns.png".format(nouns)), dpi=300, transparent=True, bbox_inches="tight")
-
 
 # In[47]:
 
-
 nouns="semantic"
-p = make_plot(d.loc[d["list structure"] == nouns], nouns=nouns)
+p = plot_timecourse(d.loc[d["list structure"] == nouns], nouns=nouns)
 p.fig.set_size_inches(w=w_disp, h=h_disp)
 
-
-# In[48]:
-
-
+# save
 if savefigs:
     p.fig.set_size_inches(w=w, h=h)
     p.savefig(os.path.join(savedir, "word_order_{}_nouns.pdf".format(nouns)), transparent=True, bbox_inches="tight")
     p.savefig(os.path.join(savedir, "word_order_{}_nouns.png".format(nouns)), dpi=300, transparent=True, bbox_inches="tight")
 
-
-# ## Experiment 3: effect of list length
-
-# In[102]:
-
+# %% ======================= %%
+# ======== LIST LENGTH ===== %%
 
 data = None
 data = pd.concat([data_gpt, data_rnn])
-
-
-# In[103]:
-
 
 # select repeat condition and all list lengths
 context_len = 8
@@ -255,26 +234,26 @@ list_len = [3, 5, 10]
 context = "intact"
 
 # we drop the first token
-sel = (data.prompt_len==context_len) &       (data.list_len.isin(list_len)) &       (data.second_list.isin(["repeat", "permute", "control"])) &       (~data.token.isin(["<|endoftext|>", " "])) &       (data.list.isin(["random", "categorized"])) &       (data.context==context) &       (data.model_id=="a-10") &       (data.marker.isin([1, 3])) &       (data.marker_pos_rel.isin(list(range(1, 10))))
+sel = (data.prompt_len==context_len) &\
+      (data.list_len.isin(list_len)) &\
+      (data.second_list.isin(["repeat", "permute", "control"])) & \
+      (~data.token.isin(["<|endoftext|>", " "])) & \
+      (data.list.isin(["random", "categorized"])) & \
+      (data.context==context) & \
+      (data.model_id=="a-10") & \
+      (data.marker.isin([1, 3])) & \
+      (data.marker_pos_rel.isin(list(range(1, 10))))
 
 d = data.loc[sel].copy()
 
-
 # Now, we average over tokens
-
-# In[104]:
-
-
 units = ["list_len", "sentid", "model", "marker", "list", "second_list"]
 dagg = d.groupby(units).agg({"surp": ["mean", "std"]}, {"token": list}).reset_index()
 dagg.columns = ['_'.join(col_v) if col_v[-1] != '' else col_v[0] for col_v in dagg.columns.values]
 
 
-# In[108]:
-
-
+# %% 
 # Define function that computes relative change in average surprisal
-
 def get_relative_change(x1=None, x2=None, labels1=None, labels2=None):
     
     """
@@ -282,7 +261,7 @@ def get_relative_change(x1=None, x2=None, labels1=None, labels2=None):
     should match.
     """
     
-    # check that any labels match
+    # check that labels match
     if (labels1 is not None) & (labels2 is not None):
         assert (labels1 == labels2).all()
     
@@ -291,8 +270,7 @@ def get_relative_change(x1=None, x2=None, labels1=None, labels2=None):
     return x_del
 
 
-# In[109]:
-
+# %%
 
 def make_bar_plot(data_frame, x, y, hue, col,
                   xlabel=None, ylabel=None, suptitle=None,
@@ -303,9 +281,10 @@ def make_bar_plot(data_frame, x, y, hue, col,
                     kind="bar", dodge=0.5, palette="tab10", zorder=2, legend=False, seed=12345,
                     hue_order=hue_order,
                     facecolor=(1, 1, 1, 0), edgecolor=["tab:gray"], ecolor=["tab:gray"], bottom=0)
+    
     ax = g.axes[0]
 
-    # right panel
+    # left panel
     select = (data_frame.model=="gpt-2")
     sns.stripplot(ax=ax[0], data=data_frame[select], x=x, y=y, hue=hue, hue_order=hue_order,
                   palette="tab10", dodge=0.5, alpha=0.25, zorder=1)
@@ -322,6 +301,7 @@ def make_bar_plot(data_frame, x, y, hue, col,
     ax[0].set_xlabel(xlabel)
     ax[1].set_xlabel(xlabel)
     
+    # make bars darker than pointclouds for visual benefit
     blue, orange, green = sns.color_palette("dark")[0:3]
     n_x_groups = len(data_frame[x].unique())
     for i in [0, 1]:
@@ -333,10 +313,15 @@ def make_bar_plot(data_frame, x, y, hue, col,
             patch.set_edgecolor(green)
     
     # annotate
-    #x_level = data_frame
-    #x_l = data_frame
-    #n = len(data_frame.loc([data_frame[x]=, y, col, hue]))  # get n for one plotted group
-    #ax[1].text(x=ax[1].get_xlim()[0], y=ax[1].get_ylim()[0]*0.9, s="N = {}".format(n))
+    x_levels = data_frame.loc[x].unique()
+    col_levels = data_frame.loc[col].unique()
+    hue_levels = data_frame.loc[hue].unique()
+    
+    # find n rows for one plotted group
+    one_group = (data_frame[x]==x_levels[0]) & (data_frame[hue]==hue_levels[0]) & (data_frame[col] == col_levels[0])
+    n = len(data_frame.loc[one_group])  
+    
+    ax[1].text(x=ax[1].get_xlim()[0], y=ax[1].get_ylim()[0]*0.9, s="N = {}".format(n))
     
     # legend
     # Improve the legend 
@@ -356,11 +341,8 @@ def make_bar_plot(data_frame, x, y, hue, col,
     return g, ax
 
 
-# In[110]:
-
-
-# apply relatvie change computation and apply to 
-
+# %% compute relative change
+# apply relatvie change to each group and apply to 
 df_list = []
 for model in ["gpt-2", "lstm"]:
     for length in [3, 5, 10]:
