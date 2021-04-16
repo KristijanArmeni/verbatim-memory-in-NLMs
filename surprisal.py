@@ -24,7 +24,11 @@ from typing import List
 from string import punctuation
 
 # own modules
-sys.path.append(os.path.join(os.environ['HOME'], 'code', 'lm-mem', 'data'))
+if "win" in sys.platform:
+    sys.path.append(os.path.join(os.environ['homepath'], 'project', 'lm-mem', 'src'))
+elif "linux" in sys.platform:
+    sys.path.append(os.path.join(os.environ['HOME'], 'code', 'lm-mem', 'data'))
+    
 
 # ===== WRAPPERS FOR DATASET CONSTRUCTION ===== #
 
@@ -133,8 +137,8 @@ def concat_and_tokenize_inputs(prefixes=None, prompts=None, word_list1=None, wor
     return input_seqs_tokenized, metadata
 
 
-def concat_and_tokenize_inputs2(prefixes=None, ngram_sets=None, ngram_size=None,
-                               tokenizer=None):
+def concat_and_tokenize_inputs2(prefixes=None, input_sets=None, ngram_size=None,
+                                tokenizer=None):
         
     """
     function that concatenates and tokenizes
@@ -155,12 +159,13 @@ def concat_and_tokenize_inputs2(prefixes=None, ngram_sets=None, ngram_size=None,
     # loop over different prefixes:
     for prefix_key in prefixes.keys():
 
-        # loop over prompts
-        for dst_size in ngram_sets.keys():
+        # loop over distractor sets
+        for dst_size in input_sets.keys():
             
-            input_lists = ngram_sets[dst_size]
+            # get input lists interleaved with distractors of dst_size
+            input_lists = input_sets[dst_size]
             
-            # loop over trials
+            # loop each input sequence
             for i in range(len(input_lists)):
                 
                 # tokenize strings separately to be able to construct markers for prefix, word lists etc.
@@ -215,30 +220,12 @@ def interleave(items1, items2):
     
     items2.append("") # add a dummy element at the end
     return [val for pair in zip(items1, items2) for val in pair]
-    
-def code_intereleaved_tokens(tokens=None, markers=[1, 2], n_target_toks=None, n_dst_toks=None, repetitions=5):
-    
-    codes = list(np.tile(np.repeat(markers, [n_target_toks, n_dst_toks]), repetitions))
-    
-    # compute effective list length
-    len_effect = len(tokens)
-    len_full = (n_target_toks*repetitions) + ((n_dst_toks)*(repetitions))
-    
-    # there should always be just one distractor ngram too much, 
-    # make sure it checks
-    ngram_diff = len_full - len_effect
-    assert ngram_diff == n_dst_toks
-    
-    # this process generates 1 ngram code too much, drop it
-    if n_dst_toks != 0:
-        del codes[-n_dst_toks:]
-    assert len(codes) == len(tokens)
-    
-    return codes
+
 
 def interleave_targets_and_distractors(word_list, distractors):
-
-    distractor_sizes = ["n0"] + list(distractors.keys()) # conde the non-interleaved condition as well
+    
+    # conde the non-interleaved condition as well
+    distractor_sizes = ["n0"] + list(distractors.keys()) 
 
     out = {key: [] for key in distractor_sizes}
     
@@ -398,6 +385,7 @@ class Experiment(object):
 
 def runtime_code(): 
     
+    
     from stimuli import prefixes, prompts, prefixes_repeated_ngrams
     
     
@@ -430,13 +418,16 @@ def runtime_code():
     assert os.path.isdir(savedir)                                 # check that the folder exists
     outpath = os.path.join(savedir, argins.output_filename)
     
-    data_dir = os.path.join(os.environ["HOME"], "code", "lm-mem", "data")
+    # manage platform dependent stuff
+    if "win" in sys.platform: 
+        data_dir = os.path.join(os.environ["homepath"], "project", "lm-mem", "src", "data")
+    elif "linux" in sys.platform:
+        data_dir = os.path.join(os.environ["HOME"], "code", "lm-mem", "data")
 
     print("condition == {}".format(argins.condition))
     print("scenario == {}".format(argins.scenario))
     
-    
-    # ===== DATASET MANAGEMENT ===== #
+    # ===== DATA MANAGEMENT ===== #
     
     # load the word lists in .json files
     with open(argins.input_filename) as f:
@@ -498,6 +489,10 @@ def runtime_code():
     
     # run the experiment for all possible word lists
     # construct input sequences
+    
+    # list storing output dataframes
+    experiment_outputs = []
+    
     for n_words in list(word_lists1.keys()):
         
         if argins.paradigm == "with-context":
@@ -516,12 +511,12 @@ def runtime_code():
             
                         
             input_sequences, meta_data = concat_and_tokenize_inputs2(prefixes=prefixes_repeated_ngrams[argins.scenario],
-                                                                     ngram_sets=word_lists,
+                                                                     input_sets=word_lists,
                                                                      ngram_size=n_words.split("-")[0],
                                                                      tokenizer=tokenizer)
             
         
-        # loop over conditions
+        # ===== RUN EXPERIMENT LOOP ===== #
         output_dict = experiment.run_perplexity(input_sequences)
         
         
@@ -550,7 +545,6 @@ def runtime_code():
                       meta_data["subtok_markers"],
                       output_dict["surp"]]
         
-        dfout = []
         counter = 1  # counter for trials
         n_sequences = len(output_dict["surp"])
         
@@ -575,15 +569,15 @@ def runtime_code():
             dftmp['stimID'] = counter                               # track sequence id
             dftmp['second_list'] = argins.condition                 # log condition of the second list
         
-            dfout.append(dftmp)
+            experiment_outputs.append(dftmp)
             counter += 1
     
     # put into a single df and save
-    dfout = pd.concat(dfout)
+    output = pd.concat(experiment_outputs)
     
     # save output
     print("Saving {}".format(outpath))
-    dfout.to_csv(outpath, sep=",")
+    output.to_csv(outpath, sep=",")
 
 # ===== RUN ===== #
 if __name__ == "__main__":
