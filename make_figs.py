@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
+# %%:
 
 import sys, os
 sys.path.append(os.path.abspath("C:/users/karmeni1/project/lm-mem/"))
@@ -16,9 +15,6 @@ from matplotlib import pyplot as plt
 import matplotlib
 
 
-# In[2]:
-
-
 # set some matplotlib options to handle text better
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
@@ -27,17 +23,14 @@ matplotlib.rcParams['ps.fonttype'] = 42
 #sns.set(font_scale=1.3)
 sns.set_style("white")  # use the simple white style
 
-
-# In[3]:
+# %%
 
 # set paths
 home_dir = os.path.join(os.environ['homepath'], "project", "lm-mem", "src")
 savedir = os.path.join(os.environ['homepath'], "project", "lm-mem", "fig")
 savefigs = True
 
-
 # In[4]:
-
 
 data_rnn = pd.read_csv(os.path.join(home_dir, "output", "output_rnn_2.csv"), sep="\t", index_col=0)
 data_rnn.rename(columns={"word":"token"}, inplace=True)
@@ -48,33 +41,32 @@ data_gpt.sentid -= 1  # switch to zero indexing
 data_gpt["model"] = "gpt-2"
 data_rnn["model"] = "lstm"
 
+# %% ===== DESIGN FIGURES ===== %%
 
-# # Design figures
-
-# In[6]:
-
-
-# common fig properties
+# set display and saving dimensions
 w, h, w_disp, h_disp = 7, 0.6, 17, 3
 
+# select apropriate conditions
+sel = (data_gpt.prompt_len == 8) & \
+      (data_gpt.list_len == 10) & \
+      (data_gpt.second_list == "repeat") & \
+      (data_gpt.context=="intact") & \
+      (data_gpt.list=="random") & \
+      (data_gpt.sentid.isin([40, 41])) & \
+      (data_gpt.model_id=="a-10") & \
+      (~data_gpt.token.isin([" ", "<|endoftext|>"]))      
 
-# In[7]:
-
-
-sel = (data_gpt.prompt_len==8) &       (data_gpt.list_len==10) &       (data_gpt.second_list=="repeat") &       (data_gpt.context=="intact") &       (data_gpt.list=="random") &       (data_gpt.sentid.isin([40, 41])) &       (data_gpt.model_id=="a-10") &       (~data_gpt.token.isin([" ", "<|endoftext|>"]))
+# select data
 data = data_gpt.loc[sel].copy()
 
+# %%
 
-# In[8]:
-
-
+# extract single sentence data
 x = data.loc[data.sentid==41].reset_index().index.values
 y = data.loc[data.sentid==41].surp.to_numpy()
 l = data.loc[data.sentid==41].token.to_numpy()
 
-
-# In[9]:
-
+# %%
 
 f, a = plt.subplots(figsize=(w_disp, 2))
 a.plot(x, y, marker=".", markerfacecolor="white", linestyle="--", linewidth=1)
@@ -93,33 +85,31 @@ a.spines["top"].set_visible(False)
 a.spines["right"].set_visible(False)
 a.set(ylabel="surprisal", title="Word-by-word surprisal (-LL) GPT-2");
 
-
-# In[10]:
-
-
+# save
 if savefigs:
     f.set_size_inches(w=w, h=h)
     f.savefig(os.path.join(savedir, "example_gpt2.pdf"), transparent=True, dpi=300, bbox_inches="tight")
     f.savefig(os.path.join(savedir, "example_gpt2.png"), transparent=True, dpi=300, bbox_inches="tight")
 
+# %% Example RNN timecourse
 
-# In[11]:
+sel = (data_rnn.prompt_len==8) &\
+      (data_rnn.list_len==10) & \
+      (data_rnn.second_list=="repeat") & \
+      (data_rnn.context=="intact") & \
+      (data_rnn.list=="random") & \
+      (data_rnn.model_id=="a-10") & \
+      (data_rnn.sentid.isin([40, 41]))
 
-
-sel = (data_rnn.prompt_len==8) &       (data_rnn.list_len==10) &       (data_rnn.second_list=="repeat") &       (data_rnn.context=="intact") &       (data_rnn.list=="random") &       (data_rnn.model_id=="a-10") &       (data_rnn.sentid.isin([40, 41]))
 data = data_rnn.loc[sel].copy()
 
-
-# In[12]:
-
+# %% 
 
 x = data.loc[data.sentid==41].reset_index().index.values
 y = data.loc[data.sentid==41].surp.to_numpy()
 l = data.loc[data.sentid==41].token.to_numpy()
 
-
-# In[13]:
-
+# %% Plot
 
 f, a = plt.subplots(figsize=(w_disp, 2))
 a.plot(x, y, marker=".", markerfacecolor="white", linestyle="--", linewidth=1)
@@ -139,60 +129,60 @@ a.spines["right"].set_visible(False)
 
 a.set(ylabel="surprisal", title="Word-by-word surprisal (-LL) LSTM");
 
-
-# In[14]:
-
+# %% save
 
 if savefigs:
     f.set_size_inches(w=w, h=h)
     f.savefig(os.path.join(savedir, "./example_rnn.pdf"), transparent=True, dpi=300, bbox_inches="tight")
     f.savefig(os.path.join(savedir, "./example_rnn.png"), transparent=True, dpi=300, bbox_inches="tight")
 
+# %% ===== MAIN FIGURES ===== %%
 
-# # Main figures
+# Experiment 1 and 2: word order and semantic structure
 
-# ## Experiment 1 and 2: word order and semantic structure
-
-# In[43]:
-
-
-# common fig properties
+# set figure dimensions
 w, h, w_disp, h_disp = 10, 1.5, 17, 3
-
-
-# In[22]:
-
 
 data = pd.concat([data_gpt, data_rnn])
 
+# rename row values 
 data.loc[data["list"]=="categorized", "list"] = "semantic"
 data.loc[data["list"]=="random", "list"] = "arbitrary"
-data.loc[data["second_list"]=="control", "second_list"] = "unseen"
+data.loc[data["second_list"]=="control", "second_list"] = "novel"
 data.loc[data["second_list"]=="repeat", "second_list"] = "repeated"
 data.loc[data["second_list"]=="permute", "second_list"] = "permuted"
 
-
 # In[23]:
 
+context_len = 8         # select short context
+list_len = 10           # select shortest list
+context = "intact"      # take the intact context
+markers = [2, 3]
+marker_range = list(range(-4, 10))
+list_types = ["arbitrary", "semantic"]
 
-context_len = 8
-list_len = 10
-context = "intact"
-
-sel = (data.prompt_len==context_len) &       (data.list_len==list_len) &       (data.list.isin(["arbitrary", "semantic"])) &       (data.context==context) &       (data.model_id=="a-10") &       (data.marker.isin([2, 3])) &       (data.marker_pos_rel.isin(list(range(-4, 10))))
+sel = (data.prompt_len == context_len) & \
+      (data.list_len == list_len) & \
+      (data.list.isin(list_types)) & \
+      (data.context == context) & \
+      (data.model_id == "a-10") & \
+      (data.marker.isin(markers)) & \
+      (data.marker_pos_rel.isin(marker_range))
+      
 d = data.loc[sel].copy()
 
 # name column manually
 d.rename(columns={"list": "list structure", "second_list": "condition"}, inplace=True)
 
 
-# In[44]:
+# %% wrapper function
 
 
 def make_plot(data, nouns):
+    
     p = sns.relplot(kind="line", data=data, x="marker_pos_rel", y="surp", style="condition", col="model", 
                     estimator=np.mean, ci=95.0, err_style="bars",
-                    markers=True, style_order=["repeated", "permuted", "unseen"],
+                    markers=True, style_order=["repeated", "permuted", "novel"],
                     legend="auto", linewidth=1)
     #p.fig.set_size_inches(14, 4)
     p.fig.subplots_adjust(top=0.85)
