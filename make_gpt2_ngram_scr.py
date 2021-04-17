@@ -22,13 +22,13 @@ for model_id in ["a-10"]:
                                                                  condition,
                                                                  list_type)
                 
-                input_fname_path = os.path.join(root_dir, "data", "{}_lists.json".format(list_type))
+                input_fname_path = os.path.join(root_dir, "data", "{}.json".format(list_type))
                 output_path = os.path.join(root_dir, "output")
                 python_file = os.path.join(root_dir, "surprisal.py")
                 
                 # create command string
                 command = "python {} --condition {} --scenario {} " \
-                          "--paradigm repeated-ngrams" \
+                          "--paradigm repeated-ngrams " \
                           "--input_filename {} " \
                           "--output_dir {} --output_file {}"\
                           .format(python_file,
@@ -46,7 +46,7 @@ for model_id in ["a-10"]:
                 f.write("#!/bin/bash\n")
                 f.write("#SBATCH --job-name=" + scr_filename + "\n")
                 f.write("#SBATCH --time=48:0:0\n")
-                f.write("#SBATCH --partition=shared\n")
+                f.write("#SBATCH --partition=lrgmem\n")
                 f.write("#SBATCH --nodes=1\n")
                 f.write("#SBATCH --ntasks-per-node=5\n")
                 f.write("#SBATCH --mail-type=end\n")
