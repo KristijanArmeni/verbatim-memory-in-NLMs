@@ -8,7 +8,7 @@ do
     do
         for l in "random" "categorized";
         do
-            python ./data/make_rnn_inputfiles.py --json_filename $homedir"/data/"$l"_lists.json" --paradigm "with-context" --condition $cond --scenario_key $sce
+            python $homedir"/data/make_rnn_inputfiles.py" --json_filename $homedir"/data/"$l"_lists.json" --paradigm "with-context" --condition $cond --scenario_key $sce
         done
     done
 done
