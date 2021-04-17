@@ -46,7 +46,7 @@ for model_id in ["a-10"]:
                 f.write("#!/bin/bash\n")
                 f.write("#SBATCH --job-name=" + scr_filename + "\n")
                 f.write("#SBATCH --time=48:0:0\n")
-                f.write("#SBATCH --partition=shared\n")
+                f.write("#SBATCH --partition=lrgmem\n")
                 f.write("#SBATCH --nodes=1\n")
                 f.write("#SBATCH --ntasks-per-node=5\n")
                 f.write("#SBATCH --mail-type=end\n")

@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=script_surp_gpt2_a-10_sce1_control_categorized
 #SBATCH --time=48:0:0
-#SBATCH --partition=shared
+#SBATCH --partition=lrgmem
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=5
 #SBATCH --mail-type=end
