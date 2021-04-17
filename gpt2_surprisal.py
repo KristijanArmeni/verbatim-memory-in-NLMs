@@ -91,6 +91,11 @@ def concat_and_tokenize_inputs(prefixes=None, prompts=None, word_list1=None, wor
         "prompt": [],
         }
     
+    # join list elements into strings for tokenizer below
+    input_seqs = [" " + ", ".join(tks) + "." for tks in word_list1]
+    input_seqs2 = [" " + ", ".join(tks) + "." for tks in word_list2]
+    
+    # list storing outputs
     input_seqs_tokenized = []
     
     # loop over different prefixes:
@@ -100,13 +105,13 @@ def concat_and_tokenize_inputs(prefixes=None, prompts=None, word_list1=None, wor
         for prompt_key in prompts.keys():
 
             # loop over trials
-            for i in range(len(word_list1)):
+            for i in range(len(input_seqs)):
                 
                 # tokenize strings separately to be able to construct markers for prefix, word lists etc.
                 i1 = tokenizer.encode("<|endoftext|> " + prefixes[prefix_key], return_tensors="pt")   # prefix IDs, add eos token
-                i2 = tokenizer.encode(word_list1[i], return_tensors="pt") 
+                i2 = tokenizer.encode(input_seqs[i], return_tensors="pt") 
                 i3 = tokenizer.encode(prompts[prompt_key], return_tensors="pt")                       # prompt IDs
-                i4 = tokenizer.encode(word_list2[i] + "<|endoftext|>", return_tensors="pt")
+                i4 = tokenizer.encode(input_seqs2[i] + "<|endoftext|>", return_tensors="pt")
 
                 # compose the input ids tensors
                 input_ids = torch.cat((i1, i2, i3, i4), dim=1)
