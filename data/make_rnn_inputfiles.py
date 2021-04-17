@@ -122,7 +122,8 @@ if args.paradigm == "with-context":
             for list_size in stim.keys():
                 
                 current_list = stim[list_size]
-                curr_list_rev = stim_reversed[list_size]
+                if args.condition == "control":
+                    curr_list_rev = stim_reversed[list_size]
                 
                 for j, l in enumerate(current_list):
                     
