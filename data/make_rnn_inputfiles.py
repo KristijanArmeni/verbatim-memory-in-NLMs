@@ -3,7 +3,7 @@ import json
 import argparse
 from nltk import word_tokenize
 import numpy as np
-import os
+import os, sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--json_filename", type=str)
@@ -18,7 +18,10 @@ args = parser.parse_args()
 
 fname = args.json_filename
 
-input_dir = os.path.join(os.environ["HOME"], "code", "lm-mem", "data")
+if  "linux" in sys.platform:
+    input_dir = os.path.join(os.environ["HOME"], "code", "lm-mem", "data")
+elif  "win" in sys.platform:
+    input_dir = os.path.join(os.environ["homepath"], "project", "lm-mem", "src", "data")
 
 if args.list_only: 
     scenario = "nosce" 
