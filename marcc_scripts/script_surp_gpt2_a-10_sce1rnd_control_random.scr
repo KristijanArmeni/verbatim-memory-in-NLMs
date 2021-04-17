@@ -13,5 +13,5 @@
 ml anaconda
 conda activate ~/code/conda_envs/core_env
 
-python /home-3/karmeni1@jhu.edu/code/lm-mem/surprisal.py --condition control --scenario sce1rnd --input_filename /home-3/karmeni1@jhu.edu/code/lm-mem/data/random_lists.json --output_dir /home-3/karmeni1@jhu.edu/code/lm-mem/output --output_file surprisal_gpt2_a-10_sce1rnd_control_random.csv
+python /home-3/karmeni1@jhu.edu/code/lm-mem/gpt2_surprisal.py --condition control --scenario sce1rnd --paradigm with-context --input_filename /home-3/karmeni1@jhu.edu/code/lm-mem/data/random_lists.json --output_dir /home-3/karmeni1@jhu.edu/code/lm-mem/output --output_file surprisal_gpt2_a-10_sce1rnd_control_random.csv
 

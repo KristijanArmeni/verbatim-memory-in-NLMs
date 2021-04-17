@@ -5,7 +5,7 @@ import os
 
 # home directory on marcc compute cluster
 # this is git versioned repo:
-root_dir=os.path.expanduser("~/code/lm-mem")
+root_dir = os.path.expanduser("~/code/lm-mem")
 scripts_dir = os.path.join(root_dir, "marcc_scripts")
 log_dir = os.path.join(root_dir, 'logs')
 
@@ -23,11 +23,11 @@ for model_id in ["a-10"]:
                 
                 input_fname_path = os.path.join(root_dir, "data", "{}_lists.json".format(list_type))
                 output_path = os.path.join(root_dir, "output")
-                python_file = os.path.join(root_dir, "surprisal.py")
+                python_file = os.path.join(root_dir, "gpt2_surprisal.py")
                 
                 # create command string
                 command = "python {} --condition {} --scenario {} " \
-                          "--paradigm with-context" \
+                          "--paradigm with-context " \
                           "--input_filename {} " \
                           "--output_dir {} --output_file {}"\
                           .format(python_file,
