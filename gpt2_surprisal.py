@@ -76,7 +76,7 @@ def assign_subtokens_to_groups(subtoken_splits, markers, ngram1_size, ngram2_siz
     return out
 
 def concat_and_tokenize_inputs(prefixes=None, prompts=None, word_list1=None, word_list2=None,
-                               tokenizer=None):
+                               ngram_size=None, tokenizer=None):
         
     """
     function that concatenates and tokenizes
@@ -135,7 +135,7 @@ def concat_and_tokenize_inputs(prefixes=None, prompts=None, word_list1=None, wor
                 metadata["trialID"].append(np.concatenate(trials).tolist())
                 metadata["positionID"].append(np.concatenate(positions).tolist())
                 metadata["subtok"].append(np.concatenate(split_ids).tolist())
-                metadata["list_len"].append(len([e.strip().replace(".", "") for e in word_list1[i].split(",")]))
+                metadata["list_len"].append(ngram_size)
                 metadata["prefix"].append(prefix_key)
                 metadata["prompt"].append(prompt_key)
                 
@@ -508,6 +508,7 @@ def runtime_code():
                                                                     prefixes=prefixes[argins.scenario], 
                                                                     word_list1=word_lists1[n_words], 
                                                                     word_list2=word_lists2[n_words],
+                                                                    ngram_size=n_words.strip("n"),
                                                                     tokenizer=tokenizer)
             
         elif argins.paradigm == "repeated-ngrams":
