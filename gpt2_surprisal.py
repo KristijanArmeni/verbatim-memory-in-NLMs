@@ -348,13 +348,13 @@ class Experiment(object):
                outputs = self.model(sel_input_ids, labels=target_ids)  # this returns avg log likelihood over sequence
                log_likelihood = outputs[0] * trg_len  # not sure about this multiplication here (undoing averaging?)
 
-               llh.append(log_likelihood.tolist())
+               llh.append(log_likelihood.cpu().tolist())
                toks = self.tokenizer.decode(target_ids[0][-stride::])
                tokens.append(toks)  # store the last token (target_id)
 
         # compute perplexity, divide by the lenth of the sequence
         # use np.nansum as token at position 0 will have -LL of nan
-        ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc)
+        ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc).cpu()
         return ppl, llh, tokens
     
     def run_perplexity(self, input_sequences_ids) -> List:
@@ -576,6 +576,8 @@ def runtime_code():
         
             experiment_outputs.append(dftmp)
             counter += 1
+    
+    experiment.model.to("cpu")
     
     # put into a single df and save
     output = pd.concat(experiment_outputs)
