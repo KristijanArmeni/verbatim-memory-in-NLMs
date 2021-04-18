@@ -336,7 +336,9 @@ class Experiment(object):
 
             # define target labels, use input ids as target outputs
             target_ids = sel_input_ids.clone()
-            target_ids[:, :-trg_len] = -100  # ignore the tokens that were used for context when computing the loss
+            
+            # do not compute the loss on  tokens (-100) that are used for context
+            target_ids[:, :-trg_len] = -100  
 
             # set model to evaluation mode
             self.model.eval()
@@ -344,8 +346,11 @@ class Experiment(object):
             # get model output
             with torch.no_grad():
 
-               # compute log likelihood
-               outputs = self.model(sel_input_ids, labels=target_ids)  # this returns avg log likelihood over sequence
+               # compute neg log likelihood over target ids (n+1 in our case)
+               # indices are shifted under the hood by model.__call__()
+               outputs = self.model(sel_input_ids, labels=target_ids)
+               
+               # first element of the tuple contains the loss
                log_likelihood = outputs[0] * trg_len  # not sure about this multiplication here (undoing averaging?)
 
                llh.append(log_likelihood.cpu().tolist())
@@ -357,10 +362,16 @@ class Experiment(object):
         ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc).cpu()
         return ppl, llh, tokens
     
-    def run_perplexity(self, input_sequences_ids) -> List:
+    def start(self, input_sequences_ids) -> List:
         """
-        experiment.run() will loop over prefixes, prompts, and word_lists and run the Sampler on them
-        It returns a list of tuples.
+        experiment.start() will loop over prefixes, prompts, and word_lists and run the .ppl() method on them
+        It returns a dict:
+        outputs = {
+            "sequence_ppl": [],
+            "surp": [],
+            "token": [],
+            }
+            
         """
         
         # output dict
@@ -435,9 +446,10 @@ def runtime_code():
     # ===== DATA MANAGEMENT ===== #
     
     # load the word lists in .json files
-    with open(argins.input_filename) as f:
+    fname = os.path.join(data_dir, argins.input_filename)
+    with open(fname) as f:
         
-        print("Loading {} ...".format(argins.input_filename))
+        print("Loading {} ...".format(fname))
         stim = json.load(f)
     
         # convert word lists to strings and permute the second one if needed
@@ -500,6 +512,9 @@ def runtime_code():
     
     for n_words in list(word_lists1.keys()):
         
+        # ===== PREPARE INPUT SEQUENCES ===== #
+        
+        # inputs for contextualized paradigm
         if argins.paradigm == "with-context":
             
             # this routing loops over prompts and prefixes
@@ -510,7 +525,8 @@ def runtime_code():
                                                                     word_list2=word_lists2[n_words],
                                                                     ngram_size=n_words.strip("n"),
                                                                     tokenizer=tokenizer)
-            
+        
+        # prepare input sequences for the repeated ngrams paradigm
         elif argins.paradigm == "repeated-ngrams":
 
             word_lists = interleave_targets_and_distractors(word_lists1[n_words], distractors)
@@ -523,7 +539,8 @@ def runtime_code():
             
         
         # ===== RUN EXPERIMENT LOOP ===== #
-        output_dict = experiment.run_perplexity(input_sequences)
+        
+        output_dict = experiment.start(input_sequences[0:5])
         
         
         # ===== FORMAT AND SAVE OUTPUT ===== #
