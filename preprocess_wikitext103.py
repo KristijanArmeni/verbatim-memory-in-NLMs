@@ -130,10 +130,15 @@ def runtime_code():
     # strings is fine)
     print("Tokenizing train set ...")
     train_toks = tokenizer.tokenize("".join(wiki_train_resized))
+    wiki_train_resize = None
+    
     print("Tokenizing valid set ...")
     val_toks = tokenizer.tokenize("".join(wiki_val))
     print("Tokenizing test set ...")
     test_toks = tokenizer.tokenize("".join(wiki_test))
+    
+    # clear for memory
+    wiki_val, wiki_test = None, None, None
     
     # split into chunks of equal lengths, pad at the end and at the beginning
     # with eos
@@ -146,11 +151,17 @@ def runtime_code():
     test_toks_chunked = list(chunk(test_toks, args.sequence_len, equal_len=True,
                          eos=eos, bos=eos))
     
+    # clear for memory
+    train_toks, val_toks, test_toks = None, None, None
+    
     # create input indices
     train_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in train_toks_chunked]
     val_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in val_toks_chunked]
     test_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in test_toks_chunked]
-
+    
+    # clear for memory
+    train_toks_chunked, val_toks_chunked, test_toks_chunked = None, None, None
+    
     end_time = time.perf_counter()
     
     # print some timing feedback
