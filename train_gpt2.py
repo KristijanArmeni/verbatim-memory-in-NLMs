@@ -383,6 +383,16 @@ def runtime_code():
     
     # use cuda if available
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
+    
+    if args.device == "cuda":
+        t = torch.cuda.get_device_properties(0).total_memory()
+        r = torch.cuda.memory_reserved(0)
+        a = torch.cuda.memory_allocated(0)
+        f = r-a
+        print("total GPU mem: {}".format(t))
+        print("reserved GPU mem: {}".format(r))
+        print("allocated GPU mem: {}".format(a))
+        print("available GPU mem: {}".format(f))
 
 
     # ===== PREPARE DATASET ===== #
@@ -396,19 +406,23 @@ def runtime_code():
     wiki_test = load_dataset(path=args.test_ds)
     
     # initialize tokenizer
+    print("Loading tokenizer ...")
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
     
     # join the read in lines (they're separated by \n so joining with empty 
     # strings is fine)
+    print("Tokenizing datasets")
     train_toks = tokenizer.tokenize("".join(wiki_train))
     val_toks = tokenizer.tokenize("".join(wiki_val))
     test_toks = tokenizer.tokenize("".join(wiki_test))
     
     # resize train set to selected nr of tokens
+    print("Resizing train set to {} tokens".format(args.train_set_size))
     train_toks = resize(toks=train_toks, n_tokens=args.train_set_size)
     
     # split into chunks of equal lengths, pad at the end and at the beginning
     # with eos
+    print("Splitting tokens into chunks of 1024 tokens")
     eos = "|<endoftext>|"
     train_toks_chunked = list(chunk(train_toks, 1024, equal_len=True,
                            eos=eos, bos=eos))
