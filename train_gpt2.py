@@ -155,8 +155,8 @@ class Experiment(object):
             start_time = time.perf_counter()
 
             # run .train and .evaluate routines
-            _ = self.train(x=self.x_train)
-            val_loss = self.evaluate(x=self.x_eval)
+            _ = self.train(x=self.x_train.to(self.device))
+            val_loss = self.evaluate(x=self.x_eval.to(self.device))
             
             # check if best loss is reached and save model weights if so
             early_stopping.check(epoch_id=n, 
@@ -468,9 +468,9 @@ def runtime_code():
                                                 last_epoch=-1)
     
     experiment = Experiment(model=model,
-                            train_ds=train_ds.to(device),
-                            eval_ds=val_ds.to(device),
-                            test_ds=test_ds.to(device),
+                            train_ds=train_ds,
+                            eval_ds=val_ds,
+                            test_ds=test_ds,
                             train_config=TrainConfig(bs=args.batch_size,
                                                      n_epochs=args.n_epochs),
                             eval_config=EvalConfig(bs=args.batch_size,
