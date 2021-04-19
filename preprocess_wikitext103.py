@@ -111,9 +111,9 @@ def runtime_code():
     
     # datasets are already split into words/pre-tokenized (but not for GPT-2)
     print("Loading datasets")
-    #wiki_train = load_dataset(path=args.train_ds)
-    #wiki_val = load_dataset(path=args.val_ds)
-    wiki_test = load_dataset(path=args.test_ds)
+    wiki_train = load_dataset(path=os.path.join(args.datadir, args.train_ds))
+    wiki_val = load_dataset(path=os.path.join(args.datadir, args.val_ds))
+    wiki_test = load_dataset(path=os.path.join(args.datadir, args.test_ds))
     
     # initialize tokenizer
     print("Loading tokenizer ...")
@@ -122,30 +122,30 @@ def runtime_code():
     # join the read in lines (they're separated by \n so joining with empty 
     # strings is fine)
     print("Tokenizing train set ...")
-    #train_toks = tokenizer.tokenize("".join(wiki_train))
+    train_toks = tokenizer.tokenize("".join(wiki_train))
     print("Tokenizing valid set ...")
-    #val_toks = tokenizer.tokenize("".join(wiki_val))
+    val_toks = tokenizer.tokenize("".join(wiki_val))
     print("Tokenizing test set ...")
     test_toks = tokenizer.tokenize("".join(wiki_test))
     
     # resize train set to selected nr of tokens
-    #print("Resizing train set to {} tokens".format(args.train_set_size))
-    #train_toks = resize(toks=train_toks, n_tokens=args.train_set_size)
+    print("Resizing train set to {} tokens".format(args.train_set_size))
+    train_toks = resize(toks=train_toks, n_tokens=args.train_set_size)
     
     # split into chunks of equal lengths, pad at the end and at the beginning
     # with eos
     print("Splitting tokens into chunks of {} tokens".format(args.sequence_len))
     eos = "|<endoftext>|"
-    #train_toks_chunked = list(chunk(train_toks, args.sequence_len, equal_len=True,
-    #                       eos=eos, bos=eos))
-    #val_toks_chunked = list(chunk(val_toks, args.sequence_len, equal_len=True,
-    #                     eos=eos, bos=eos))
+    train_toks_chunked = list(chunk(train_toks, args.sequence_len, equal_len=True,
+                           eos=eos, bos=eos))
+    val_toks_chunked = list(chunk(val_toks, args.sequence_len, equal_len=True,
+                         eos=eos, bos=eos))
     test_toks_chunked = list(chunk(test_toks, args.sequence_len, equal_len=True,
                          eos=eos, bos=eos))
     
     # create input indices
-    #train_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in train_toks_chunked]
-    #val_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in val_toks_chunked]
+    train_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in train_toks_chunked]
+    val_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in val_toks_chunked]
     test_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in test_toks_chunked]
 
     end_time = time.perf_counter()
@@ -155,14 +155,14 @@ def runtime_code():
     print("Dataset preparation took {} (HH:MM:SS)".format(elapsed))
 
     # save tensors
-    #fname = os.path.join(args.savedir, "ids_train_ds.json")
-    #with open(fname, 'w') as f:
-    #    json.dump(train_input_ids, f)
+    fname = os.path.join(args.savedir, "ids_train_ds.json")
+    with open(fname, 'w') as f:
+        json.dump(train_input_ids, f)
     
-        # save tensors
-    #fname = os.path.join(args.savedir, "ids_valid_ds.json")
-    #with open(fname, 'w') as f:
-    #    json.dump(val_input_ids, f)
+    # save tensors
+    fname = os.path.join(args.savedir, "ids_valid_ds.json")
+    with open(fname, 'w') as f:
+        json.dump(val_input_ids, f)
         
     # save tensors
     fname = os.path.join(args.savedir, "ids_test_ds.json")
