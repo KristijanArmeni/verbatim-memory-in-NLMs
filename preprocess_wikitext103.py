@@ -76,8 +76,7 @@ def batchify(x, bs):
 # wrapper for resizing
 def resize(toks, n_tokens):
     
-    if n_tokens < len(toks):
-        
+    if n_tokens < len(toks):   
         out = toks[0:n_tokens]
     else:
         raise ValueError("Cannot resize, new size larger than existing size")
@@ -100,6 +99,8 @@ def runtime_code():
                         help="path to validation set")
     parser.add_argument("--test_ds", type=str,
                         help="path to tokenized file")
+    parser.add_argument("--train_set_size", type=float,
+                        help="size of the training set (in M tokens)")
     parser.add_argument("--sequence_len", type=int,
                         help="sequence length (in tokens) used in training and evaluation")
     parser.add_argument("--savedir", type=str, 
@@ -119,18 +120,20 @@ def runtime_code():
     print("Loading tokenizer ...")
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
     
+    # resize train set to selected nr of tokens (in mio)
+    n_tokens = int(args.train_set_size*1e6)
+    print("Resizing train set to {} tokens".format(n_tokens))
+    wiki_train_resized = resize(toks=wiki_train, n_tokens=n_tokens)
+    wiki_train = None # clear wiki_train
+    
     # join the read in lines (they're separated by \n so joining with empty 
     # strings is fine)
     print("Tokenizing train set ...")
-    train_toks = tokenizer.tokenize("".join(wiki_train))
+    train_toks = tokenizer.tokenize("".join(wiki_train_resized))
     print("Tokenizing valid set ...")
     val_toks = tokenizer.tokenize("".join(wiki_val))
     print("Tokenizing test set ...")
     test_toks = tokenizer.tokenize("".join(wiki_test))
-    
-    # resize train set to selected nr of tokens
-    print("Resizing train set to {} tokens".format(args.train_set_size))
-    train_toks = resize(toks=train_toks, n_tokens=args.train_set_size)
     
     # split into chunks of equal lengths, pad at the end and at the beginning
     # with eos
