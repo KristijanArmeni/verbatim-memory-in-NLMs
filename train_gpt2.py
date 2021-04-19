@@ -14,45 +14,13 @@ from datetime import timedelta
 from tqdm import tqdm
 import numpy as np
 import torch
-from transformers import AutoTokenizer, GPT2Config, GPT2LMHeadModel, AdamW, get_cosine_schedule_with_warmup
+import json
+from transformers import GPT2Config, GPT2LMHeadModel, AdamW, get_cosine_schedule_with_warmup
 
 
-# ============================= #
-# ===== DATASET FUNCTIONS ===== #
-# ============================= #
-
-def load_dataset(path):
-    
-    # make sure it handles "~" in path string correctly
-    path = os.path.expanduser(path)
-    
-    with open(path, "r", encoding="utf-8") as file_handle:
-        
-        lines = file_handle.readlines()
-        file_handle.close()
-
-    return lines
-
-# split dataset into chunks of 1024 tokens
-def chunk(l, n, equal_len=True, bos=None, eos=None):
-    
-    n = max(1, n)
-    
-    if (bos is not None) and (eos is not None):
-        
-        # if bos and eos need to be added adjust selected n to not exceed
-        # the allowed maximum
-        print("Adding bos and eos setting {} to {}".format(n, n-2))
-        n -= 2
-    
-    if equal_len:
-        total_len = (len(l)//n)*n
-    else:
-        total_len = len(l)
-    
-    output_list =([bos] + l[i:i+n] + [eos] for i in range(0, total_len, n))
-    
-    return output_list
+# ============================== #
+# ===== DATASET MANAGEMENT ===== #
+# ============================== #
 
 # wrapper for batching the data
 def batchify(x, bs):
@@ -72,22 +40,25 @@ def batchify(x, bs):
     
     return np.reshape(a=xtmp, newshape=newshape)
 
-# wrapper for resizing
-def resize(toks, n_tokens):
-    
-    if n_tokens < len(toks):
-        
-        out = toks[0:n_tokens]
-    else:
-        raise ValueError("Cannot resize, new size larger than existing size")
-    
-    return out
-
 
 # ============================ #
 # ===== TRAINING CLASSES ===== #
 # ============================ #
 
+# wrapper function
+def print_cuda_mem_info(device_id=0):
+    
+    t = torch.cuda.get_device_properties(device_id).total_memory
+    r = torch.cuda.memory_reserved(device_id)
+    a = torch.cuda.memory_allocated(device_id)
+    f = r-a
+    
+    gb_factor = 0.9313*10e-10
+    
+    print("total GPU mem (gb): {}".format(round(t*gb_factor)))
+    print("reserved GPU mem: {}".format(r*gb_factor))
+    print("allocated GPU mem: {}".format(a))
+    print("available GPU mem: {}".format(f))
 
 # create helper config classes
 class TrainConfig(object):
@@ -344,6 +315,8 @@ def runtime_code():
     # collect input arguments
     parser = argparse.ArgumentParser()
     
+    parser.add_argument("--datadir", type=str,
+                        help="path to dataset .json files")
     parser.add_argument("--train_ds", type=str,
                         help="path to training dataset")
     parser.add_argument("--val_ds", type=str,
@@ -354,8 +327,10 @@ def runtime_code():
                         help="filename for saving model checkpoint to --savedir")
     parser.add_argument("--seed", type=int,
                         help="seed used in torch.manual_seed() for reproducibility")
-    parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
+    parser.add_argument("--device", type=str, default="cpu", choices=["cpu", "cuda"],
                         help="device used for training")
+    parser.add_argument("--train_set_size", type=str, default="40",
+                        help="size of the traininset (in million tokens")
     parser.add_argument("--train_batch_size", type=int,
                         help="batch size to use in training ddataset")
     parser.add_argument("--eval_batch_size", type=int,
@@ -385,64 +360,29 @@ def runtime_code():
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     
     if args.device == "cuda":
-        t = torch.cuda.get_device_properties(0).total_memory()
-        r = torch.cuda.memory_reserved(0)
-        a = torch.cuda.memory_allocated(0)
-        f = r-a
-        print("total GPU mem: {}".format(t))
-        print("reserved GPU mem: {}".format(r))
-        print("allocated GPU mem: {}".format(a))
-        print("available GPU mem: {}".format(f))
+        
+        print_cuda_mem_info()
+
+    # ===== LOAD DATASETS ===== #    
+    
+    # load indices from .json files
+    fname = os.path.join(args.datadir, args.train_ds)
+    with open(fname, 'w') as f:
+        train_input_ids = json.load(f)
+        
+    fname = os.path.join(args.datadir, args.val_ds)
+    with open(fname, 'w') as f:
+        val_input_ids = json.load(f)
+
+    fname = os.path.join(args.datadir, args.test_ds)
+    with open(fname, 'w') as f:
+        test_input_ids = json.dump(f)
 
 
-    # ===== PREPARE DATASET ===== #
-    
-    start_time = time.perf_counter()
-    
-    # datasets are already split into words/pre-tokenized (but not for GPT-2)
-    print("Loading datasets")
-    wiki_train = load_dataset(path=args.train_ds)
-    wiki_val = load_dataset(path=args.val_ds)
-    wiki_test = load_dataset(path=args.test_ds)
-    
-    # initialize tokenizer
-    print("Loading tokenizer ...")
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    
-    # join the read in lines (they're separated by \n so joining with empty 
-    # strings is fine)
-    print("Tokenizing datasets")
-    train_toks = tokenizer.tokenize("".join(wiki_train))
-    val_toks = tokenizer.tokenize("".join(wiki_val))
-    test_toks = tokenizer.tokenize("".join(wiki_test))
-    
-    # resize train set to selected nr of tokens
-    print("Resizing train set to {} tokens".format(args.train_set_size))
-    train_toks = resize(toks=train_toks, n_tokens=args.train_set_size)
-    
-    # split into chunks of equal lengths, pad at the end and at the beginning
-    # with eos
-    print("Splitting tokens into chunks of 1024 tokens")
-    eos = "|<endoftext>|"
-    train_toks_chunked = list(chunk(train_toks, 1024, equal_len=True,
-                           eos=eos, bos=eos))
-    val_toks_chunked = list(chunk(val_toks, 1024, equal_len=True,
-                         eos=eos, bos=eos))
-    test_toks_chunked = list(chunk(test_toks, 1024, equal_len=True,
-                         eos=eos, bos=eos))
-    
-    # create input indices
-    train_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in train_toks_chunked]
-    val_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in val_toks_chunked]
-    test_input_ids = [tokenizer.convert_tokens_to_ids(chunk) for chunk in test_toks_chunked]
-    
-    # clear for memory (vars no longer needed)
-    wiki_train, wiki_val, wiki_test = None, None, None
-    train_toks, val_toks, test_toks = None, None, None
-    train_toks_chunked, val_toks_chunked, test_toks_chunked = None, None, None
     
     # batch the data into new shape: 
     # shape = (batch_size, batch_id, sequence_length)
+    print("Batchifying data ...")
     train_ds = torch.tensor(data=batchify(np.asarray(train_input_ids), 
                                           bs=args.train_batch_size),
                             dtype=torch.long)
@@ -456,16 +396,10 @@ def runtime_code():
                                          bs=args.test_batch_size),
                            dtype=torch.long)
     
-    end_time = time.perf_counter()
-    
-    # print some timing feedback
-    elapsed = str(timedelta(seconds=round(end_time-start_time)))
-    print("Dataset preparation took {} (HH:MM:SS)".format(elapsed))
-    
-    
     # ==== INITIALIZE MODEL, CONFIG AND EXPERIMENT CLASSES ===== #
     
     # initialize model with default config and move to device
+    print("Loading model to {}".format(args.device))
     torch.manual_seed(args.seed)
     model = GPT2LMHeadModel(GPT2Config()).to(device)
     
