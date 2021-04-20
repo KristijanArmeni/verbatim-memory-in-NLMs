@@ -540,7 +540,7 @@ def runtime_code():
         
         # ===== RUN EXPERIMENT LOOP ===== #
         
-        output_dict = experiment.start(input_sequences[0:5])
+        output_dict = experiment.start(input_sequences)
         
         
         # ===== FORMAT AND SAVE OUTPUT ===== #
