@@ -142,7 +142,7 @@ def runtime_code():
     test_toks = tokenizer.tokenize("".join(wiki_test))
     
     # clear for memory
-    wiki_val, wiki_test = None, None, None
+    wiki_val, wiki_test = None, None
     
     # split into chunks of equal lengths, pad at the end and at the beginning
     # with eos

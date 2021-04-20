@@ -12,6 +12,5 @@
 ml anaconda
 conda activate ~/code/conda_envs/core_env
 
-python /home-3/karmeni1@jhu.edu/code/lm-mem/preprocess_wikitext103.py --datadir
-/home-3/karmeni1@jhu.edu/work/karmeni1/wikitext-103 --train_ds wiki.train.tokens
---val_ds wiki.valid.tokens --test_ds wiki.test.tokens --train_set_size 40 --sequence_len 1024 --savedir /home-3/karmeni1@jhu.edu/work/karmeni1/wikitext-103/retokenized 
+python /home-3/karmeni1@jhu.edu/code/lm-mem/preprocess_wikitext103.py --datadir /home-3/karmeni1@jhu.edu/work/karmeni1/wikitext-103 --train_ds wiki.train.tokens --val_ds wiki.valid.tokens --test_ds wiki.test.tokens --train_set_size 40 --sequence_len 1024 --savedir /home-3/karmeni1@jhu.edu/work/karmeni1/wikitext-103/retokenized
+
