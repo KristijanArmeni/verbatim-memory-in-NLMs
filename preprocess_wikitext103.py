@@ -116,15 +116,19 @@ def runtime_code():
     wiki_val = load_dataset(path=os.path.join(args.datadir, args.val_ds))
     wiki_test = load_dataset(path=os.path.join(args.datadir, args.test_ds))
     
-    # initialize tokenizer
-    print("Loading tokenizer ...")
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    
     # resize train set to selected nr of tokens (in mio)
     n_tokens = int(args.train_set_size*1e6)
     print("Resizing train set to {} tokens".format(n_tokens))
+    
+    # join wiki subsections and then split where each token is a list element
+    # dataset is pretokenized
+    wiki_train = "".join(wiki_train).split(" ")
     wiki_train_resized = resize(toks=wiki_train, n_tokens=n_tokens)
     wiki_train = None # clear wiki_train
+    
+    # initialize tokenizer
+    print("Loading tokenizer ...")
+    tokenizer = AutoTokenizer.from_pretrained("gpt2")
     
     # join the read in lines (they're separated by \n so joining with empty 
     # strings is fine)
