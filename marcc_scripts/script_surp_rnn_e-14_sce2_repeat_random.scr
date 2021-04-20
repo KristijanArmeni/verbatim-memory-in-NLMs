@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=script_surp_rnn_e-14_sce2_repeat_random
-#SBATCH --time=48:0:0
+#SBATCH --time=02:00:00
 #SBATCH --partition=shared
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=5
@@ -13,5 +13,5 @@
 ml anaconda
 conda activate ~/code/conda_envs/lmpytorch1.3
 
-python /home-3/karmeni1@jhu.edu/code/lm-mem/neural-complexity-master/main.py --model_file /home-3/karmeni1@jhu.edu/code/lm-mem/rnn_models/LSTM_400_40m_e_14-d0.2.pt --vocab_file /home-3/karmeni1@jhu.edu/code/lm-mem/neural-complexity-master/vocab.txt --data_dir /home-3/karmeni1@jhu.edu/code/lm-mem/data --testfname random_lists_sce2_repeat.txt --csvfname surprisal_rnn_e-14_sce2_repeat_random.csv --markersfname random_lists_sce2_repeat_markers.txt --output_dir /home-3/karmeni1@jhu.edu/code/lm-mem/output --lowercase --test --words
+python /home-3/karmeni1@jhu.edu/code/lm-mem/rnn/main.py --model_file /home-3/karmeni1@jhu.edu/code/lm-mem/rnn_models/LSTM_400_40m_e_14-d0.2.pt --vocab_file /home-3/karmeni1@jhu.edu/code/lm-mem/rnn/vocab.txt --data_dir /home-3/karmeni1@jhu.edu/code/lm-mem/data/rnn_input_files --testfname random_lists_sce2_repeat.txt --csvfname surprisal_rnn_e-14_sce2_repeat_random.csv --markersfname random_lists_sce2_repeat_markers.txt --output_dir /home-3/karmeni1@jhu.edu/code/lm-mem/output --lowercase --test --words
 

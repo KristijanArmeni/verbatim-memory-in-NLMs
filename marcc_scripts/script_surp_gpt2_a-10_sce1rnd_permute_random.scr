@@ -1,9 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=script_surp_gpt2_a-10_sce1rnd_permute_random
-#SBATCH --time=48:0:0
-#SBATCH --partition=lrgmem
+#SBATCH --time=3:0:0
+#SBATCH --mem 3gb
+#SBATCH --partition=gpuk80
+#SBATCH --gres=gpu:1
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=5
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=6
 #SBATCH --mail-type=end
 #SBATCH --mail-user=karmeni1@jhu.edu
 #SBATCH --output=/home-3/karmeni1@jhu.edu/code/lm-mem/logs/script_surp_gpt2_a-10_sce1rnd_permute_random.log
@@ -13,5 +16,5 @@
 ml anaconda
 conda activate ~/code/conda_envs/core_env
 
-python /home-3/karmeni1@jhu.edu/code/lm-mem/gpt2_surprisal.py --condition permute --scenario sce1rnd --paradigm with-context --input_filename /home-3/karmeni1@jhu.edu/code/lm-mem/data/random_lists.json --output_dir /home-3/karmeni1@jhu.edu/code/lm-mem/output --output_file surprisal_gpt2_a-10_sce1rnd_permute_random.csv
+python /home-3/karmeni1@jhu.edu/code/lm-mem/gpt2_surprisal.py --condition permute --scenario sce1rnd --paradigm with-context --input_filename /home-3/karmeni1@jhu.edu/code/lm-mem/data/random_lists.json --output_dir /home-3/karmeni1@jhu.edu/code/lm-mem/output --output_file surprisal_gpt2_a-10_sce1rnd_permute_random.csv --device cuda
 

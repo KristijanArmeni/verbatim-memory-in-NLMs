@@ -29,7 +29,8 @@ for model_id in ["a-10"]:
                 command = "python {} --condition {} --scenario {} " \
                           "--paradigm with-context " \
                           "--input_filename {} " \
-                          "--output_dir {} --output_file {}"\
+                          "--output_dir {} --output_file {} " \
+                          "--device cuda"\
                           .format(python_file,
                                   condition, 
                                   scenario, 
@@ -45,10 +46,13 @@ for model_id in ["a-10"]:
     
                 f.write("#!/bin/bash\n")
                 f.write("#SBATCH --job-name=" + scr_filename + "\n")
-                f.write("#SBATCH --time=48:0:0\n")
-                f.write("#SBATCH --partition=lrgmem\n")
+                f.write("#SBATCH --time=3:0:0\n")
+                f.write("#SBATCH --mem 3gb\n" )
+                f.write("#SBATCH --partition=gpuk80\n")
+                f.write("#SBATCH --gres=gpu:1\n")
                 f.write("#SBATCH --nodes=1\n")
-                f.write("#SBATCH --ntasks-per-node=5\n")
+                f.write("#SBATCH --ntasks-per-node=1\n")
+                f.write("#SBATCH --cpus-per-task=6\n")
                 f.write("#SBATCH --mail-type=end\n")
                 f.write("#SBATCH --mail-user=karmeni1@jhu.edu\n")
                 f.write("#SBATCH --output=" + os.path.join(log_dir, scr_filename) + ".log\n")
