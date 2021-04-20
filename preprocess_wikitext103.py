@@ -134,7 +134,7 @@ def runtime_code():
     # strings is fine)
     print("Tokenizing train set ...")
     train_toks = tokenizer.tokenize("".join(wiki_train_resized))
-    wiki_train_resize = None
+    wiki_train_resized = None
     
     print("Tokenizing valid set ...")
     val_toks = tokenizer.tokenize("".join(wiki_val))
