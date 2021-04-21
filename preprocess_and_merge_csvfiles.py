@@ -21,8 +21,6 @@ files_rnn = glob.glob(os.path.join(output_folder, "surprisal_rnn_?-*.csv"))
 
 def load_and_preproc_csv(output_folder, filenames):
 
-    # load output .csvs in a loop, then concatenate them
-    dfs = []
 
     for file in filenames:
 
@@ -60,8 +58,8 @@ def load_and_preproc_csv(output_folder, filenames):
             dftmp = dftmp.loc[(~dftmp.ispunct) & (dftmp.token != '<|endoftext|>')]
             
             # merge subtokens add the token markers and relative markers
-            dftmp = postprocess_dataframe(dfin=dftmp.copy(), has_subtoks=True,
-                                       keep_groups=columns)
+            dftmp = preprocess_dataframe(dfin=dftmp.copy(), has_subtoks=True,
+                                          keep_groups=columns)
             
             # change some column names for ngram experiment appropriately
             if dftmp.list.unique() == "ngram-random":
@@ -75,8 +73,8 @@ def load_and_preproc_csv(output_folder, filenames):
             dftmp.rename(columns= {"markers": "marker"}, inplace = True), 
             
             # only add the token markers and relative markers
-            dftmp = postprocess_dataframe(dfin=dftmp.copy(), has_subtoks = False,
-                                       keep_groups=None)
+            dftmp = preprocess_dataframe(dfin=dftmp.copy(), has_subtoks = False,
+                                         keep_groups=None)
             
             # TEMP rename column to make it consistent, consdier fixing
             # this upstream
@@ -84,13 +82,10 @@ def load_and_preproc_csv(output_folder, filenames):
                 
                  dftmp.rename(columns={"list_len": "ngram_len"}, inplace=True)
 
-        dfs.append(dftmp)
-        dftmp = None
-
-    return pd.concat(dfs)
+    return dftmp
 
 
-def postprocess_dataframe(dfin, has_subtoks=None, keep_groups=None):
+def preprocess_dataframe(dfin, has_subtoks=None, keep_groups=None):
     
     # rename some columns to avoid the need for if/else lower
     dfin.rename(columns={"stimID": "sentid", "trialID" : "marker", "prompt": "prompt_len"}, inplace=True)
