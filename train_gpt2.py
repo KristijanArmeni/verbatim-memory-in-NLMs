@@ -90,6 +90,7 @@ class Experiment(object):
                  x_train=None, x_eval=None, x_test=None,
                  train_config=None, eval_config=None, 
                  optimizer=None,
+                 device = None,
                  lr_scheduler=None,
                  model_name=None,
                  savedir=None,
@@ -100,6 +101,7 @@ class Experiment(object):
         self.x_test = x_test
         self.model = model
         self.optim = optimizer
+        self.device = device
         self.cfg_train = train_config
         self.cfg_eval = eval_config
         self.log = {
@@ -429,6 +431,7 @@ def runtime_code():
                             eval_config=EvalConfig(bs=args.eval_batch_size,
                                                    es_patience=args.es_patience),
                             optimizer=optimizer,
+                            device = device,
                             lr_scheduler=scheduler,
                             model_name=args.model_name,
                             savedir=args.savedir,
