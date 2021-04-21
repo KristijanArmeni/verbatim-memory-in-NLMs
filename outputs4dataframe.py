@@ -1,13 +1,17 @@
 
 import os
+import sys
 import pandas as pd
 import numpy as np
 import glob
 from tqdm import tqdm
 
-
-output_folder = os.path.join(os.environ['homepath'], "project", "lm-mem", 
-                             "src", "output")
+if "win" in sys.platform:
+    output_folder = os.path.join(os.environ['homepath'], "project", "lm-mem", 
+                                 "src", "output")
+elif "linux" in sys.platform:
+    output_folder = os.path.join(os.environ['HOME'], "code", "lm-mem", 
+                                 "src", "output")
 
 # file naming syntax:
 # metric_model_scenario_condition_list-type
@@ -164,8 +168,6 @@ rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn[10:1
 print("Preprocessing gpt output...")
 gpt = load_and_preproc_csv(output_folder=output_folder, filenames=files_gpt)
 
-# fix some renaming etc
-
 # rename prompt length values to more meaningful ones
 prompt_len_map = {
     1: 8,
@@ -193,7 +195,6 @@ gpt.rename(columns={"scenario": "context"}, inplace=True)
 rnn.rename(columns={"scenario": "context"}, inplace=True)
 
 # drop some redundant columns creted by Pandas bookkeeping system
-# rnn.drop(["Unnamed: 0"], axis=1, inplace=True)
 gpt.drop(["Unnamed: 0"], axis=1, inplace=True)
 
 # save back to csv (waste of memory but let's stick to this for now)
