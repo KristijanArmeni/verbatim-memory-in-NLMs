@@ -57,9 +57,9 @@ def print_cuda_mem_info(device_id=0):
     gb_factor = 0.9313*10e-10
     
     print("total GPU mem (gb): {}".format(round(t*gb_factor)))
-    print("reserved GPU mem: {}".format(r*gb_factor))
-    print("allocated GPU mem: {}".format(a))
-    print("available GPU mem: {}".format(f))
+    print("reserved GPU mem (gb): {}".format(r*gb_factor))
+    print("allocated GPU mem (gb): {}".format(a*gb_factor))
+    print("available GPU mem (gb): {}".format(f*gb_factor))
 
 # create helper config classes
 class TrainConfig(object):
@@ -342,7 +342,7 @@ def runtime_code():
                         help="maximum number of trainin epochs (iterations)")
     parser.add_argument("--lr", type=float,
                         help="starting learning rate")
-    parser.add_argument("--betas", type=tuple,
+    parser.add_argument("--betas", type=str,
                         help="betas parameter for Adam optimizer")
     parser.add_argument("--num_lr_warmup_steps", type=int,
                         help="number of consecutive epochs for which learning" 
@@ -381,9 +381,7 @@ def runtime_code():
     print("Loading {}".format(fname))
     with open(fname, 'r') as f:
         test_input_ids = json.load(f)
-
-
-    
+ 
     # batch the data into new shape: 
     # shape = (batch_size, batch_id, sequence_length)
     print("Batchifying data ...")
@@ -417,19 +415,19 @@ def runtime_code():
     
     # initilize learning rate scheduler
     scheduler = get_cosine_schedule_with_warmup(optimizer=optimizer, 
-                                                num_warmup_steps=args.num_warmup_steps,
+                                                num_warmup_steps=args.num_lr_warmup_steps,
                                                 num_training_steps=args.max_epochs,
                                                 num_cycles=0.5,
                                                 last_epoch=-1)
     
     experiment = Experiment(model=model,
-                            train_ds=train_ds,
-                            eval_ds=val_ds,
-                            test_ds=test_ds,
-                            train_config=TrainConfig(bs=args.batch_size,
-                                                     n_epochs=args.n_epochs),
-                            eval_config=EvalConfig(bs=args.batch_size,
-                                                   patience=args.es_patience),
+                            x_train=train_ds,
+                            x_eval=val_ds,
+                            x_test=test_ds,
+                            train_config=TrainConfig(bs=args.train_batch_size,
+                                                     max_epochs=args.max_epochs),
+                            eval_config=EvalConfig(bs=args.eval_batch_size,
+                                                   es_patience=args.es_patience),
                             optimizer=optimizer,
                             lr_scheduler=scheduler,
                             model_name=args.model_name,
