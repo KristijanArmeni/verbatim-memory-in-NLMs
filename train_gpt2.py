@@ -11,6 +11,7 @@ import argparse
 import os
 import time
 from datetime import timedelta
+from ast import literal_eval
 from tqdm import tqdm
 import numpy as np
 import torch
@@ -367,16 +368,19 @@ def runtime_code():
     
     # load indices from .json files
     fname = os.path.join(args.datadir, args.train_ds)
-    with open(fname, 'w') as f:
+    print("Loading {}".format(fname))
+    with open(fname, 'r') as f:
         train_input_ids = json.load(f)
-        
+    
     fname = os.path.join(args.datadir, args.val_ds)
-    with open(fname, 'w') as f:
+    print("Loading {}".format(fname))
+    with open(fname, 'r') as f:
         val_input_ids = json.load(f)
 
     fname = os.path.join(args.datadir, args.test_ds)
-    with open(fname, 'w') as f:
-        test_input_ids = json.dump(f)
+    print("Loading {}".format(fname))
+    with open(fname, 'r') as f:
+        test_input_ids = json.load(f)
 
 
     
@@ -388,7 +392,7 @@ def runtime_code():
                             dtype=torch.long)
 
     val_ds = torch.tensor(data=batchify(np.asarray(val_input_ids), 
-                                         bs=args.val_batch_size),
+                                         bs=args.eval_batch_size),
                            dtype=torch.long)
     
     # keep batch size 1 for testing
@@ -403,10 +407,13 @@ def runtime_code():
     torch.manual_seed(args.seed)
     model = GPT2LMHeadModel(GPT2Config()).to(device)
     
+    print("GPU info after model loading:\n")
+    print_cuda_mem_info()
+
     # declare optimizer
     optimizer=AdamW(params=model.parameters(), 
                     lr=args.lr, 
-                    betas=args.betas)
+                    betas=literal_eval(args.betas))
     
     # initilize learning rate scheduler
     scheduler = get_cosine_schedule_with_warmup(optimizer=optimizer, 
