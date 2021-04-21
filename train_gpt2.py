@@ -102,8 +102,6 @@ class Experiment(object):
         self.optim = optimizer
         self.cfg_train = train_config
         self.cfg_eval = eval_config
-        self.n_epochs
-        self.loss
         self.log = {
             "train_loss": [],
             "eval_loss": [],
@@ -114,15 +112,17 @@ class Experiment(object):
         
         # initialize early stopping class 
         early_stopping = self.EarlyStopping(model=self.model,
-                                            patience=self.cfg_eval.patience)
+                                            patience=self.cfg_eval.es_patience)
         
         print("Starting training...")
         
+        n_epochs = self.cfg_train.max_epochs
+
         # loop over epochs
-        for n in list(range(0, self.max_epochs)):
+        for n in list(range(0, n_epochs)):
             
-            print("Epoch {}/{} ({}%).".format(n, self.max_epochs, 
-                                             (n/self.max_epochs)*100))
+            print("Epoch {}/{} ({}%).".format(n, n_epochs, 
+                                             (n/n_epochs)*100))
             
             start_time = time.perf_counter()
 
@@ -159,7 +159,7 @@ class Experiment(object):
             print("Evaluating model on test set ...")
             
             test_loss = self.evaluate(x=self.test_ds)
-            self.log["test_ppl": np.exp(test_loss)]
+            self.log["test_ppl"]: np.exp(test_loss)
 
         
     def train(self, x):
@@ -258,7 +258,7 @@ class Experiment(object):
         set loss has not decreased for n == EarlyStopping().patience epochs in a row.
         """
         
-        def __init__(self, model, patience):
+        def __init__(self, model=None, patience=None):
             
             self.model = model     # placeholder for self.model object form the Experiment() class
             self.best_score = None
