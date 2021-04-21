@@ -250,7 +250,7 @@ class Experiment(object):
         
         pass
 
-    def EarlyStopping(object):
+    class EarlyStopping(object):
         
         """
         EarlyStopping() is a helpher class that keeps track of evaluation loss.
