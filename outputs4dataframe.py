@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 import glob
+from tqdm import tqdm
 
 
 output_folder = os.path.join(os.environ['homepath'], "project", "lm-mem", 
@@ -38,58 +39,130 @@ def load_and_preproc_csv(output_folder, filenames):
         # remove punctuation prior to creating token index
         # filter out punctuation
         if arc == "gpt2":
+                         
+            # we need these columns in the output after merging
+            columns = ["subtok", "sentid", "list_len", "prompt_len", 
+                        "scenario", "list", "second_list", "model_id", "marker"]
             
-            #drop punctuation
-            dftmp = dftmp.loc[~dftmp.ispunct, :]
+            # ngram experiment doesn't have prompts, but distractors
+            if dftmp.list.unique() == "ngram-random":
+                
+                # we need these columns in the output after merging
+                columns = ["subtok", "subtok_markers", "sentid", "list_len", "prompt_len", 
+                          "scenario", "list", "second_list", "model_id", "marker"]
 
-            # rename some columns to avoid the need for if/else lower
-            dftmp.rename(columns={"stimID": "sentid", "trialID" : "marker", "prompt": "prompt_len"}, inplace=True)
+                
+            # throw out punctuation and eos
+            dftmp = dftmp.loc[(~dftmp.ispunct) & (dftmp.token != '<|endoftext|>')]
+            
+            # merge subtokens add the token markers and relative markers
+            dftmp = postprocess_dataframe(dfin=dftmp.copy(), has_subtoks=True,
+                                       keep_groups=columns)
+            
+            # change some column names for ngram experiment appropriately
+            if dftmp.list.unique() == "ngram-random":
+                
+                dftmp.rename(columns = {"prompt_len": "dist_len", "list_len": "ngram_len" }, inplace=True)
 
         elif arc == "rnn":
+            
             dftmp = dftmp.loc[~dftmp.word.isin([":", ".", ","])].copy()
-
-        # add "sentpos" column containing token index within a sentence
-        if arc == "gpt2":
-            tmp = []
-            for s in dftmp.sentid.unique():
-                tmp.append(np.arange(0, len(dftmp.loc[dftmp.sentid == s, "sentid"])))
-            dftmp["sentpos"] = np.concatenate(tmp)
-
-        # now also create marker pos index (start indexing with 1)
-        tmp = []  # clear variable
-        for sentid in dftmp.sentid.unique():
-            t = dftmp.loc[dftmp.sentid == sentid]
-            for m in t.marker.unique():
-                tmp.append(np.arange(0, len(t.loc[t.marker == m]))+1)
-        dftmp["marker_pos"] = np.concatenate(tmp)
-
-        # let's also create a column where the pre-target tokens are indexed relative
-        # to the target (-3, -2, -1, ...) markers so whe can plot those as well
-        tmp = []  # clear variable
-        for sentid in dftmp.sentid.unique():
-            t = dftmp.loc[dftmp.sentid == sentid]
-            for m in t.marker.unique():
-                # use relative indexing for markers prior to target tokens
-                ntok = len(t.loc[t.marker == m])
-                if m == 2:
-                    # start with 1, reverse and make it negative
-                    tmp.append(-1*((np.arange(0, ntok)+1)[::-1]))
-                else:
-                    tmp.append((np.arange(0, ntok)))
-        dftmp["marker_pos_rel"] = np.concatenate(tmp)
+            
+            dftmp.rename(columns= {"markers": "marker"}, inplace = True), 
+            
+            # only add the token markers and relative markers
+            dftmp = postprocess_dataframe(dfin=dftmp.copy(), has_subtoks = False,
+                                       keep_groups=None)
+            
+            # TEMP rename column to make it consistent, consdier fixing
+            # this upstream
+            if dftmp.list.unique() == "ngram-random":
+                
+                 dftmp.rename(columns={"list_len": "ngram_len"}, inplace=True)
 
         dfs.append(dftmp)
-        dftmp, tmp = None, None
+        dftmp = None
 
     return pd.concat(dfs)
 
 
+def postprocess_dataframe(dfin, has_subtoks=None, keep_groups=None):
+    
+    # rename some columns to avoid the need for if/else lower
+    dfin.rename(columns={"stimID": "sentid", "trialID" : "marker", "prompt": "prompt_len"}, inplace=True)
+    
+    # now do the massive loops and merge subtokens
+    merged_dfs = []       # here we will store merged dfs
+    marker_pos = []       # this is for marker arrays
+    marker_pos_rel = []
+    
+    # loop over list conditions
+    for llen in dfin.list_len.unique():
+        
+        sel1 = (dfin.list_len==llen)
+        
+        # loop over markers
+        for sent in tqdm(dfin.loc[sel1].sentid.unique(), desc="list len == {}".format(llen)):
+            
+            sel2 = (dfin.list_len==llen) & (dfin.sentid==sent)
+            
+            # loop over sentences
+            for mark in dfin.loc[sel2].marker.unique():
+                
+                # merge tokens for this list_len, this sentece and this  marker
+                sel3 = (dfin.list_len == llen) &\
+                       (dfin.sentid == sent) &\
+                       (dfin.marker == mark)
+                
+                n_rows = len(dfin.loc[sel3])
+                
+                # only gpt-2 outputs have subtoks that need to be merged
+                if has_subtoks and (keep_groups is not None):
+                    df_merged = merge_subtoks(df=dfin.loc[sel3].copy(), 
+                                              group_levels=keep_groups)
+                    
+                    n_rows = len(df_merged)                        
+                    merged_dfs.append(df_merged)
+
+                # code markers relative to target tokens lists
+                if mark in [0, 2]:
+                    # start with 1, reverse and make it negative
+                    marker_pos_rel.append(-1*((np.arange(0, n_rows)+1)[::-1]))
+                else:
+                    marker_pos_rel.append(np.arange(0, n_rows))
+                    
+                # code marker position without negative indices
+                marker_pos.append(np.arange(0, n_rows)) 
+    
+    if has_subtoks:
+        dfout = pd.concat(merged_dfs)
+    else:
+        dfout = dfin
+        
+    dfout["marker_pos"] = np.concatenate(marker_pos)
+    dfout["marker_pos_rel"] = np.concatenate(marker_pos_rel)
+    
+    return dfout
+
+
+def merge_subtoks(df, group_levels):
+    """
+    helper function to perform averging over subtokens via .groupby and .agg
+    """
+    
+    dfout = df.groupby(group_levels, sort=False)\
+              .agg({"surp": "mean", "token": "_".join})\
+              .reset_index()
+    
+    return dfout 
+
 #===== LOAD CSV FILES =====#
-print("Preprocessing gpt output...")
-gpt = load_and_preproc_csv(output_folder=output_folder, filenames=files_gpt)
 
 print("Preprocessing rnn output...")
-rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn)
+rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn[10:12])
+
+print("Preprocessing gpt output...")
+gpt = load_and_preproc_csv(output_folder=output_folder, filenames=files_gpt)
 
 # fix some renaming etc
 
@@ -124,11 +197,11 @@ rnn.rename(columns={"scenario": "context"}, inplace=True)
 gpt.drop(["Unnamed: 0"], axis=1, inplace=True)
 
 # save back to csv (waste of memory but let's stick to this for now)
-fname = os.path.join(output_folder, "output_gpt2_.csv")
+fname = os.path.join(output_folder, "output_gpt2_2.csv")
 print("Saving {}".format(fname))
 gpt.to_csv(fname, sep="\t")
 
-fname = os.path.join(output_folder, "output_rnn_.csv")
+fname = os.path.join(output_folder, "output_rnn_2.csv")
 print("Saving {}".format(fname))
 rnn.to_csv(fname, sep="\t")
 
