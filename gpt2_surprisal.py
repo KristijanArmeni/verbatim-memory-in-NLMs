@@ -40,7 +40,10 @@ def mark_subtoken_splits(tokens):
     count = 0
     for i in range(len(tokens)):
         
-        if "Ġ" in tokens[i]:
+        # if the token is split, it does not gave the symbol for whitespace
+        # if the word is at position 0, it also has to start a new token, so 
+        # count it
+        if "Ġ" in tokens[i] or i == 0:
             count += 1
         
         if tokens[i] in punctuation:
@@ -110,7 +113,7 @@ def concat_and_tokenize_inputs(prefixes=None, prompts=None, word_list1=None, wor
                 # tokenize strings separately to be able to construct markers for prefix, word lists etc.
                 i1 = tokenizer.encode("<|endoftext|> " + prefixes[prefix_key], return_tensors="pt")   # prefix IDs, add eos token
                 i2 = tokenizer.encode(input_seqs[i], return_tensors="pt") 
-                i3 = tokenizer.encode(prompts[prompt_key], return_tensors="pt")                       # prompt IDs
+                i3 = tokenizer.encode(" " + prompts[prompt_key], return_tensors="pt")                       # prompt IDs
                 i4 = tokenizer.encode(input_seqs2[i] + "<|endoftext|>", return_tensors="pt")
 
                 # compose the input ids tensors
@@ -468,7 +471,7 @@ def runtime_code():
         # This condition test for the effect of word order
         # Lists have the same words, but the word order is permuted
         # int the second one
-        word_lists2 = {key: [" " + ", ".join(np.random.RandomState((543+j)*5).permutation(stim[key][j]).tolist()) + "."
+        word_lists2 = {key: [np.random.RandomState((543+j)*5).permutation(stim[key][j]).tolist()
                       for j in range(len(stim[key]))]
                       for key in stim.keys()}
     
