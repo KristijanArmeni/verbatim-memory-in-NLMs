@@ -6,19 +6,6 @@ import numpy as np
 import glob
 from tqdm import tqdm
 
-if "win" in sys.platform:
-    output_folder = os.path.join(os.environ['homepath'], "project", "lm-mem", 
-                                 "src", "output")
-elif "linux" in sys.platform:
-    output_folder = os.path.join(os.environ['HOME'], "code", "lm-mem", "output")
-
-# file naming syntax:
-# metric_model_scenario_condition_list-type
-files_gpt = glob.glob(os.path.join(output_folder, "surprisal_gpt2_?-*.csv"))
-files_rnn = glob.glob(os.path.join(output_folder, "surprisal_rnn_?-*.csv"))
-
-files_gpt.sort()
-files_rnn.sort()
 
 def load_and_preproc_csv(output_folder, filenames):
 
@@ -87,7 +74,7 @@ def load_and_preproc_csv(output_folder, filenames):
         # append df for this experiment
         out.append(dftmp)
 
-    return pd.concat(out)
+    return pd.concat(out, ignore_index=True)
 
 
 def preprocess_dataframe(dfin, has_subtoks=None, keep_groups=None):
@@ -161,6 +148,20 @@ def merge_subtoks(df, group_levels):
     return dfout 
 
 #===== LOAD CSV FILES =====#
+
+if "win" in sys.platform:
+    output_folder = os.path.join(os.environ['homepath'], "project", "lm-mem", 
+                                 "src", "output")
+elif "linux" in sys.platform:
+    output_folder = os.path.join(os.environ['HOME'], "code", "lm-mem", "output")
+
+# file naming syntax:
+# metric_model_scenario_condition_list-type
+files_gpt = glob.glob(os.path.join(output_folder, "surprisal_gpt2_?-*.csv"))
+files_rnn = glob.glob(os.path.join(output_folder, "surprisal_rnn_?-*.csv"))
+
+files_gpt.sort()
+files_rnn.sort()
 
 print("Preprocessing rnn output...")
 rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn)
