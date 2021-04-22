@@ -10,17 +10,19 @@ if "win" in sys.platform:
     output_folder = os.path.join(os.environ['homepath'], "project", "lm-mem", 
                                  "src", "output")
 elif "linux" in sys.platform:
-    output_folder = os.path.join(os.environ['HOME'], "code", "lm-mem", 
-                                 "src", "output")
+    output_folder = os.path.join(os.environ['HOME'], "code", "lm-mem", "output")
 
 # file naming syntax:
 # metric_model_scenario_condition_list-type
 files_gpt = glob.glob(os.path.join(output_folder, "surprisal_gpt2_?-*.csv"))
 files_rnn = glob.glob(os.path.join(output_folder, "surprisal_rnn_?-*.csv"))
 
+files_gpt.sort()
+files_rnn.sort()
 
 def load_and_preproc_csv(output_folder, filenames):
 
+    out = []
 
     for file in filenames:
 
@@ -80,9 +82,12 @@ def load_and_preproc_csv(output_folder, filenames):
             # this upstream
             if dftmp.list.unique() == "ngram-random":
                 
-                 dftmp.rename(columns={"list_len": "ngram_len"}, inplace=True)
+                dftmp.rename(columns={"list_len": "ngram_len"}, inplace=True)
+        
+        # append df for this experiment
+        out.append(dftmp)
 
-    return dftmp
+    return pd.concat(out)
 
 
 def preprocess_dataframe(dfin, has_subtoks=None, keep_groups=None):
@@ -158,7 +163,7 @@ def merge_subtoks(df, group_levels):
 #===== LOAD CSV FILES =====#
 
 print("Preprocessing rnn output...")
-rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn[10:12])
+rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn)
 
 print("Preprocessing gpt output...")
 gpt = load_and_preproc_csv(output_folder=output_folder, filenames=files_gpt)
@@ -190,14 +195,14 @@ gpt.rename(columns={"scenario": "context"}, inplace=True)
 rnn.rename(columns={"scenario": "context"}, inplace=True)
 
 # drop some redundant columns creted by Pandas bookkeeping system
-gpt.drop(["Unnamed: 0"], axis=1, inplace=True)
+# gpt.drop(["Unnamed: 0"], axis=1, inplace=True)
 
 # save back to csv (waste of memory but let's stick to this for now)
-fname = os.path.join(output_folder, "output_gpt2_2.csv")
+fname = os.path.join(output_folder, "output_gpt2.csv")
 print("Saving {}".format(fname))
 gpt.to_csv(fname, sep="\t")
 
-fname = os.path.join(output_folder, "output_rnn_2.csv")
+fname = os.path.join(output_folder, "output_rnn.csv")
 print("Saving {}".format(fname))
 rnn.to_csv(fname, sep="\t")
 
