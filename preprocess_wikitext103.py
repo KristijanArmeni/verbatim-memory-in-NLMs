@@ -173,17 +173,17 @@ def runtime_code():
     print("Dataset preparation took {} (HH:MM:SS)".format(elapsed))
 
     # save tensors
-    fname = os.path.join(args.savedir, "ids_train_ds.json")
+    fname = os.path.join(args.savedir, "ids_train_ds_{}.json".format(args.sequence_len))
     with open(fname, 'w') as f:
         json.dump(train_input_ids, f)
     
     # save tensors
-    fname = os.path.join(args.savedir, "ids_valid_ds.json")
+    fname = os.path.join(args.savedir, "ids_valid_ds_{}.json".format(args.sequence_len))
     with open(fname, 'w') as f:
         json.dump(val_input_ids, f)
         
     # save tensors
-    fname = os.path.join(args.savedir, "ids_test_ds.json")
+    fname = os.path.join(args.savedir, "ids_test_ds_{}.json".format(args.sequence_len))
     with open(fname, 'w') as f:
         json.dump(test_input_ids, f)
 
