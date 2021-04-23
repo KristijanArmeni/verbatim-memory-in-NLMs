@@ -110,7 +110,7 @@ def preprocess_gpt_dataframe(dfin, has_subtoks=None, keep_groups=None):
                 if has_subtoks and (keep_groups is not None):
                     df_merged = merge_subtoks(df=dfin.loc[sel3].copy(), 
                                               group_levels=keep_groups,
-                                              merge_operation="prod")
+                                              merge_operation="mean")
                     
                     n_rows = len(df_merged)                        
                     merged_dfs.append(df_merged)
