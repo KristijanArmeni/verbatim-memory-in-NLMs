@@ -51,7 +51,7 @@ def load_and_preproc_csv(output_folder, filenames):
             
             # merge subtokens add the token markers and relative markers
             dftmp = preprocess_gpt_dataframe(dfin=dftmp.copy(), has_subtoks=True,
-                                          keep_groups=columns)
+                                             keep_groups=columns)
             
             # change some column names for ngram experiment appropriately
             if dftmp.list.unique() == "ngram-random":
@@ -109,7 +109,8 @@ def preprocess_gpt_dataframe(dfin, has_subtoks=None, keep_groups=None):
                 # only gpt-2 outputs have subtoks that need to be merged
                 if has_subtoks and (keep_groups is not None):
                     df_merged = merge_subtoks(df=dfin.loc[sel3].copy(), 
-                                              group_levels=keep_groups)
+                                              group_levels=keep_groups,
+                                              merge_operation="prod")
                     
                     n_rows = len(df_merged)                        
                     merged_dfs.append(df_merged)
@@ -135,13 +136,13 @@ def preprocess_gpt_dataframe(dfin, has_subtoks=None, keep_groups=None):
     return dfout
 
 
-def merge_subtoks(df, group_levels):
+def merge_subtoks(df, group_levels, merge_operation="prod"):
     """
     helper function to perform averging over subtokens via .groupby and .agg
     """
     
     dfout = df.groupby(group_levels, sort=False)\
-              .agg({"surp": "mean", "token": "_".join})\
+              .agg({"surp": merge_operation, "token": "_".join})\
               .reset_index()
     
     return dfout 
@@ -198,11 +199,11 @@ files_rnn = glob.glob(os.path.join(output_folder, "surprisal_rnn_?-*.csv"))
 files_gpt.sort()
 files_rnn.sort()
 
-print("Preprocessing rnn output...")
-rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn[0:2])
-
 print("Preprocessing gpt output...")
 gpt = load_and_preproc_csv(output_folder=output_folder, filenames=files_gpt)
+
+print("Preprocessing rnn output...")
+rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn)
 
 # rename prompt length values to more meaningful ones
 prompt_len_map = {
