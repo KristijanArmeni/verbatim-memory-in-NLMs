@@ -100,7 +100,7 @@ class Experiment(object):
         self.x_eval = x_eval
         self.x_test = x_test
         self.model = model
-        self.optim = optimizer
+        self.optimizer = optimizer
         self.device = device
         self.cfg_train = train_config
         self.cfg_eval = eval_config
@@ -207,7 +207,7 @@ class Experiment(object):
         self.optimizer.step()
         
         # change learning rate according to chosen scheduler
-        self.scheduler.step()
+        self.lr_scheduler.step()
         
         # clear the gradients
         self.model.zero_grad()
