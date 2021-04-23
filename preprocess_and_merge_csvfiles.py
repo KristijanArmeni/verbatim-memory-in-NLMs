@@ -31,6 +31,12 @@ def load_and_preproc_csv(output_folder, filenames):
         # filter out punctuation
         if arc == "gpt2":
                          
+            # rename some columns to avoid the need for if/else lower
+            dftmp.rename(columns={"stimID": "sentid", "trialID" : "marker", "prompt": "prompt_len"}, inplace=True)
+            
+            # throw out punctuation and eos
+            dftmp = dftmp.loc[(~dftmp.ispunct) & (dftmp.token != '<|endoftext|>')]
+            
             # we need these columns in the output after merging
             columns = ["subtok", "sentid", "list_len", "prompt_len", 
                         "scenario", "list", "second_list", "model_id", "marker"]
@@ -42,12 +48,9 @@ def load_and_preproc_csv(output_folder, filenames):
                 columns = ["subtok", "subtok_markers", "sentid", "list_len", "prompt_len", 
                           "scenario", "list", "second_list", "model_id", "marker"]
 
-                
-            # throw out punctuation and eos
-            dftmp = dftmp.loc[(~dftmp.ispunct) & (dftmp.token != '<|endoftext|>')]
             
             # merge subtokens add the token markers and relative markers
-            dftmp = preprocess_dataframe(dfin=dftmp.copy(), has_subtoks=True,
+            dftmp = preprocess_gpt_dataframe(dfin=dftmp.copy(), has_subtoks=True,
                                           keep_groups=columns)
             
             # change some column names for ngram experiment appropriately
@@ -62,8 +65,7 @@ def load_and_preproc_csv(output_folder, filenames):
             dftmp.rename(columns= {"markers": "marker"}, inplace = True), 
             
             # only add the token markers and relative markers
-            dftmp = preprocess_dataframe(dfin=dftmp.copy(), has_subtoks = False,
-                                         keep_groups=None)
+            dftmp = preprocess_rnn_dataframe(dfin=dftmp)
             
             # TEMP rename column to make it consistent, consdier fixing
             # this upstream
@@ -77,10 +79,7 @@ def load_and_preproc_csv(output_folder, filenames):
     return pd.concat(out, ignore_index=True)
 
 
-def preprocess_dataframe(dfin, has_subtoks=None, keep_groups=None):
-    
-    # rename some columns to avoid the need for if/else lower
-    dfin.rename(columns={"stimID": "sentid", "trialID" : "marker", "prompt": "prompt_len"}, inplace=True)
+def preprocess_gpt_dataframe(dfin, has_subtoks=None, keep_groups=None):
     
     # now do the massive loops and merge subtokens
     merged_dfs = []       # here we will store merged dfs
@@ -147,6 +146,42 @@ def merge_subtoks(df, group_levels):
     
     return dfout 
 
+
+def preprocess_rnn_dataframe(dfin, has_subtoks=None, keep_groups=None):
+    
+    # now do the massive loops and merge subtokens
+    marker_pos = []       # this is for marker arrays
+    marker_pos_rel = []
+    
+    # loop over list conditions
+    for sent in tqdm(dfin.sentid.unique(), desc="sentid"):
+        
+        # loop over sentences
+        for mark in dfin.loc[dfin.sentid==sent].marker.unique():
+            
+            # merge tokens for this list_len, this sentece and this  marker
+            sel1 = (dfin.sentid == sent) &\
+                   (dfin.marker == mark)
+            
+            n_rows = len(dfin.loc[sel1])
+
+            # code markers relative to target tokens lists
+            if mark in [0, 2]:
+                # start with 1, reverse and make it negative
+                marker_pos_rel.append(-1*((np.arange(0, n_rows)+1)[::-1]))
+            else:
+                marker_pos_rel.append(np.arange(0, n_rows))
+                
+            # code marker position without negative indices
+            marker_pos.append(np.arange(0, n_rows)) 
+
+    dfout = dfin
+        
+    dfout["marker_pos"] = np.concatenate(marker_pos)
+    dfout["marker_pos_rel"] = np.concatenate(marker_pos_rel)
+    
+    return dfout
+
 #===== LOAD CSV FILES =====#
 
 if "win" in sys.platform:
@@ -164,7 +199,7 @@ files_gpt.sort()
 files_rnn.sort()
 
 print("Preprocessing rnn output...")
-rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn)
+rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn[0:2])
 
 print("Preprocessing gpt output...")
 gpt = load_and_preproc_csv(output_folder=output_folder, filenames=files_gpt)
