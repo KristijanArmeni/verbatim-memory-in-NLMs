@@ -481,7 +481,8 @@ def runtime_code():
         # Here list length is the only common factor between two lists
     
         print("Creating reverse control condition...")
-        word_lists2 = {key: list(reversed(stim[key])) for key in stim.keys()}
+        word_lists2 = {key: np.roll(a=stim[key], shift=1, axis=0).tolist() 
+                       for key in stim.keys()}
     
     else:
         word_lists2 = word_lists1
