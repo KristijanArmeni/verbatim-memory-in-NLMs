@@ -65,7 +65,13 @@ def load_and_preproc_csv(output_folder, filenames):
             
             dftmp = dftmp.loc[~dftmp.word.isin([":", ".", ","])].copy()
             
+            # temporarily
             dftmp.rename(columns= {"markers": "marker"}, inplace = True), 
+            
+            # HACK, for the recode_sentid_columns to work, temporarily
+            # call "dist_len" colmn "prompt_len" (inconsistent naming)
+            if dftmp.list.unique() == "ngram-random":
+                dftmp.rename(columns = {"dist_len": "prompt_len"}, inplace=True)
             
             # only add the token markers and relative markers
             dftmp = preprocess_rnn_dataframe(dfin=dftmp)
@@ -77,7 +83,7 @@ def load_and_preproc_csv(output_folder, filenames):
             # this upstream
             if dftmp.list.unique() == "ngram-random":
                 
-                dftmp.rename(columns={"list_len": "ngram_len"}, inplace=True)
+                dftmp.rename(columns={"list_len": "ngram_len", "prompt_len": "dist_len"}, inplace=True)
         
         # append df for this experiment
         out.append(dftmp)
@@ -229,11 +235,11 @@ files_rnn = glob.glob(os.path.join(output_folder, "surprisal_rnn_?-*.csv"))
 files_gpt.sort()
 files_rnn.sort()
 
-print("Preprocessing gpt output...")
-gpt = load_and_preproc_csv(output_folder=output_folder, filenames=files_gpt[0:1])
-
 print("Preprocessing rnn output...")
-rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn[0:1])
+rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn)
+
+print("Preprocessing gpt output...")
+gpt = load_and_preproc_csv(output_folder=output_folder, filenames=files_gpt)
 
 # rename prompt length values to more meaningful ones
 prompt_len_map = {
