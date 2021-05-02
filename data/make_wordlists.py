@@ -141,7 +141,7 @@ def load_and_sample_noun_pool(path, which, model_vocab, n_items=None, n_lists=20
 
 # ===== RUN CODE ===== #
 
-vocab_file=os.path.join(home_dir, 'project', 'lm-mem', 'src', 'neural-complexity-master', "vocab.txt")
+vocab_file=os.path.join(home_dir, 'project', 'lm-mem', 'src', 'rnn', "vocab.txt")
 
 # read rnn vocab
 with open(vocab_file, 'r', encoding='utf-8') as f:
@@ -160,6 +160,8 @@ which = argins.which
 # construct distractors from random noun pools
 if argins.which == "ngram-distractors" or argins.which == "ngram-random":
     which = "random"
+elif argins.which == "ngram-categorized":
+    which = "categorized"
 
 # ===== CREATE WORD LISTS AND N-GRAM SUBSETS ===== #
 lists_of_tokens = load_and_sample_noun_pool(path=path, 
@@ -169,14 +171,19 @@ lists_of_tokens = load_and_sample_noun_pool(path=path,
                                             model_vocab=rnn_vocab, 
                                             seed=12345)
 
+# create circular shifts of the lists
+cshifts = list(np.arange(0, 10) + 1)
+
+lists_of_tokens_shifted = [np.roll(np.asarray(alist), s).tolist() for alist in lists_of_tokens
+                           for s in cshifts]
+
 # generate lists of length 3, 5, 7 and 10
 # now create subsets of the original list
 subsets = [3, 5, 7, 10]
 
 # first sample angain the random noun pool
-out_dict = {"n{}".format(n_items): [alist[0:n_items] for alist in lists_of_tokens]
-            for n_items in subsets
-            }
+out_dict = {"n{}".format(n_items): [alist[0:n_items] for alist in lists_of_tokens_shifted]
+            for n_items in subsets}
 
 # for ngram lists sample the created lists repeatedly
 if argins.which=="ngram-random" or argins.which=="ngram-distractors":
