@@ -262,6 +262,29 @@ def interleave_targets_and_distractors(word_list, distractors):
     return out
 
 
+def sample_indices_by_group(groups, seed):
+    
+    out_ids = np.zeros(groups.shape, dtype=int)
+    indices = np.arange(groups.size)
+    rng = np.random.RandomState(seed)
+    ignore_id = -1
+    
+    # number of selected samples must mach size of one group
+    sample_size = np.sum(groups == 0)
+    
+    for group in np.unique(groups):
+        
+        # choose indices not from current group and not the ones already sampled
+        candidate_pool = indices[(groups != group) & (indices != ignore_id)]
+        
+        sel_ids = rng.choice(a=candidate_pool, size = sample_size)
+        out_ids[groups == group] = sel_ids
+        
+        # mark already selected indices
+        indices[sel_ids] = ignore_id
+        
+    return out_ids
+
 # ===== EXPERIMENT CLASS ===== #
 
 class Experiment(object):
@@ -479,12 +502,24 @@ def runtime_code():
     
         # This serves as a control conditions
         # Here list length is the only common factor between two lists
+        
+        print("Creating control condition...")
     
-        print("Creating reverse control condition...")
-        word_lists2 = {key: np.roll(a=stim[key], shift=1, axis=0).tolist() 
-                       for key in stim.keys()}
-    
+        n_items_per_group = 10
+        n_groups = len(word_lists1["n10"])//n_items_per_group
+        groups = np.repeat(np.arange(0, n_groups), n_items_per_group)
+        
+        ids = sample_indices_by_group(groups=groups, seed=12345)
+        
+        word_lists2 = {key: np.asarray(stim[key])[ids].tolist() for key in stim.keys()}
+        
+        # make sure control tokens do not appear in the target lists
+        for k in stim.keys():
+            assert ~np.any([set(t1).issubset(set(t2)) 
+                            for t1, t2 in zip(word_lists1[k], word_lists2[k])])
+        
     else:
+        
         word_lists2 = word_lists1
     
     # if n-gram experiment modify prompt and prefix dicts, recreate them on the fly
