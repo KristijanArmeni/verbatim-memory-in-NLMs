@@ -38,7 +38,32 @@ if args.paradigm == "repeated-ngrams":
 elif args.paradigm == "with-context":
     marker_keys = ["string", "markers", "list_len", "prompt_len"]
 
-trials = { key: [] for key in marker_keys}
+trials = {key: [] for key in marker_keys}
+
+# ===== HELPER FUNCTIONS ===== #
+
+def sample_indices_by_group(groups, seed):
+    
+    out_ids = np.zeros(groups.shape, dtype=int)
+    indices = np.arange(groups.size)
+    rng = np.random.RandomState(seed)
+    ignore_id = -1
+    
+    # number of selected samples must mach size of one group
+    sample_size = np.sum(groups == 0)
+    
+    for group in np.unique(groups):
+        
+        # choose indices not from current group and not the ones already sampled
+        candidate_pool = indices[(groups != group) & (indices != ignore_id)]
+        
+        sel_ids = rng.choice(a=candidate_pool, size = sample_size)
+        out_ids[groups == group] = sel_ids
+        
+        # mark already selected indices
+        indices[sel_ids] = ignore_id
+        
+    return out_ids
 
 # ==== LOAD .JSON FILES WITH WORD LISTS ==== #
 
@@ -64,13 +89,23 @@ elif args.paradigm == "repeated-ngrams":
         print("Loading {}".format(distractor_file))
         dist = json.load(f)   
 
-stim_reversed = None
+stim_control = None
 if args.condition == "control":
 
-    print("Creating reverse control condition...")
+    print("Creating control condition...")
     
-    stim_reversed = {key: list(reversed(stim[key])) for key in stim.keys()}
-
+    n_items_per_group = 10
+    n_groups = len(stim["n10"])//n_items_per_group
+    groups = np.repeat(np.arange(0, n_groups), n_items_per_group)
+    
+    ids = sample_indices_by_group(groups=groups, seed=12345)
+    
+    stim_control = {key: np.asarray(stim[key])[ids].tolist() for key in stim.keys()}
+    
+    # make sure control tokens do not appear in the target lists
+    for k in stim.keys():
+        assert ~np.any([set(t1).issubset(set(t2)) 
+                        for t1, t2 in zip(stim[k], stim_control[k])])
  
 # select dict with correct prompts and prefixes
 prompts = prompts[args.scenario_key]
@@ -126,7 +161,7 @@ if args.paradigm == "with-context":
                 
                 current_list = stim[list_size]
                 if args.condition == "control":
-                    curr_list_rev = stim_reversed[list_size]
+                    curr_list_rev = stim_control[list_size]
                 
                 for j, l in enumerate(current_list):
                     
