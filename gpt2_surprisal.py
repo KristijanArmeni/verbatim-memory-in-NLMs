@@ -340,7 +340,7 @@ class Experiment(object):
         return model
 
     # loop over input list
-    def ppl(self, input_ids, context_len, stride, device):
+    def ppl(self, input_ids, context_len, stride):
         """
         method for computing token-by-token negative log likelihood on input_ids
         taken from: https://huggingface.co/transformers/perplexity.html
@@ -358,7 +358,7 @@ class Experiment(object):
             trg_len = end_loc - i  # may be different from stride on last loop
 
             # select the current input index span
-            sel_input_ids = input_ids[:, begin_loc: end_loc].to(device)
+            sel_input_ids = input_ids[:, begin_loc: end_loc].to(self.device)
 
             # define target labels, use input ids as target outputs
             target_ids = sel_input_ids.clone()
@@ -366,9 +366,10 @@ class Experiment(object):
             # do not compute the loss on  tokens (-100) that are used for context
             target_ids[:, :-trg_len] = -100  
 
+
             # set model to evaluation mode
             self.model.eval()
-
+            
             # get model output
             with torch.no_grad():
 
@@ -377,12 +378,12 @@ class Experiment(object):
                outputs = self.model(sel_input_ids, labels=target_ids)
                
                # first element of the tuple contains the loss
-               log_likelihood = outputs[0] * trg_len  # not sure about this multiplication here (undoing averaging?)
+               log_likelihood = outputs.loss.item() * trg_len  # not sure about this multiplication here (undoing averaging?)
 
-               llh.append(log_likelihood.cpu().tolist())
+               llh.append(log_likelihood)
                toks = self.tokenizer.decode(target_ids[0][-stride::])
                tokens.append(toks)  # store the last token (target_id)
-
+               
         # compute perplexity, divide by the lenth of the sequence
         # use np.nansum as token at position 0 will have -LL of nan
         ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc).cpu()
@@ -413,8 +414,7 @@ class Experiment(object):
             # this returns surprisal (neg log ll)
             ppl, surp, toks = self.ppl(input_ids=input_ids.to(self.device), 
                                        context_len=self.context_len, 
-                                       stride=1,
-                                       device=self.device)
+                                       stride=1)
 
             # store the output tuple and
             outputs["sequence_ppl"].append(ppl)
