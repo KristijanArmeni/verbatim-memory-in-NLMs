@@ -193,7 +193,7 @@ if argins.which in ["ngram-random", "ngram-categorized"] or argins.which=="ngram
     n_reps = 5
     
     # sample repeated ngram sequences from the lists of 10 items
-    tmp = {"{}gram".format(n_gram): [list(chunk(np.tile(alist[0:n_gram], reps=n_reps).tolist(), n_gram, n_gram)) 
+    tmp = {"n{}".format(n_gram): [list(chunk(np.tile(alist[0:n_gram], reps=n_reps).tolist(), n_gram, n_gram)) 
                                       for alist in out_dict["n10"]]
                                       for n_gram in n_grams}
     
