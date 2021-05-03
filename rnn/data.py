@@ -355,9 +355,10 @@ class SentenceCorpus(object):
                 row_values = line.strip("\n").split("\t")
                 
                 tmp = [int(el) for el in row_values[0].strip("[]").split(",")]
-                markers[colnames[0]].append(tmp) #these are the markers
-                markers[colnames[1]].append(row_values[1])  # this codes ex. condition
+                markers[colnames[0]].append(tmp)            # these are the actual markers
+                markers[colnames[1]].append(row_values[1])  # this is stimid
                 markers[colnames[2]].append(row_values[2])  # this codes ex. condition
+                markers[colnames[3]].append(row_values[3])  # this codes ex. condition
 
         return markers
 

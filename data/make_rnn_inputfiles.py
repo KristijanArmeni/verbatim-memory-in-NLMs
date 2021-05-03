@@ -182,9 +182,9 @@ markersoutname = args.json_filename.replace(".json", "_{}_{}_markers.txt".format
 # use different marker labels for two experiments
 
 if args.paradigm == "repeated-ngrams":
-    marker_keys = ["string", "stimid", "markers", "list_len", "dist_len"]
+    marker_keys = ["string", "markers", "stimid",  "list_len", "dist_len"]
 elif args.paradigm == "with-context":
-    marker_keys = ["string", "stimid", "markers", "list_len", "prompt_len"]
+    marker_keys = ["string", "markers", "stimid", "list_len", "prompt_len"]
 
 trials = {key: [] for key in marker_keys}
 
