@@ -86,6 +86,7 @@ def concat_and_tokenize_inputs(prefixes=None, prompts=None, word_list1=None, wor
     """
         
     metadata = {
+        "stimid": [],
         "trialID": [],
         "positionID": [],
         "subtok": [],
@@ -136,6 +137,7 @@ def concat_and_tokenize_inputs(prefixes=None, prompts=None, word_list1=None, wor
                     split_ids.append(mark_subtoken_splits(tokenizer.convert_ids_to_tokens(ids[0])))
                 
                 metadata["trialID"].append(np.concatenate(trials).tolist())
+                metadata["stimid"].append(i)
                 metadata["positionID"].append(np.concatenate(positions).tolist())
                 metadata["subtok"].append(np.concatenate(split_ids).tolist())
                 metadata["list_len"].append(ngram_size)
@@ -153,6 +155,7 @@ def concat_and_tokenize_inputs2(prefixes=None, input_sets=None, ngram_size=None,
     """
         
     metadata = {
+        "stimid": [],
         "trialID": [],
         "positionID": [],
         "subtok": [],
@@ -163,63 +166,45 @@ def concat_and_tokenize_inputs2(prefixes=None, input_sets=None, ngram_size=None,
         }
     
     input_seqs_tokenized = []
-    
-    # loop over different prefixes:
-    for prefix_key in prefixes.keys():
 
-        # loop over distractor sets
-        for dst_size in input_sets.keys():
+    # loop over distractor sets
+    for dst_size in input_sets.keys():
+        
+        # get input lists interleaved with distractors of dst_size
+        input_lists = input_sets[dst_size]
+        
+        # loop each input sequence
+        for i in range(len(input_lists)):
             
-            # get input lists interleaved with distractors of dst_size
-            input_lists = input_sets[dst_size]
+            # tokenize strings separately to be able to construct markers for prefix, word lists etc.
+            #i1 = tokenizer.encode("<|endoftext|> " + prefixes[prefix_key], return_tensors="pt")   # prefix IDs, add eos token
+            input_ids = tokenizer.encode("<|endoftext|> " + input_lists[i] + "<|endoftext|>", return_tensors="pt") 
+
+            # compose the input ids tensors
+            #input_ids = torch.cat((i1, i2), dim=1)
             
-            # loop each input sequence
-            for i in range(len(input_lists)):
-                
-                # tokenize strings separately to be able to construct markers for prefix, word lists etc.
-                i1 = tokenizer.encode("<|endoftext|> " + prefixes[prefix_key], return_tensors="pt")   # prefix IDs, add eos token
-                i2 = tokenizer.encode(input_lists[i] + "<|endoftext|>", return_tensors="pt") 
+            input_seqs_tokenized.append(input_ids)
 
-                # compose the input ids tensors
-                input_ids = torch.cat((i1, i2), dim=1)
-                
-                input_seqs_tokenized.append(input_ids)
+            # construct IDs for prefix, word lists and individual tokens
+            # useful for data vizualization etc.
 
-                # construct IDs for prefix, word lists and individual tokens
-                # useful for data vizualization etc.
-                trials = []
-                positions = []
-                split_ids = []
-                split_ids_markers = []
-                
-                for j, ids in enumerate((i1, i2)):
-                    
-                    tmp = np.zeros(shape=ids.shape[1], dtype=int)  # code the trial structure
-                    tmp[:] = j
-                    tmp2 = np.arange(ids.shape[1])                 # create token position index
-                    trials.append(tmp)
-                    positions.append(tmp2)
-                    split_ids.append(mark_subtoken_splits(tokenizer.convert_ids_to_tokens(ids[0])))
-                    
-                    if j == 0:
-                        prefix_toks = np.unique(split_ids[j])[np.unique(split_ids[j]) > 0]
-                        markers, ngram1_size, ngram2_size, n_repet = [0, 0], 1, 0, len(prefix_toks)
-                    elif j == 1:
-                        markers, ngram1_size, ngram2_size, n_repet = [1, 2], ngram_size, int(dst_size.strip("n")), 5
-                    
-                    split_ids_markers.append(assign_subtokens_to_groups(subtoken_splits=split_ids[j], 
-                                                                        markers=markers, 
-                                                                        ngram1_size=ngram1_size, 
-                                                                        ngram2_size=ngram2_size,
-                                                                        n_repet=n_repet))
-                
-                metadata["trialID"].append(np.concatenate(trials).tolist())
-                metadata["positionID"].append(np.concatenate(positions).tolist())
-                metadata["subtok"].append(np.concatenate(split_ids).tolist())
-                metadata["subtok_markers"].append(np.concatenate(split_ids_markers).tolist())
-                metadata["list_len"].append(ngram_size)
-                metadata["prefix"].append(prefix_key)
-                metadata["prompt"].append(dst_size.strip("n"))
+            split_ids = mark_subtoken_splits(tokenizer.convert_ids_to_tokens(input_ids[0]))
+            
+            markers, ngram1_size, ngram2_size, n_repet = [1, 2], ngram_size, int(dst_size.strip("n")), 5
+            
+            split_ids_markers = assign_subtokens_to_groups(subtoken_splits=split_ids, 
+                                                           markers=markers, 
+                                                           ngram1_size=ngram1_size, 
+                                                           ngram2_size=ngram2_size,
+                                                           n_repet=n_repet)
+            
+            metadata["trialID"].append(np.ones(shape=input_ids.shape[1], dtype=int).tolist())
+            metadata["stimid"].append(i)
+            metadata["positionID"].append(np.arange(input_ids.shape[1]).tolist())
+            metadata["subtok"].append(np.concatenate(split_ids).tolist())
+            metadata["subtok_markers"].append(split_ids_markers.tolist())
+            metadata["list_len"].append(ngram_size)
+            metadata["prompt"].append(dst_size.strip("n"))
                 
     return input_seqs_tokenized, metadata
 
@@ -625,12 +610,15 @@ def runtime_code():
         
             # now add the constant values for the current sequence rows
             dftmp["ispunct"] = dftmp.token.isin([".", ":", ","])    # create punctuation info column
-            dftmp['prefix'] = meta_data["prefix"][i]                # add a column of prefix labels
+            dftmp["stimid"] = meta_data["stimid"][i]                # stimulus id
             dftmp['prompt'] = meta_data["prompt"][i]                # add a column of prompt labels
             dftmp["list_len"] = meta_data["list_len"][i]            # add list length
             dftmp['stimID'] = counter                               # track sequence id
             dftmp['second_list'] = argins.condition                 # log condition of the second list
-        
+            
+            if argins.paradigm == "with-context":
+                dftmp['prefix'] = meta_data["prefix"][i]                # add a column of prefix labels
+            
             experiment_outputs.append(dftmp)
             counter += 1
     
