@@ -392,9 +392,13 @@ def get_complexity(state, obs, sentid, markers):
         # Populate output dict
         marker_keys = list(markers.keys())
         new_key_value_pairs = [("word", word), ("sentid", sentid), ("corpuspos", corpuspos),
-                               (marker_keys[0], markers[marker_keys[0]][sentid][corpuspos]), (marker_keys[1], markers[marker_keys[1]][sentid]),
-                               (marker_keys[2], int(markers[marker_keys[2]][sentid])), ("wlen", len(word)), ("surp", float(surp)),
-                               ("hs", float(Hs[corpuspos])), ("dHs", float(Hs[max(corpuspos-1, 0)])-float(Hs[corpuspos]))]
+                               (marker_keys[0], markers[marker_keys[0]][sentid][corpuspos]), 
+                               (marker_keys[1], markers[marker_keys[1]][sentid]), 
+                               (marker_keys[2], markers[marker_keys[2]][sentid]),
+                               (marker_keys[3], int(markers[marker_keys[3]][sentid])), 
+                               ("wlen", len(word)), ("surp", float(surp)),
+                               ("hs", float(Hs[corpuspos])), 
+                               ("dHs", float(Hs[max(corpuspos-1, 0)])-float(Hs[corpuspos]))]
 
             # additionally populate
         guesstuples, guessscoretuples = [], []
