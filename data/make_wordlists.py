@@ -173,7 +173,7 @@ lists_of_tokens = load_and_sample_noun_pool(path=path,
                                             seed=12345)
 
 # create circular shifts of the lists
-cshifts = list(np.arange(0, 10) + 1)
+cshifts = list(np.arange(0, 10))
 
 lists_of_tokens_shifted = [np.roll(np.asarray(alist), s).tolist() for alist in lists_of_tokens
                            for s in cshifts]
