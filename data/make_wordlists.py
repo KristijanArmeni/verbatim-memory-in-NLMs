@@ -18,7 +18,8 @@ import warnings
 # input arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("--which", type=str, choices=["random", "categorized", 
-                                                  "ngram-random", "ngram-distractors"],
+                                                  "ngram-random", "ngram-categorized",
+                                                  "ngram-distractors"],
                     help="specifies which stimulus set to build")
 parser.add_argument("--output_filename", type=str)
 
@@ -186,8 +187,7 @@ out_dict = {"n{}".format(n_items): [alist[0:n_items] for alist in lists_of_token
             for n_items in subsets}
 
 # for ngram lists sample the created lists repeatedly
-if argins.which=="ngram-random" or argins.which=="ngram-distractors":
-    
+if argins.which in ["ngram-random", "ngram-categorized"] or argins.which=="ngram-distractors":
     
     n_grams = [2, 3, 5, 7, 10]
     n_reps = 5
