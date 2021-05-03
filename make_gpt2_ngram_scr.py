@@ -15,12 +15,12 @@ master_bash = open(os.path.join(scripts_dir, 'run_gpt2_surprisal_ngramex_scripts
 for model_id in ["a-10"]:
     for scenario in ["sce1"]:
         for condition in ["repeat"]:
-            for list_type in ["ngram-random"]:
+            for list_type in ["ngram-random", "ngram-categorized"]:
     
                 outname = "surprisal_gpt2_{}_{}_{}_{}.csv".format(model_id,
-                                                                 scenario, 
-                                                                 condition,
-                                                                 list_type)
+                                                                  scenario, 
+                                                                  condition,
+                                                                  list_type)
                 
                 input_fname_path = os.path.join(root_dir, "data", "{}.json".format(list_type))
                 output_path = os.path.join(root_dir, "output")
@@ -45,10 +45,12 @@ for model_id in ["a-10"]:
     
                 f.write("#!/bin/bash\n")
                 f.write("#SBATCH --job-name=" + scr_filename + "\n")
-                f.write("#SBATCH --time=48:0:0\n")
-                f.write("#SBATCH --partition=lrgmem\n")
+                # f.write("#SBATCH --time=24:00:00")
+                f.write("#SBATCH --partition=gpuk80\n")
+                f.write("#SBATCH --gres=gpu:1\n")
+                f.write("#SBATCH --cpus-per-task=6\n")
                 f.write("#SBATCH --nodes=1\n")
-                f.write("#SBATCH --ntasks-per-node=5\n")
+                f.write("#SBATCH --ntasks-per-node=1\n")
                 f.write("#SBATCH --mail-type=end\n")
                 f.write("#SBATCH --mail-user=karmeni1@jhu.edu\n")
                 f.write("#SBATCH --output=" + os.path.join(log_dir, scr_filename) + ".log\n")

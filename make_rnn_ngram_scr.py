@@ -19,7 +19,7 @@ model_ids = ["a-10", "b-11", "c-12", "d-13", "e-14"]
 for model_id in model_ids:
     for scenario in ["sce1"]:
         for condition in ["repeat"]:
-            for list_type in ["ngram-random"]:
+            for list_type in ["ngram-random", "ngram-categorized"]:
     
                 outname = "surprisal_rnn_{}_{}_{}_{}.csv".format(model_id, scenario, condition, list_type)
                 
@@ -72,7 +72,7 @@ for model_id in model_ids:
     
                 f.write("#!/bin/bash\n")
                 f.write("#SBATCH --job-name=" + scr_filename + "\n")
-                f.write("#SBATCH --time=48:0:0\n")
+                f.write("#SBATCH --time=10:00:00\n")
                 f.write("#SBATCH --partition=shared\n")
                 f.write("#SBATCH --nodes=1\n")
                 f.write("#SBATCH --ntasks-per-node=5\n")

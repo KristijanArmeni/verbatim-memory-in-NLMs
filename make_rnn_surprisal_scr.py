@@ -74,7 +74,7 @@ for model_id in model_ids:
     
                 f.write("#!/bin/bash\n")
                 f.write("#SBATCH --job-name=" + scr_filename + "\n")
-                f.write("#SBATCH --time=02:00:00\n")
+                f.write("#SBATCH --time=12:00:00\n")
                 f.write("#SBATCH --partition=shared\n")
                 f.write("#SBATCH --nodes=1\n")
                 f.write("#SBATCH --ntasks-per-node=5\n")
