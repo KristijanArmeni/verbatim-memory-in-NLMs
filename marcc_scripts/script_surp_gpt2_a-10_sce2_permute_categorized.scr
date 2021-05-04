@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=script_surp_gpt2_a-10_sce2_permute_categorized
-#SBATCH --time=3:0:0
-#SBATCH --mem 3gb
+#SBATCH --time=20:00:00
+#SBATCH --mem 5gb
 #SBATCH --partition=gpuk80
 #SBATCH --gres=gpu:1
 #SBATCH --nodes=1

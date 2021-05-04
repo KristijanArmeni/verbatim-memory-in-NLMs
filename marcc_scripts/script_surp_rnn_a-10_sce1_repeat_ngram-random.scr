@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=script_surp_rnn_a-10_sce1_repeat_ngram-random
-#SBATCH --time=48:0:0
+#SBATCH --time=10:00:00
 #SBATCH --partition=shared
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=5

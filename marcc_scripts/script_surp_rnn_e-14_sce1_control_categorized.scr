@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=script_surp_rnn_e-14_sce1_control_categorized
-#SBATCH --time=02:00:00
+#SBATCH --time=12:00:00
 #SBATCH --partition=shared
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=5
