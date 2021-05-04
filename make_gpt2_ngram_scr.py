@@ -45,7 +45,8 @@ for model_id in ["a-10"]:
     
                 f.write("#!/bin/bash\n")
                 f.write("#SBATCH --job-name=" + scr_filename + "\n")
-                # f.write("#SBATCH --time=24:00:00")
+                f.write("#SBATCH --time=12:00:00\n")
+                f.write("#SBATCH --mem=5gb\n")
                 f.write("#SBATCH --partition=gpuk80\n")
                 f.write("#SBATCH --gres=gpu:1\n")
                 f.write("#SBATCH --cpus-per-task=6\n")
