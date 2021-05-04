@@ -30,7 +30,7 @@ for model_id in ["a-10"]:
                 command = "python {} --condition {} --scenario {} " \
                           "--paradigm repeated-ngrams " \
                           "--input_filename {} " \
-                          "--output_dir {} --output_file {}"\
+                          "--output_dir {} --output_file {}" \
                           "--device cuda"\
                           .format(python_file,
                                   condition, scenario,
