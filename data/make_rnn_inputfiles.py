@@ -221,8 +221,8 @@ if args.paradigm == "with-context":
                                                           list2=l2)
         
                     trials[marker_keys[0]].append(string)
-                    trials[marker_keys[1]].append(str(j))
-                    trials[marker_keys[2]].append(str(markers))
+                    trials[marker_keys[1]].append(str(markers))
+                    trials[marker_keys[2]].append(str(j))
                     trials[marker_keys[3]].append(str(list_size.strip("n")))
                     trials[marker_keys[4]].append(prompt_key)
 
@@ -286,8 +286,8 @@ elif args.paradigm == "repeated-ngrams":
                     assert len(toks) == len(codes)
         
                     trials[marker_keys[0]].append(fullstring)
-                    trials[marker_keys[1]].append(str(i))
-                    trials[marker_keys[2]].append(str(codes))
+                    trials[marker_keys[1]].append(str(codes))
+                    trials[marker_keys[2]].append(str(i))
                     trials[marker_keys[3]].append(ngram.strip("n"))
                     trials[marker_keys[4]].append(dst_size.strip("n"))
 
