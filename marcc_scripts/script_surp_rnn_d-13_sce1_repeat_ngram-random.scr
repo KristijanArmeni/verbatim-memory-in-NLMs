@@ -13,5 +13,5 @@
 ml anaconda
 conda activate ~/code/conda_envs/lmpytorch1.3
 
-python /home-3/karmeni1@jhu.edu/code/lm-mem/rnn/main.py --model_file /home-3/karmeni1@jhu.edu/code/lm-mem/rnn_models/LSTM_400_40m_d_13-d0.2.pt --vocab_file /home-3/karmeni1@jhu.edu/code/lm-mem/rnn/vocab.txt --data_dir /home-3/karmeni1@jhu.edu/code/lm-mem/data --testfname ngram-random_lists_sce1_repeat.txt --csvfname surprisal_rnn_d-13_sce1_repeat_ngram-random.csv --markersfname ngram-random_lists_sce1_repeat_markers.txt --output_dir /home-3/karmeni1@jhu.edu/code/lm-mem/output --lowercase --test --words
+python /home-3/karmeni1@jhu.edu/code/lm-mem/rnn/main.py --model_file /home-3/karmeni1@jhu.edu/code/lm-mem/rnn_models/LSTM_400_40m_d_13-d0.2.pt --vocab_file /home-3/karmeni1@jhu.edu/code/lm-mem/rnn/vocab.txt --data_dir /home-3/karmeni1@jhu.edu/code/lm-mem/data/rnn_input_files --testfname ngram-random_sce1_repeat.txt --csvfname surprisal_rnn_d-13_sce1_repeat_ngram-random.csv --markersfname ngram-random_sce1_repeat_markers.txt --output_dir /home-3/karmeni1@jhu.edu/code/lm-mem/output --lowercase --test --words
 
