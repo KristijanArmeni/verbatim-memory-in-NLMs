@@ -37,9 +37,9 @@ for model_id in model_ids:
                 
                 # create absolute paths
                 python_script = os.path.join(root_dir, "rnn", "main.py")
-                data_dir = os.path.join(root_dir, "data")
+                data_dir = os.path.join(root_dir, "data", "rnn_input_files")
                 vocab_path = os.path.join(root_dir, "rnn", "vocab.txt")
-                test_input_file = "{}_lists_{}_{}.txt".format(list_type, scenario, condition)
+                test_input_file = "{}_{}_{}.txt".format(list_type, scenario, condition)
                 markers_fname = test_input_file.replace(".txt", "_markers.txt")
                 output_dir = os.path.join(root_dir, "output")
     
