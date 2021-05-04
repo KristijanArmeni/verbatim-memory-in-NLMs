@@ -24,7 +24,7 @@ for model_id in ["a-10"]:
                 
                 input_fname_path = os.path.join(root_dir, "data", "{}.json".format(list_type))
                 output_path = os.path.join(root_dir, "output")
-                python_file = os.path.join(root_dir, "surprisal.py")
+                python_file = os.path.join(root_dir, "gpt2_surprisal.py")
                 
                 # create command string
                 command = "python {} --condition {} --scenario {} " \
