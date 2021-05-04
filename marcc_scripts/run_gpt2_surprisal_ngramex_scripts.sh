@@ -1,1 +1,2 @@
 sbatch script_surp_gpt2_a-10_sce1_repeat_ngram-random.scr
+sbatch script_surp_gpt2_a-10_sce1_repeat_ngram-categorized.scr
