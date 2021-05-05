@@ -43,7 +43,7 @@ def mark_subtoken_splits(tokens):
         # if the token is split, it does not gave the symbol for whitespace
         # if the word is at position 0, it also has to start a new token, so 
         # count it
-        if "Ġ" in tokens[i] or i == 0:
+        if "Ġ" in tokens[i]:
             count += 1
         
         if tokens[i] in punctuation:
@@ -147,7 +147,7 @@ def concat_and_tokenize_inputs(prefixes=None, prompts=None, word_list1=None, wor
     return input_seqs_tokenized, metadata
 
 
-def concat_and_tokenize_inputs2(prefixes=None, input_sets=None, ngram_size=None,
+def concat_and_tokenize_inputs2(input_sets=None, ngram_size=None,
                                 tokenizer=None):
         
     """
@@ -178,7 +178,7 @@ def concat_and_tokenize_inputs2(prefixes=None, input_sets=None, ngram_size=None,
             
             # tokenize strings separately to be able to construct markers for prefix, word lists etc.
             #i1 = tokenizer.encode("<|endoftext|> " + prefixes[prefix_key], return_tensors="pt")   # prefix IDs, add eos token
-            input_ids = tokenizer.encode("<|endoftext|> " + input_lists[i] + "<|endoftext|>", return_tensors="pt") 
+            input_ids = tokenizer.encode("<|endoftext|>" + input_lists[i] + "<|endoftext|>", return_tensors="pt") 
 
             # compose the input ids tensors
             #input_ids = torch.cat((i1, i2), dim=1)
@@ -201,8 +201,8 @@ def concat_and_tokenize_inputs2(prefixes=None, input_sets=None, ngram_size=None,
             metadata["trialID"].append(np.ones(shape=input_ids.shape[1], dtype=int).tolist())
             metadata["stimid"].append(i)
             metadata["positionID"].append(np.arange(input_ids.shape[1]).tolist())
-            metadata["subtok"].append(np.concatenate(split_ids).tolist())
-            metadata["subtok_markers"].append(split_ids_markers.tolist())
+            metadata["subtok"].append(split_ids)
+            metadata["subtok_markers"].append(split_ids_markers)
             metadata["list_len"].append(ngram_size)
             metadata["prompt"].append(dst_size.strip("n"))
                 
@@ -413,7 +413,7 @@ class Experiment(object):
 def runtime_code(): 
     
     
-    from stimuli import prefixes, prompts, prefixes_repeated_ngrams
+    from stimuli import prefixes, prompts
     
     
     # ===== INITIATIONS ===== #
@@ -556,8 +556,7 @@ def runtime_code():
             word_lists = interleave_targets_and_distractors(word_lists1[n_words], distractors)
             
                         
-            input_sequences, meta_data = concat_and_tokenize_inputs2(prefixes=prefixes_repeated_ngrams[argins.scenario],
-                                                                     input_sets=word_lists,
+            input_sequences, meta_data = concat_and_tokenize_inputs2(input_sets=word_lists,
                                                                      ngram_size=int(n_words.strip("n")),
                                                                      tokenizer=tokenizer)
             
