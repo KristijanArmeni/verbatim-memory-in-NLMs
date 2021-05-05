@@ -558,7 +558,7 @@ def runtime_code():
                         
             input_sequences, meta_data = concat_and_tokenize_inputs2(prefixes=prefixes_repeated_ngrams[argins.scenario],
                                                                      input_sets=word_lists,
-                                                                     ngram_size=n_words.strip("n"),
+                                                                     ngram_size=int(n_words.strip("n")),
                                                                      tokenizer=tokenizer)
             
         
