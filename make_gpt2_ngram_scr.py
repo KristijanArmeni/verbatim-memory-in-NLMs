@@ -12,7 +12,7 @@ log_dir = os.path.join(root_dir, 'logs')
 
 master_bash = open(os.path.join(scripts_dir, 'run_gpt2_surprisal_ngramex_scripts.sh'), 'w')
 
-for model_id in ["a-10"]:
+for model_id in ["a-10", "r-10"]:
     for scenario in ["sce1"]:
         for condition in ["repeat"]:
             for list_type in ["ngram-random", "ngram-categorized"]:
@@ -26,14 +26,25 @@ for model_id in ["a-10"]:
                 output_path = os.path.join(root_dir, "output")
                 python_file = os.path.join(root_dir, "gpt2_surprisal.py")
                 
+                model_type = "pretrained"
+                model_seed = None
+                
+                if model_id == "r-10:
+                    model_type = "random"
+                    model_seed = 12345
+                
                 # create command string
                 command = "python {} --condition {} --scenario {} " \
                           "--paradigm repeated-ngrams " \
+                          "--model_type {} " \
+                          "--model_seed {} " \
                           "--input_filename {} " \
                           "--output_dir {} --output_file {} " \
                           "--device cuda"\
                           .format(python_file,
                                   condition, scenario,
+                                  model_type,
+                                  model_seed,
                                   input_fname_path,
                                   output_path,
                                   outname)
@@ -46,8 +57,8 @@ for model_id in ["a-10"]:
     
                 f.write("#!/bin/bash\n")
                 f.write("#SBATCH --job-name=" + scr_filename + "\n")
-                f.write("#SBATCH --time=12:00:00\n")
-                f.write("#SBATCH --mem=5gb\n")
+                f.write("#SBATCH --time=03:30:00\n")
+                f.write("#SBATCH --mem=4gb\n")
                 f.write("#SBATCH --partition=gpuk80\n")
                 f.write("#SBATCH --gres=gpu:1\n")
                 f.write("#SBATCH --cpus-per-task=6\n")
