@@ -16,7 +16,7 @@ import sys, os
 import argparse
 import numpy as np
 import pandas as pd
-from transformers import AutoModelForCausalLM, AutoTokenizer, top_k_top_p_filtering
+from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config, top_k_top_p_filtering
 import torch
 from torch.nn import functional as F
 from tqdm import trange
@@ -408,6 +408,7 @@ class Experiment(object):
 
         return outputs
 
+
 # ===== RUNTIME CODE WRAPPER ===== #
 
 def runtime_code(): 
@@ -429,6 +430,10 @@ def runtime_code():
                         help="whether or not to permute the second word list")
     parser.add_argument("--context_len", type=int, default=1024,
                         help="length of context window in tokens for transformers")
+    parser.add_argument("--model_type", type=str, default="pretrained", choices=["pretrained", "random"],
+                        help="whether or not to load a pretrained model or initialize randomly")
+    parser.add_argument("--model_seed", type=int, default=12345,
+                        help="seed value to be used in torch.manual_seed() prior to calling GPT2Model()")
     parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
                         help="whether to run on cpu or cuda")
     parser.add_argument("--input_filename", type=str,
@@ -521,8 +526,17 @@ def runtime_code():
     device = torch.device(argins.device if torch.cuda.is_available() else "cpu") 
         
     # setup the model
-    tokenizer = AutoTokenizer.from_pretrained('gpt2')
-    model = AutoModelForCausalLM.from_pretrained('gpt2')
+    tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
+    
+    # load pretrained small model
+    if argins.model_type == "pretrained":
+        model = GPT2LMHeadModel.from_pretrained('gpt2')
+    
+    # or initialize a random model
+    elif argins.model_type == "random":
+        # initialize with random weights
+        torch.manual_seed(argins.model_seed)
+        model = GPT2LMHeadModel(config=GPT2Config()) 
     
     experiment = Experiment(model=model, tokenizer=tokenizer, 
                             context_len=argins.context_len,
@@ -608,7 +622,6 @@ def runtime_code():
                                  columns=colnames)
         
             # now add the constant values for the current sequence rows
-            dftmp["ispunct"] = dftmp.token.isin([".", ":", ","])    # create punctuation info column
             dftmp["stimid"] = meta_data["stimid"][i]                # stimulus id
             dftmp['prompt'] = meta_data["prompt"][i]                # add a column of prompt labels
             dftmp["list_len"] = meta_data["list_len"][i]            # add list length
