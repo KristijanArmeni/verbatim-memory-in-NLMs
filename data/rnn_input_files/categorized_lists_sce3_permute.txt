@@ -1,7 +1,7 @@
 Before the meeting , Mary wrote down the following lists of words . One was : window , door , roof . And the other : roof , window , door .
 Before the meeting , Mary wrote down the following lists of words . One was : hall , window , door . And the other : door , hall , window .
 Before the meeting , Mary wrote down the following lists of words . One was : hearth , hall , window . And the other : window , hearth , hall .
-Before the meeting , Mary wrote down the following lists of words . One was : basement , hearth , hall . And the other : basement , hearth , hall .
+Before the meeting , Mary wrote down the following lists of words . One was : basement , hearth , hall . And the other : hall , basement , hearth .
 Before the meeting , Mary wrote down the following lists of words . One was : room , basement , hearth . And the other : hearth , room , basement .
 Before the meeting , Mary wrote down the following lists of words . One was : ceiling , room , basement . And the other : room , basement , ceiling .
 Before the meeting , Mary wrote down the following lists of words . One was : floor , ceiling , room . And the other : floor , room , ceiling .
@@ -12,7 +12,7 @@ Before the meeting , Mary wrote down the following lists of words . One was : le
 Before the meeting , Mary wrote down the following lists of words . One was : toe , leg , arms . And the other : leg , toe , arms .
 Before the meeting , Mary wrote down the following lists of words . One was : hand , toe , leg . And the other : toe , hand , leg .
 Before the meeting , Mary wrote down the following lists of words . One was : ear , hand , toe . And the other : ear , toe , hand .
-Before the meeting , Mary wrote down the following lists of words . One was : finger , ear , hand . And the other : finger , ear , hand .
+Before the meeting , Mary wrote down the following lists of words . One was : finger , ear , hand . And the other : finger , hand , ear .
 Before the meeting , Mary wrote down the following lists of words . One was : nose , finger , ear . And the other : finger , nose , ear .
 Before the meeting , Mary wrote down the following lists of words . One was : foot , nose , finger . And the other : finger , foot , nose .
 Before the meeting , Mary wrote down the following lists of words . One was : eye , foot , nose . And the other : eye , nose , foot .
@@ -30,29 +30,29 @@ Before the meeting , Mary wrote down the following lists of words . One was : ba
 Before the meeting , Mary wrote down the following lists of words . One was : destroyer , battleship , cruiser . And the other : battleship , destroyer , cruiser .
 Before the meeting , Mary wrote down the following lists of words . One was : robin , sparrow , heron . And the other : robin , heron , sparrow .
 Before the meeting , Mary wrote down the following lists of words . One was : vulture , robin , sparrow . And the other : robin , sparrow , vulture .
-Before the meeting , Mary wrote down the following lists of words . One was : woodpecker , vulture , robin . And the other : woodpecker , vulture , robin .
+Before the meeting , Mary wrote down the following lists of words . One was : woodpecker , vulture , robin . And the other : vulture , robin , woodpecker .
 Before the meeting , Mary wrote down the following lists of words . One was : pigeon , woodpecker , vulture . And the other : woodpecker , vulture , pigeon .
 Before the meeting , Mary wrote down the following lists of words . One was : parrot , pigeon , woodpecker . And the other : pigeon , parrot , woodpecker .
 Before the meeting , Mary wrote down the following lists of words . One was : hawk , parrot , pigeon . And the other : pigeon , hawk , parrot .
 Before the meeting , Mary wrote down the following lists of words . One was : crow , hawk , parrot . And the other : crow , parrot , hawk .
 Before the meeting , Mary wrote down the following lists of words . One was : eagle , crow , hawk . And the other : hawk , eagle , crow .
-Before the meeting , Mary wrote down the following lists of words . One was : heron , eagle , crow . And the other : heron , eagle , crow .
+Before the meeting , Mary wrote down the following lists of words . One was : heron , eagle , crow . And the other : eagle , heron , crow .
 Before the meeting , Mary wrote down the following lists of words . One was : sparrow , heron , eagle . And the other : sparrow , eagle , heron .
-Before the meeting , Mary wrote down the following lists of words . One was : apple , pear , banana . And the other : apple , pear , banana .
-Before the meeting , Mary wrote down the following lists of words . One was : apricot , apple , pear . And the other : apricot , apple , pear .
+Before the meeting , Mary wrote down the following lists of words . One was : apple , pear , banana . And the other : banana , pear , apple .
+Before the meeting , Mary wrote down the following lists of words . One was : apricot , apple , pear . And the other : pear , apricot , apple .
 Before the meeting , Mary wrote down the following lists of words . One was : lemon , apricot , apple . And the other : apple , lemon , apricot .
 Before the meeting , Mary wrote down the following lists of words . One was : grapefruit , lemon , apricot . And the other : apricot , lemon , grapefruit .
 Before the meeting , Mary wrote down the following lists of words . One was : plum , grapefruit , lemon . And the other : grapefruit , lemon , plum .
-Before the meeting , Mary wrote down the following lists of words . One was : cherry , plum , grapefruit . And the other : cherry , plum , grapefruit .
+Before the meeting , Mary wrote down the following lists of words . One was : cherry , plum , grapefruit . And the other : grapefruit , plum , cherry .
 Before the meeting , Mary wrote down the following lists of words . One was : grape , cherry , plum . And the other : plum , grape , cherry .
 Before the meeting , Mary wrote down the following lists of words . One was : peach , grape , cherry . And the other : cherry , peach , grape .
-Before the meeting , Mary wrote down the following lists of words . One was : banana , peach , grape . And the other : banana , peach , grape .
+Before the meeting , Mary wrote down the following lists of words . One was : banana , peach , grape . And the other : grape , banana , peach .
 Before the meeting , Mary wrote down the following lists of words . One was : pear , banana , peach . And the other : banana , pear , peach .
-Before the meeting , Mary wrote down the following lists of words . One was : hammer , saw , nails . And the other : hammer , saw , nails .
+Before the meeting , Mary wrote down the following lists of words . One was : hammer , saw , nails . And the other : hammer , nails , saw .
 Before the meeting , Mary wrote down the following lists of words . One was : screws , hammer , saw . And the other : saw , hammer , screws .
-Before the meeting , Mary wrote down the following lists of words . One was : drill , screws , hammer . And the other : drill , screws , hammer .
+Before the meeting , Mary wrote down the following lists of words . One was : drill , screws , hammer . And the other : screws , hammer , drill .
 Before the meeting , Mary wrote down the following lists of words . One was : wrench , drill , screws . And the other : drill , wrench , screws .
-Before the meeting , Mary wrote down the following lists of words . One was : ruler , wrench , drill . And the other : ruler , wrench , drill .
+Before the meeting , Mary wrote down the following lists of words . One was : ruler , wrench , drill . And the other : wrench , ruler , drill .
 Before the meeting , Mary wrote down the following lists of words . One was : chisel , ruler , wrench . And the other : wrench , ruler , chisel .
 Before the meeting , Mary wrote down the following lists of words . One was : plane , chisel , ruler . And the other : plane , ruler , chisel .
 Before the meeting , Mary wrote down the following lists of words . One was : level , plane , chisel . And the other : chisel , plane , level .
@@ -62,13 +62,13 @@ Before the meeting , Mary wrote down the following lists of words . One was : hu
 Before the meeting , Mary wrote down the following lists of words . One was : sunshine , hurricane , tornado . And the other : hurricane , sunshine , tornado .
 Before the meeting , Mary wrote down the following lists of words . One was : clouds , sunshine , hurricane . And the other : hurricane , clouds , sunshine .
 Before the meeting , Mary wrote down the following lists of words . One was : cyclone , clouds , sunshine . And the other : clouds , sunshine , cyclone .
-Before the meeting , Mary wrote down the following lists of words . One was : wind , cyclone , clouds . And the other : wind , cyclone , clouds .
+Before the meeting , Mary wrote down the following lists of words . One was : wind , cyclone , clouds . And the other : wind , clouds , cyclone .
 Before the meeting , Mary wrote down the following lists of words . One was : storm , wind , cyclone . And the other : cyclone , wind , storm .
 Before the meeting , Mary wrote down the following lists of words . One was : hail , storm , wind . And the other : wind , hail , storm .
-Before the meeting , Mary wrote down the following lists of words . One was : snow , hail , storm . And the other : snow , hail , storm .
+Before the meeting , Mary wrote down the following lists of words . One was : snow , hail , storm . And the other : hail , storm , snow .
 Before the meeting , Mary wrote down the following lists of words . One was : rain , snow , hail . And the other : snow , rain , hail .
 Before the meeting , Mary wrote down the following lists of words . One was : tornado , rain , snow . And the other : snow , tornado , rain .
-Before the meeting , Mary wrote down the following lists of words . One was : oxygen , hydrogen , nitrogen . And the other : oxygen , hydrogen , nitrogen .
+Before the meeting , Mary wrote down the following lists of words . One was : oxygen , hydrogen , nitrogen . And the other : oxygen , nitrogen , hydrogen .
 Before the meeting , Mary wrote down the following lists of words . One was : potassium , oxygen , hydrogen . And the other : potassium , hydrogen , oxygen .
 Before the meeting , Mary wrote down the following lists of words . One was : calcium , potassium , oxygen . And the other : potassium , oxygen , calcium .
 Before the meeting , Mary wrote down the following lists of words . One was : chlorine , calcium , potassium . And the other : potassium , calcium , chlorine .
@@ -85,9 +85,9 @@ Before the meeting , Mary wrote down the following lists of words . One was : ma
 Before the meeting , Mary wrote down the following lists of words . One was : astronomy , mathematics , geology . And the other : astronomy , geology , mathematics .
 Before the meeting , Mary wrote down the following lists of words . One was : botany , astronomy , mathematics . And the other : astronomy , botany , mathematics .
 Before the meeting , Mary wrote down the following lists of words . One was : zoology , botany , astronomy . And the other : botany , astronomy , zoology .
-Before the meeting , Mary wrote down the following lists of words . One was : biology , zoology , botany . And the other : biology , zoology , botany .
+Before the meeting , Mary wrote down the following lists of words . One was : biology , zoology , botany . And the other : botany , zoology , biology .
 Before the meeting , Mary wrote down the following lists of words . One was : psychology , biology , zoology . And the other : zoology , psychology , biology .
-Before the meeting , Mary wrote down the following lists of words . One was : physics , psychology , biology . And the other : physics , psychology , biology .
+Before the meeting , Mary wrote down the following lists of words . One was : physics , psychology , biology . And the other : psychology , biology , physics .
 Before the meeting , Mary wrote down the following lists of words . One was : piano , drum , trumpet . And the other : piano , trumpet , drum .
 Before the meeting , Mary wrote down the following lists of words . One was : oboe , piano , drum . And the other : oboe , drum , piano .
 Before the meeting , Mary wrote down the following lists of words . One was : trombone , oboe , piano . And the other : piano , oboe , trombone .
@@ -103,7 +103,7 @@ Before the meeting , Mary wrote down the following lists of words . One was : di
 Before the meeting , Mary wrote down the following lists of words . One was : cup , dish , knife . And the other : knife , dish , cup .
 Before the meeting , Mary wrote down the following lists of words . One was : mixer , cup , dish . And the other : cup , dish , mixer .
 Before the meeting , Mary wrote down the following lists of words . One was : bowl , mixer , cup . And the other : bowl , cup , mixer .
-Before the meeting , Mary wrote down the following lists of words . One was : stove , bowl , mixer . And the other : stove , bowl , mixer .
+Before the meeting , Mary wrote down the following lists of words . One was : stove , bowl , mixer . And the other : stove , mixer , bowl .
 Before the meeting , Mary wrote down the following lists of words . One was : pot , stove , bowl . And the other : bowl , pot , stove .
 Before the meeting , Mary wrote down the following lists of words . One was : pan , pot , stove . And the other : pot , stove , pan .
 Before the meeting , Mary wrote down the following lists of words . One was : fork , pan , pot . And the other : pot , pan , fork .
@@ -116,24 +116,24 @@ Before the meeting , Mary wrote down the following lists of words . One was : go
 Before the meeting , Mary wrote down the following lists of words . One was : tuna , goldfish , cod . And the other : cod , tuna , goldfish .
 Before the meeting , Mary wrote down the following lists of words . One was : salmon , tuna , goldfish . And the other : goldfish , salmon , tuna .
 Before the meeting , Mary wrote down the following lists of words . One was : perch , salmon , tuna . And the other : perch , tuna , salmon .
-Before the meeting , Mary wrote down the following lists of words . One was : herring , perch , salmon . And the other : herring , perch , salmon .
-Before the meeting , Mary wrote down the following lists of words . One was : shark , herring , perch . And the other : shark , herring , perch .
+Before the meeting , Mary wrote down the following lists of words . One was : herring , perch , salmon . And the other : perch , salmon , herring .
+Before the meeting , Mary wrote down the following lists of words . One was : shark , herring , perch . And the other : perch , shark , herring .
 Before the meeting , Mary wrote down the following lists of words . One was : football , baseball , basketball . And the other : football , basketball , baseball .
 Before the meeting , Mary wrote down the following lists of words . One was : badminton , football , baseball . And the other : football , badminton , baseball .
-Before the meeting , Mary wrote down the following lists of words . One was : lacrosse , badminton , football . And the other : lacrosse , badminton , football .
+Before the meeting , Mary wrote down the following lists of words . One was : lacrosse , badminton , football . And the other : badminton , lacrosse , football .
 Before the meeting , Mary wrote down the following lists of words . One was : hockey , lacrosse , badminton . And the other : badminton , hockey , lacrosse .
-Before the meeting , Mary wrote down the following lists of words . One was : golf , hockey , lacrosse . And the other : golf , hockey , lacrosse .
+Before the meeting , Mary wrote down the following lists of words . One was : golf , hockey , lacrosse . And the other : lacrosse , golf , hockey .
 Before the meeting , Mary wrote down the following lists of words . One was : soccer , golf , hockey . And the other : soccer , hockey , golf .
 Before the meeting , Mary wrote down the following lists of words . One was : swimming , soccer , golf . And the other : soccer , golf , swimming .
 Before the meeting , Mary wrote down the following lists of words . One was : tennis , swimming , soccer . And the other : tennis , soccer , swimming .
 Before the meeting , Mary wrote down the following lists of words . One was : basketball , tennis , swimming . And the other : tennis , basketball , swimming .
 Before the meeting , Mary wrote down the following lists of words . One was : baseball , basketball , tennis . And the other : basketball , tennis , baseball .
 Before the meeting , Mary wrote down the following lists of words . One was : doctor , lawyer , teacher . And the other : teacher , doctor , lawyer .
-Before the meeting , Mary wrote down the following lists of words . One was : psychologist , doctor , lawyer . And the other : psychologist , doctor , lawyer .
-Before the meeting , Mary wrote down the following lists of words . One was : nurse , psychologist , doctor . And the other : nurse , psychologist , doctor .
+Before the meeting , Mary wrote down the following lists of words . One was : psychologist , doctor , lawyer . And the other : lawyer , doctor , psychologist .
+Before the meeting , Mary wrote down the following lists of words . One was : nurse , psychologist , doctor . And the other : doctor , nurse , psychologist .
 Before the meeting , Mary wrote down the following lists of words . One was : salesman , nurse , psychologist . And the other : salesman , psychologist , nurse .
 Before the meeting , Mary wrote down the following lists of words . One was : carpenter , salesman , nurse . And the other : salesman , carpenter , nurse .
-Before the meeting , Mary wrote down the following lists of words . One was : professor , carpenter , salesman . And the other : professor , carpenter , salesman .
+Before the meeting , Mary wrote down the following lists of words . One was : professor , carpenter , salesman . And the other : carpenter , salesman , professor .
 Before the meeting , Mary wrote down the following lists of words . One was : engineer , professor , carpenter . And the other : engineer , carpenter , professor .
 Before the meeting , Mary wrote down the following lists of words . One was : dentist , engineer , professor . And the other : engineer , dentist , professor .
 Before the meeting , Mary wrote down the following lists of words . One was : teacher , dentist , engineer . And the other : dentist , engineer , teacher .
@@ -142,7 +142,7 @@ Before the meeting , Mary wrote down the following lists of words . One was : oa
 Before the meeting , Mary wrote down the following lists of words . One was : hickory , oak , maple . And the other : maple , hickory , oak .
 Before the meeting , Mary wrote down the following lists of words . One was : fir , hickory , oak . And the other : fir , oak , hickory .
 Before the meeting , Mary wrote down the following lists of words . One was : walnut , fir , hickory . And the other : fir , walnut , hickory .
-Before the meeting , Mary wrote down the following lists of words . One was : redwood , walnut , fir . And the other : redwood , walnut , fir .
+Before the meeting , Mary wrote down the following lists of words . One was : redwood , walnut , fir . And the other : fir , walnut , redwood .
 Before the meeting , Mary wrote down the following lists of words . One was : spruce , redwood , walnut . And the other : walnut , spruce , redwood .
 Before the meeting , Mary wrote down the following lists of words . One was : birch , spruce , redwood . And the other : spruce , birch , redwood .
 Before the meeting , Mary wrote down the following lists of words . One was : elm , birch , spruce . And the other : spruce , elm , birch .
@@ -151,7 +151,7 @@ Before the meeting , Mary wrote down the following lists of words . One was : ma
 Before the meeting , Mary wrote down the following lists of words . One was : shirt , socks , pants . And the other : pants , shirt , socks .
 Before the meeting , Mary wrote down the following lists of words . One was : sweater , shirt , socks . And the other : shirt , socks , sweater .
 Before the meeting , Mary wrote down the following lists of words . One was : hat , sweater , shirt . And the other : hat , shirt , sweater .
-Before the meeting , Mary wrote down the following lists of words . One was : dress , hat , sweater . And the other : dress , hat , sweater .
+Before the meeting , Mary wrote down the following lists of words . One was : dress , hat , sweater . And the other : hat , sweater , dress .
 Before the meeting , Mary wrote down the following lists of words . One was : coat , dress , hat . And the other : dress , hat , coat .
 Before the meeting , Mary wrote down the following lists of words . One was : skirt , coat , dress . And the other : dress , skirt , coat .
 Before the meeting , Mary wrote down the following lists of words . One was : blouse , skirt , coat . And the other : blouse , coat , skirt .
@@ -173,14 +173,14 @@ Before the meeting , Mary wrote down the following lists of words . One was : ca
 Before the meeting , Mary wrote down the following lists of words . One was : ocean , cave , mountain . And the other : cave , mountain , ocean .
 Before the meeting , Mary wrote down the following lists of words . One was : tundra , ocean , cave . And the other : cave , ocean , tundra .
 Before the meeting , Mary wrote down the following lists of words . One was : canyon , tundra , ocean . And the other : canyon , ocean , tundra .
-Before the meeting , Mary wrote down the following lists of words . One was : lake , canyon , tundra . And the other : lake , canyon , tundra .
+Before the meeting , Mary wrote down the following lists of words . One was : lake , canyon , tundra . And the other : canyon , lake , tundra .
 Before the meeting , Mary wrote down the following lists of words . One was : rock , lake , canyon . And the other : rock , canyon , lake .
-Before the meeting , Mary wrote down the following lists of words . One was : river , rock , lake . And the other : river , rock , lake .
+Before the meeting , Mary wrote down the following lists of words . One was : river , rock , lake . And the other : lake , rock , river .
 Before the meeting , Mary wrote down the following lists of words . One was : valley , river , rock . And the other : river , valley , rock .
 Before the meeting , Mary wrote down the following lists of words . One was : hill , valley , river . And the other : hill , river , valley .
 Before the meeting , Mary wrote down the following lists of words . One was : murder , rape , robbery . And the other : rape , murder , robbery .
 Before the meeting , Mary wrote down the following lists of words . One was : battery , murder , rape . And the other : rape , murder , battery .
-Before the meeting , Mary wrote down the following lists of words . One was : adultery , battery , murder . And the other : adultery , battery , murder .
+Before the meeting , Mary wrote down the following lists of words . One was : adultery , battery , murder . And the other : murder , battery , adultery .
 Before the meeting , Mary wrote down the following lists of words . One was : larceny , adultery , battery . And the other : larceny , battery , adultery .
 Before the meeting , Mary wrote down the following lists of words . One was : kidnapping , larceny , adultery . And the other : kidnapping , adultery , larceny .
 Before the meeting , Mary wrote down the following lists of words . One was : arson , kidnapping , larceny . And the other : larceny , arson , kidnapping .
@@ -191,9 +191,9 @@ Before the meeting , Mary wrote down the following lists of words . One was : ra
 Before the meeting , Mary wrote down the following lists of words . One was : log , cat , horse . And the other : cat , horse , log .
 Before the meeting , Mary wrote down the following lists of words . One was : mouse , log , cat . And the other : log , cat , mouse .
 Before the meeting , Mary wrote down the following lists of words . One was : bear , mouse , log . And the other : log , mouse , bear .
-Before the meeting , Mary wrote down the following lists of words . One was : pig , bear , mouse . And the other : pig , bear , mouse .
+Before the meeting , Mary wrote down the following lists of words . One was : pig , bear , mouse . And the other : mouse , pig , bear .
 Before the meeting , Mary wrote down the following lists of words . One was : elephant , pig , bear . And the other : bear , pig , elephant .
-Before the meeting , Mary wrote down the following lists of words . One was : tiger , elephant , pig . And the other : tiger , elephant , pig .
+Before the meeting , Mary wrote down the following lists of words . One was : tiger , elephant , pig . And the other : tiger , pig , elephant .
 Before the meeting , Mary wrote down the following lists of words . One was : lion , tiger , elephant . And the other : tiger , lion , elephant .
 Before the meeting , Mary wrote down the following lists of words . One was : cow , lion , tiger . And the other : tiger , lion , cow .
 Before the meeting , Mary wrote down the following lists of words . One was : horse , cow , lion . And the other : cow , lion , horse .
@@ -201,18 +201,18 @@ Before the meeting , Mary wrote down the following lists of words . One was : ca
 Before the meeting , Mary wrote down the following lists of words . One was : fly , ant , bee . And the other : fly , bee , ant .
 Before the meeting , Mary wrote down the following lists of words . One was : butterfly , fly , ant . And the other : ant , butterfly , fly .
 Before the meeting , Mary wrote down the following lists of words . One was : flea , butterfly , fly . And the other : butterfly , fly , flea .
-Before the meeting , Mary wrote down the following lists of words . One was : moth , flea , butterfly . And the other : moth , flea , butterfly .
+Before the meeting , Mary wrote down the following lists of words . One was : moth , flea , butterfly . And the other : moth , butterfly , flea .
 Before the meeting , Mary wrote down the following lists of words . One was : wasp , moth , flea . And the other : flea , wasp , moth .
 Before the meeting , Mary wrote down the following lists of words . One was : beetle , wasp , moth . And the other : wasp , beetle , moth .
 Before the meeting , Mary wrote down the following lists of words . One was : spider , beetle , wasp . And the other : beetle , wasp , spider .
 Before the meeting , Mary wrote down the following lists of words . One was : mosquito , spider , beetle . And the other : mosquito , beetle , spider .
 Before the meeting , Mary wrote down the following lists of words . One was : bee , mosquito , spider . And the other : mosquito , bee , spider .
-Before the meeting , Mary wrote down the following lists of words . One was : ant , bee , mosquito . And the other : ant , bee , mosquito .
+Before the meeting , Mary wrote down the following lists of words . One was : ant , bee , mosquito . And the other : ant , mosquito , bee .
 Before the meeting , Mary wrote down the following lists of words . One was : blue , red , green . And the other : green , red , blue .
-Before the meeting , Mary wrote down the following lists of words . One was : blonde , blue , red . And the other : blonde , blue , red .
+Before the meeting , Mary wrote down the following lists of words . One was : blonde , blue , red . And the other : blue , blonde , red .
 Before the meeting , Mary wrote down the following lists of words . One was : brown , blonde , blue . And the other : blonde , brown , blue .
 Before the meeting , Mary wrote down the following lists of words . One was : pink , brown , blonde . And the other : pink , blonde , brown .
-Before the meeting , Mary wrote down the following lists of words . One was : white , pink , brown . And the other : white , pink , brown .
+Before the meeting , Mary wrote down the following lists of words . One was : white , pink , brown . And the other : brown , pink , white .
 Before the meeting , Mary wrote down the following lists of words . One was : purple , white , pink . And the other : pink , white , purple .
 Before the meeting , Mary wrote down the following lists of words . One was : black , purple , white . And the other : white , black , purple .
 Before the meeting , Mary wrote down the following lists of words . One was : yellow , black , purple . And the other : purple , black , yellow .
@@ -220,13 +220,13 @@ Before the meeting , Mary wrote down the following lists of words . One was : gr
 Before the meeting , Mary wrote down the following lists of words . One was : red , green , yellow . And the other : green , red , yellow .
 Before the meeting , Mary wrote down the following lists of words . One was : cotton , wool , silk . And the other : wool , silk , cotton .
 Before the meeting , Mary wrote down the following lists of words . One was : felt , cotton , wool . And the other : wool , felt , cotton .
-Before the meeting , Mary wrote down the following lists of words . One was : canvas , felt , cotton . And the other : canvas , felt , cotton .
+Before the meeting , Mary wrote down the following lists of words . One was : canvas , felt , cotton . And the other : felt , canvas , cotton .
 Before the meeting , Mary wrote down the following lists of words . One was : denim , canvas , felt . And the other : felt , denim , canvas .
 Before the meeting , Mary wrote down the following lists of words . One was : velvet , denim , canvas . And the other : canvas , denim , velvet .
 Before the meeting , Mary wrote down the following lists of words . One was : satin , velvet , denim . And the other : denim , velvet , satin .
 Before the meeting , Mary wrote down the following lists of words . One was : linen , satin , velvet . And the other : velvet , satin , linen .
 Before the meeting , Mary wrote down the following lists of words . One was : rayon , linen , satin . And the other : satin , linen , rayon .
-Before the meeting , Mary wrote down the following lists of words . One was : silk , rayon , linen . And the other : silk , rayon , linen .
+Before the meeting , Mary wrote down the following lists of words . One was : silk , rayon , linen . And the other : linen , silk , rayon .
 Before the meeting , Mary wrote down the following lists of words . One was : wool , silk , rayon . And the other : rayon , wool , silk .
 Before the meeting , Mary wrote down the following lists of words . One was : window , door , roof , wall , floor . And the other : wall , door , window , roof , floor .
 Before the meeting , Mary wrote down the following lists of words . One was : hall , window , door , roof , wall . And the other : door , roof , window , hall , wall .
@@ -281,7 +281,7 @@ Before the meeting , Mary wrote down the following lists of words . One was : pe
 Before the meeting , Mary wrote down the following lists of words . One was : hammer , saw , nails , level , plane . And the other : saw , hammer , plane , level , nails .
 Before the meeting , Mary wrote down the following lists of words . One was : screws , hammer , saw , nails , level . And the other : level , hammer , saw , nails , screws .
 Before the meeting , Mary wrote down the following lists of words . One was : drill , screws , hammer , saw , nails . And the other : nails , screws , hammer , drill , saw .
-Before the meeting , Mary wrote down the following lists of words . One was : wrench , drill , screws , hammer , saw . And the other : wrench , drill , screws , hammer , saw .
+Before the meeting , Mary wrote down the following lists of words . One was : wrench , drill , screws , hammer , saw . And the other : drill , hammer , saw , wrench , screws .
 Before the meeting , Mary wrote down the following lists of words . One was : ruler , wrench , drill , screws , hammer . And the other : ruler , hammer , wrench , drill , screws .
 Before the meeting , Mary wrote down the following lists of words . One was : chisel , ruler , wrench , drill , screws . And the other : wrench , chisel , ruler , drill , screws .
 Before the meeting , Mary wrote down the following lists of words . One was : plane , chisel , ruler , wrench , drill . And the other : plane , wrench , ruler , drill , chisel .
@@ -413,7 +413,7 @@ Before the meeting , Mary wrote down the following lists of words . One was : ba
 Before the meeting , Mary wrote down the following lists of words . One was : adultery , battery , murder , rape , robbery . And the other : battery , adultery , robbery , rape , murder .
 Before the meeting , Mary wrote down the following lists of words . One was : larceny , adultery , battery , murder , rape . And the other : adultery , larceny , battery , murder , rape .
 Before the meeting , Mary wrote down the following lists of words . One was : kidnapping , larceny , adultery , battery , murder . And the other : murder , kidnapping , adultery , battery , larceny .
-Before the meeting , Mary wrote down the following lists of words . One was : arson , kidnapping , larceny , adultery , battery . And the other : arson , kidnapping , larceny , adultery , battery .
+Before the meeting , Mary wrote down the following lists of words . One was : arson , kidnapping , larceny , adultery , battery . And the other : arson , battery , larceny , adultery , kidnapping .
 Before the meeting , Mary wrote down the following lists of words . One was : assault , arson , kidnapping , larceny , adultery . And the other : larceny , arson , assault , kidnapping , adultery .
 Before the meeting , Mary wrote down the following lists of words . One was : theft , assault , arson , kidnapping , larceny . And the other : kidnapping , theft , assault , arson , larceny .
 Before the meeting , Mary wrote down the following lists of words . One was : robbery , theft , assault , arson , kidnapping . And the other : assault , robbery , theft , kidnapping , arson .
@@ -427,7 +427,7 @@ Before the meeting , Mary wrote down the following lists of words . One was : ti
 Before the meeting , Mary wrote down the following lists of words . One was : lion , tiger , elephant , pig , bear . And the other : lion , tiger , pig , bear , elephant .
 Before the meeting , Mary wrote down the following lists of words . One was : cow , lion , tiger , elephant , pig . And the other : lion , tiger , pig , cow , elephant .
 Before the meeting , Mary wrote down the following lists of words . One was : horse , cow , lion , tiger , elephant . And the other : tiger , lion , cow , horse , elephant .
-Before the meeting , Mary wrote down the following lists of words . One was : cat , horse , cow , lion , tiger . And the other : cat , horse , cow , lion , tiger .
+Before the meeting , Mary wrote down the following lists of words . One was : cat , horse , cow , lion , tiger . And the other : lion , cat , tiger , cow , horse .
 Before the meeting , Mary wrote down the following lists of words . One was : fly , ant , bee , mosquito , spider . And the other : fly , spider , mosquito , bee , ant .
 Before the meeting , Mary wrote down the following lists of words . One was : butterfly , fly , ant , bee , mosquito . And the other : fly , bee , ant , butterfly , mosquito .
 Before the meeting , Mary wrote down the following lists of words . One was : flea , butterfly , fly , ant , bee . And the other : fly , ant , butterfly , bee , flea .
