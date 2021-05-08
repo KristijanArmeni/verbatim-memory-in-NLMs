@@ -115,6 +115,42 @@ def code_tokens(tokens=None, markers=[1, 2], n_target_toks=None, n_dst_toks=None
     return codes
 
 
+def ensure_list2_notequal(list1, list2, start_seed, seed_increment):
+    
+    """
+    new_list2 = ensure_list2_notequal(list1, list2, start_seed, seed_increment)
+    
+    Helper function that ensures that all elements in list2 are not
+    equal to elements in list1 by iteratively applying new perumtations
+    with a new start_seed, incremented by seed_increment.
+    """
+    
+    are_equal = [[t1 == t2] for t1, t2 in zip(list1, list2)]
+    
+    seed = start_seed
+    
+    # if lists are already disjoint, just return list2
+    if ~np.any(are_equal):
+        list2_new = list2
+    
+    else:
+        # do this until elements of list1 and list2 are not equal
+        while np.any(are_equal):
+            
+            rng = np.random.RandomState(seed)
+            
+            # create new permutations for l2 that are still equal
+            list2_new = [rng.permutation(l2).tolist() if l1 == l2 else l2 
+                         for l1, l2 in zip(list1, list2)]
+            
+            # update the criterion condition (none should be equal)
+            are_equal = [[l1 == l2] for l1, l2 in zip(list1, list2_new)]
+            
+            # update seed for a new try
+            seed += seed_increment
+    
+    return list2_new
+
 # ===================== #
 # ===== LOAD DATA ===== #
 # ===================== #
@@ -124,9 +160,6 @@ if args.paradigm == "with-context":
     with open(fname) as f:
         print("Loading {}".format(fname))
         stim = json.load(f)
-    
-    # join word list items into strings for tokenization
-    input_lists = [", ".join(l) + "." for l in stim]
     
 elif args.paradigm == "repeated-ngrams":
     
@@ -141,7 +174,7 @@ elif args.paradigm == "repeated-ngrams":
         print("Loading {}".format(distractor_file))
         dist = json.load(f)   
 
-stim_control = None
+word_lists2 = None
 if args.condition == "control":
 
     print("Creating control condition...")
@@ -152,12 +185,40 @@ if args.condition == "control":
     
     ids = sample_indices_by_group(groups=groups, seed=12345)
     
-    stim_control = {key: np.asarray(stim[key])[ids].tolist() for key in stim.keys()}
+    word_lists2 = {key: np.asarray(stim[key])[ids].tolist() for key in stim.keys()}
     
     # make sure control tokens do not appear in the target lists
     for k in stim.keys():
         assert ~np.any([set(t1).issubset(set(t2)) 
-                        for t1, t2 in zip(stim[k], stim_control[k])])
+                        for t1, t2 in zip(stim[k], word_lists2[k])])
+        
+elif args.condition == "permute":
+    
+    print("Creating permute condition")
+    
+    # This condition test for the effect of word order
+    # Lists have the same words, but the word order is permuted
+    # int the second one
+    word_lists2 = {key: [np.random.RandomState((543+j)*5).permutation(stim[key][j]).tolist()
+                  for j in range(len(stim[key]))]
+                  for key in stim.keys()}
+    
+    # some lists in word_lists2 may end up the equal to word_lists1 by chance,
+    # check for that and reshuffle if needed
+    word_lists1=stim
+    for list_size in word_lists2.keys():
+        
+        word_lists2[list_size] = ensure_list2_notequal(list1=word_lists1[list_size],
+                                                       list2=word_lists2[list_size],
+                                                       start_seed=123,
+                                                       seed_increment=10)
+
+    # make sure permuted lists are not equal to target lists
+    for k in stim.keys():
+        assert ~np.any([[t1 == t2] for t1, t2 in zip(word_lists1[k], word_lists2[k])])
+
+elif args.condition == "repeat":
+    word_lists2 = stim
  
 # select dict with correct prompts and prefixes
 prompts = prompts[args.scenario_key]
@@ -198,22 +259,12 @@ if args.paradigm == "with-context":
             for list_size in stim.keys():
                 
                 current_list = stim[list_size]
-                if args.condition == "control":
-                    curr_list_rev = stim_control[list_size]
+                target_lists = word_lists2[list_size]
                 
                 for j, l in enumerate(current_list):
                     
                     l1 = ", ".join(current_list[j]) + "."
-                    
-                    # modify list 2 as specified in args.condition
-                    l2 = None
-                    if args.condition == "permute":
-                        tmp = np.random.RandomState((543 + j) * 5).permutation(current_list[j]).tolist()
-                        l2 = ", ".join(tmp) + "."
-                    elif args.condition == "control":
-                        l2 = ", ".join(curr_list_rev[j]) + "."
-                    else:
-                        l2 = l1
+                    l2 = ", ".join(target_lists[j]) + "."
         
                     string, markers = tokenize_and_concat(prefix=prefixes[prefix_key], 
                                                           list1=l1, 

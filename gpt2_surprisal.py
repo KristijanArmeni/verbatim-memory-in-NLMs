@@ -249,6 +249,20 @@ def interleave_targets_and_distractors(word_list, distractors):
 
 def sample_indices_by_group(groups, seed):
     
+    """
+    randomized_indices = sample_indices_by_group(groups, seed)
+    
+    input args:
+        groups = np.array, array defining group membership (e.g. [0, 0, 0, 1, 1, 1])
+        seed   = int, argument for np.random.RandomState
+    output args:
+        randomized_indices = np.array, randomly sampled indices of groups.size
+    
+    Helper function that creates randomized indices form np.arange(groups.size)
+    by following the structure of group elements in group. It ensures that every
+    element groups is paired with an element outside its own group.
+    """
+    
     out_ids = np.zeros(groups.shape, dtype=int)
     indices = np.arange(groups.size)
     rng = np.random.RandomState(seed)
@@ -269,6 +283,42 @@ def sample_indices_by_group(groups, seed):
         indices[sel_ids] = ignore_id
         
     return out_ids
+
+def ensure_list2_notequal(list1, list2, start_seed, seed_increment):
+    
+    """
+    new_list2 = ensure_list2_notequal(list1, list2, start_seed, seed_increment)
+    
+    Helper function that ensures that all elements in list2 are not
+    equal to elements in list1 by iteratively applying new perumtations
+    with a new start_seed, incremented by seed_increment.
+    """
+    
+    are_equal = [[t1 == t2] for t1, t2 in zip(list1, list2)]
+    
+    seed = start_seed
+    
+    # if lists are already disjoint, just return list2
+    if ~np.any(are_equal):
+        list2_new = list2
+    
+    else:
+        # do this until elements of list1 and list2 are not equal
+        while np.any(are_equal):
+            
+            rng = np.random.RandomState(seed)
+            
+            # create new permutations for l2 that are still equal
+            list2_new = [rng.permutation(l2).tolist() if l1 == l2 else l2 
+                         for l1, l2 in zip(list1, list2)]
+            
+            # update the criterion condition (none should be equal)
+            are_equal = [[l1 == l2] for l1, l2 in zip(list1, list2_new)]
+            
+            # update seed for a new try
+            seed += seed_increment
+    
+    return list2_new
 
 # ===== EXPERIMENT CLASS ===== #
 
@@ -487,6 +537,18 @@ def runtime_code():
         word_lists2 = {key: [np.random.RandomState((543+j)*5).permutation(stim[key][j]).tolist()
                       for j in range(len(stim[key]))]
                       for key in stim.keys()}
+        
+        for list_size in word_lists2.keys():
+            
+            word_lists2[list_size] = ensure_list2_notequal(list1=word_lists1[list_size],
+                                                           list2=word_lists2[list_size],
+                                                           start_seed=123,
+                                                           seed_increment=10)
+
+       
+        # make sure control tokens do not appear in the target lists
+        for k in stim.keys():
+            assert ~np.any([[t1 == t2] for t1, t2 in zip(word_lists1[k], word_lists2[k])])
     
     elif argins.condition == "control":
     
