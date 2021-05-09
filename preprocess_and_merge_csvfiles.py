@@ -227,6 +227,8 @@ parser.add_argument("--model_id", type=str,
                     help="model_id string to be placed in the filename string")
 parser.add_argument("--arch", type=str,
                     help="architecture to preprocess")
+parser.add_argument("--scenario", type=str,
+                    help="which scenario data to load")
 argins = parser.parse_args()
 
 if "win" in sys.platform:
@@ -237,10 +239,10 @@ elif "linux" in sys.platform:
 
 # file naming syntax:
 # metric_model_scenario_condition_list-type
-files = glob.glob(os.path.join(output_folder, "surprisal_{}_{}*.csv".format(argins.arch, argins.model_id)))
+files = glob.glob(os.path.join(output_folder, "surprisal_{}_{}_{}*.csv".format(argins.arch, argins.model_id, argins.scenario)))
 
 if not files:
-    raise Exception("Can find any files that match pattern: {}".format(os.path.join(output_folder, "surprisal_{}_{}*.csv".format(argins.arch, argins.model_id))))
+    raise Exception("Can find any files that match pattern: {}".format(os.path.join(output_folder, "surprisal_{}_{}+{}*.csv".format(argins.arch, argins.model_id, argins.scenario))))
 
 files.sort()
 
@@ -278,11 +280,11 @@ df.rename(columns={"scenario": "context"}, inplace=True)
 df_ngram.rename(columns={"scenario": "context"}, inplace=True)
 
 # save back to csv (waste of memory but let's stick to this for now)
-fname = os.path.join(output_folder, "output_{}_{}.csv".format(argins.arch, argins.model_id))
+fname = os.path.join(output_folder, "output_{}_{}_{}.csv".format(argins.arch, argins.model_id, argins.scenario))
 print("Saving {}".format(fname))
 df.to_csv(fname, sep="\t")
 
-fname = os.path.join(output_folder, "output_{}_{}_ngram.csv".format(argins.arch, argins.model_id))
+fname = os.path.join(output_folder, "output_{}_{}_{}_ngram.csv".format(argins.arch, argins.model_id, argins.scenario))
 print("Saving {}".format(fname))
 rnn_ngram.to_csv(fname, sep="\t")
 
