@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import glob
 from tqdm import tqdm
+import argparse
 
 
 def load_and_preproc_csv(output_folder, filenames):
@@ -220,6 +221,12 @@ def recode_sentid_columns(datain):
 
 #===== LOAD CSV FILES =====#
 
+# input arguments
+parser = argparse.ArgumentParser()
+parser.add_argument("--model_id", type=str,
+                    help="model_id string to be placed in the filename string")
+argins = parser.parse_args()
+
 if "win" in sys.platform:
     output_folder = os.path.join(os.environ['homepath'], "project", "lm-mem", 
                                  "src", "output")
@@ -228,8 +235,8 @@ elif "linux" in sys.platform:
 
 # file naming syntax:
 # metric_model_scenario_condition_list-type
-files_gpt = glob.glob(os.path.join(output_folder, "surprisal_gpt2_a-10*.csv"))
-files_rnn = glob.glob(os.path.join(output_folder, "surprisal_rnn_a-10*.csv"))
+files_gpt = glob.glob(os.path.join(output_folder, "surprisal_gpt2_{}*.csv".format(argins.model_id)))
+files_rnn = glob.glob(os.path.join(output_folder, "surprisal_rnn_{}*.csv".format(argins.model_id)))
 
 files_gpt.sort()
 files_rnn.sort()
@@ -282,19 +289,19 @@ rnn_ngram.rename(columns={"scenario": "context"}, inplace=True)
 # gpt.drop(["Unnamed: 0"], axis=1, inplace=True)
 
 # save back to csv (waste of memory but let's stick to this for now)
-fname = os.path.join(output_folder, "output_gpt2.csv")
+fname = os.path.join(output_folder, "output_gpt2_{}.csv".format(argins.model_id))
 print("Saving {}".format(fname))
 gpt.to_csv(fname, sep="\t")
 
-fname = os.path.join(output_folder, "output_rnn.csv")
+fname = os.path.join(output_folder, "output_rnn_{}.csv".format(argins.model_id))
 print("Saving {}".format(fname))
 rnn.to_csv(fname, sep="\t")
 
-fname = os.path.join(output_folder, "output_gpt2_ngram.csv")
+fname = os.path.join(output_folder, "output_gpt2_{}_ngram.csv".format(argins.model_id))
 print("Saving {}".format(fname))
 gpt_ngram.to_csv(fname, sep="\t")
 
-fname = os.path.join(output_folder, "output_rnn_ngram.csv")
+fname = os.path.join(output_folder, "output_rnn_{}_ngram.csv".format(argins.model_id))
 print("Saving {}".format(fname))
 rnn_ngram.to_csv(fname, sep="\t")
 
