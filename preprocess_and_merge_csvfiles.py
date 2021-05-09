@@ -6,7 +6,7 @@ import numpy as np
 import glob
 from tqdm import tqdm
 import argparse
-
+from string import punctuation
 
 def load_and_preproc_csv(output_folder, filenames):
 
@@ -36,7 +36,7 @@ def load_and_preproc_csv(output_folder, filenames):
             dftmp.rename(columns={"stimID": "sentid", "trialID" : "marker", "prompt": "prompt_len"}, inplace=True)
             
             # throw out punctuation and eos
-            dftmp = dftmp.loc[(~dftmp.ispunct) & (dftmp.token != '<|endoftext|>')]
+            dftmp = dftmp.loc[(~dftmp.token.isin(list(punctuation) + ['<|endoftext|>']))]
             
             # we need these columns in the output after merging
             columns = ["subtok", "sentid", "list_len", "prompt_len", 
@@ -47,7 +47,7 @@ def load_and_preproc_csv(output_folder, filenames):
                 
                 # we need these columns in the output after merging
                 columns = ["subtok", "subtok_markers", "sentid", "list_len", "prompt_len", 
-                          "scenario", "list", "second_list", "model_id", "marker"]
+                           "scenario", "list", "second_list", "model_id", "marker"]
 
             
             # merge subtokens add the token markers and relative markers
@@ -244,7 +244,7 @@ files = glob.glob(os.path.join(output_folder, "surprisal_{}_{}_{}*.csv".format(a
 if not files:
     raise Exception("Can find any files that match pattern: {}".format(os.path.join(output_folder, "surprisal_{}_{}+{}*.csv".format(argins.arch, argins.model_id, argins.scenario))))
 
-files.sort()
+files.sort()q
 
 print("Preprocessing {}_{}_{} output...".format(argins.arch, argins.model_id, argins.scenario))
 df = load_and_preproc_csv(output_folder=output_folder, filenames=files)
