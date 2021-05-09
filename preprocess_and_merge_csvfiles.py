@@ -246,13 +246,8 @@ if not files:
 
 files.sort()
 
-# treat ngram experiments separately from scenario experiments
-files_ngram = [f for f in files if "ngram" in f]
-files_narrative = [f for f in files if "ngram" not in f]
-
-print("Preprocessing {}-{} output...".format(argins.arch, argins.model_id))
-df = load_and_preproc_csv(output_folder=output_folder, filenames=files_narrative)
-df_ngram = load_and_preproc_csv(output_folder=output_folder, filenames=files_ngram)
+print("Preprocessing {}_{}_{} output...".format(argins.arch, argins.model_id, argins.scenario))
+df = load_and_preproc_csv(output_folder=output_folder, filenames=files)
 
 # rename prompt length values to more meaningful ones
 prompt_len_map = {
@@ -273,18 +268,11 @@ scenario_map = {
 }
 
 df.scenario = df.scenario.map(scenario_map)
-df_ngram.scenario = df_ngram.scenario.map(scenario_map)
 
 # rename the "scenario" column to "context"
 df.rename(columns={"scenario": "context"}, inplace=True)
-df_ngram.rename(columns={"scenario": "context"}, inplace=True)
 
 # save back to csv (waste of memory but let's stick to this for now)
 fname = os.path.join(output_folder, "output_{}_{}_{}.csv".format(argins.arch, argins.model_id, argins.scenario))
 print("Saving {}".format(fname))
 df.to_csv(fname, sep="\t")
-
-fname = os.path.join(output_folder, "output_{}_{}_{}_ngram.csv".format(argins.arch, argins.model_id, argins.scenario))
-print("Saving {}".format(fname))
-rnn_ngram.to_csv(fname, sep="\t")
-
