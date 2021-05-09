@@ -53,8 +53,8 @@ def load_and_preproc_csv(output_folder, filenames):
             dftmp = preprocess_gpt_dataframe(dfin=dftmp.copy(), has_subtoks=True,
                                              keep_groups=columns)
             
-            print("Creating stimid column in {} dataframe".format(arc))
-            dftmp = recode_sentid_columns(datain=dftmp)
+            #print("Creating stimid column in {} dataframe".format(arc))
+            #dftmp = recode_sentid_columns(datain=dftmp)
             
             # change some column names for ngram experiment appropriately
             if dftmp.list.unique() == "ngram-random":
@@ -74,10 +74,9 @@ def load_and_preproc_csv(output_folder, filenames):
                 dftmp.rename(columns = {"dist_len": "prompt_len"}, inplace=True)
             
             # only add the token markers and relative markers
-            dftmp = preprocess_rnn_dataframe(dfin=dftmp)
-            
-            print("Creating stimid column in {} dataframe".format(arc))
-            dftmp = recode_sentid_columns(datain=dftmp)
+            dftmp = preprocess_rnn_dataframe(dfin=dftmp)            
+            #print("Creating stimid column in {} dataframe".format(arc))
+            # dftmp = recode_sentid_columns(datain=dftmp)
             
             # TEMP rename column to make it consistent, consdier fixing
             # this upstream
@@ -229,17 +228,25 @@ elif "linux" in sys.platform:
 
 # file naming syntax:
 # metric_model_scenario_condition_list-type
-files_gpt = glob.glob(os.path.join(output_folder, "surprisal_gpt2_?-*.csv"))
-files_rnn = glob.glob(os.path.join(output_folder, "surprisal_rnn_?-*.csv"))
+files_gpt = glob.glob(os.path.join(output_folder, "surprisal_gpt2_a-10*.csv"))
+files_rnn = glob.glob(os.path.join(output_folder, "surprisal_rnn_a-10*.csv"))
 
 files_gpt.sort()
 files_rnn.sort()
 
+# treat ngram experiments separately from scenario experiments
+files_rnn_ngram = [f for f in files_rnn if "ngram" in f]
+files_rnn_narrative = [f for f in files_rnn if "ngram" not in f]
+files_gpt_ngram = [f for f in files_gpt if "ngram" in f]
+files_gpt_narrative = [f for f in files_gpt if "ngram" not in f]
+
 print("Preprocessing rnn output...")
-rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn)
+rnn = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn_narrative)
+rnn_ngram = load_and_preproc_csv(output_folder=output_folder, filenames=files_rnn_ngram)
 
 print("Preprocessing gpt output...")
-gpt = load_and_preproc_csv(output_folder=output_folder, filenames=files_gpt)
+gpt = load_and_preproc_csv(output_folder=output_folder, filenames=files_gpt_narrative)
+gpt_ngram = load_and_preproc_csv(output_folder=output_folder, filenames=files_gpt_ngram)
 
 # rename prompt length values to more meaningful ones
 prompt_len_map = {
@@ -262,10 +269,14 @@ scenario_map = {
 
 gpt.scenario = gpt.scenario.map(scenario_map)
 rnn.scenario = rnn.scenario.map(scenario_map)
+rnn_ngram.scenario = rnn_ngram.scenario.map(scenario_map)
+gpt_ngram.scenario = gpt_ngram.scenario.map(scenario_map)
 
 # rename the "scenario" column to "context"
 gpt.rename(columns={"scenario": "context"}, inplace=True)
 rnn.rename(columns={"scenario": "context"}, inplace=True)
+gpt_ngram.rename(columns={"scenario": "context"}, inplace=True)
+rnn_ngram.rename(columns={"scenario": "context"}, inplace=True)
 
 # drop some redundant columns creted by Pandas bookkeeping system
 # gpt.drop(["Unnamed: 0"], axis=1, inplace=True)
@@ -278,4 +289,12 @@ gpt.to_csv(fname, sep="\t")
 fname = os.path.join(output_folder, "output_rnn.csv")
 print("Saving {}".format(fname))
 rnn.to_csv(fname, sep="\t")
+
+fname = os.path.join(output_folder, "output_gpt2_ngram.csv")
+print("Saving {}".format(fname))
+gpt_ngram.to_csv(fname, sep="\t")
+
+fname = os.path.join(output_folder, "output_rnn_ngram.csv")
+print("Saving {}".format(fname))
+rnn_ngram.to_csv(fname, sep="\t")
 
