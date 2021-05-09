@@ -244,7 +244,7 @@ files = glob.glob(os.path.join(output_folder, "surprisal_{}_{}_{}*.csv".format(a
 if not files:
     raise Exception("Can find any files that match pattern: {}".format(os.path.join(output_folder, "surprisal_{}_{}+{}*.csv".format(argins.arch, argins.model_id, argins.scenario))))
 
-files.sort()q
+files.sort()
 
 print("Preprocessing {}_{}_{} output...".format(argins.arch, argins.model_id, argins.scenario))
 df = load_and_preproc_csv(output_folder=output_folder, filenames=files)
