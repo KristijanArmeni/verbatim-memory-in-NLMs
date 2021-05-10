@@ -39,14 +39,14 @@ def load_and_preproc_csv(output_folder, filenames):
             dftmp = dftmp.loc[(~dftmp.token.isin(list(punctuation) + ['<|endoftext|>']))]
             
             # we need these columns in the output after merging
-            columns = ["subtok", "sentid", "list_len", "prompt_len", 
+            columns = ["subtok", "sentid", "stimid", "list_len", "prompt_len", 
                         "scenario", "list", "second_list", "model_id", "marker"]
             
             # ngram experiment doesn't have prompts, but distractors
             if dftmp.list.unique() == "ngram-random":
                 
                 # we need these columns in the output after merging
-                columns = ["subtok", "subtok_markers", "sentid", "list_len", "prompt_len", 
+                columns = ["subtok", "subtok_markers", "sentid", "stimid", "list_len", "prompt_len", 
                            "scenario", "list", "second_list", "model_id", "marker"]
 
             
@@ -149,7 +149,7 @@ def preprocess_gpt_dataframe(dfin, has_subtoks=None, keep_groups=None):
     return dfout
 
 
-def merge_subtoks(df, group_levels, merge_operation="prod"):
+def merge_subtoks(df, group_levels, merge_operation="sum"):
     """
     helper function to perform averging over subtokens via .groupby and .agg
     """
