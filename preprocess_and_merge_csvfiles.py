@@ -239,7 +239,7 @@ elif "linux" in sys.platform:
 
 # file naming syntax:
 # metric_model_scenario_condition_list-type
-files = glob.glob(os.path.join(output_folder, "surprisal_{}_{}_{}*.csv".format(argins.arch, argins.model_id, argins.scenario)))
+files = glob.glob(os.path.join(output_folder, "surprisal_{}_{}_{}_*.csv".format(argins.arch, argins.model_id, argins.scenario)))
 
 if not files:
     raise Exception("Can find any files that match pattern: {}".format(os.path.join(output_folder, "surprisal_{}_{}+{}*.csv".format(argins.arch, argins.model_id, argins.scenario))))
