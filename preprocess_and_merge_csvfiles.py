@@ -27,7 +27,9 @@ def load_and_preproc_csv(output_folder, filenames):
         dftmp["second_list"] = file.split("_")[-2]  # store information on second list
         dftmp["scenario"] = file.split("_")[-3]
         dftmp["model_id"] = file.split("_")[-4]
-
+        
+        ngram_list_labels = ["ngram-random", "ngram-categorized"]
+        
         # remove punctuation prior to creating token index
         # filter out punctuation
         if arc == "gpt2":
@@ -43,7 +45,7 @@ def load_and_preproc_csv(output_folder, filenames):
                         "scenario", "list", "second_list", "model_id", "marker"]
             
             # ngram experiment doesn't have prompts, but distractors
-            if dftmp.list.unique() == "ngram-random":
+            if dftmp.list.isin(ngram_list_labels):
                 
                 # we need these columns in the output after merging
                 columns = ["subtok", "subtok_markers", "sentid", "stimid", "list_len", "prompt_len", 
@@ -54,11 +56,8 @@ def load_and_preproc_csv(output_folder, filenames):
             dftmp = preprocess_gpt_dataframe(dfin=dftmp.copy(), has_subtoks=True,
                                              keep_groups=columns)
             
-            #print("Creating stimid column in {} dataframe".format(arc))
-            #dftmp = recode_sentid_columns(datain=dftmp)
-            
             # change some column names for ngram experiment appropriately
-            if dftmp.list.unique() == "ngram-random":
+            if dftmp.list.isin(ngram_list_labels):
                 
                 dftmp.rename(columns = {"prompt_len": "dist_len", "list_len": "ngram_len" }, inplace=True)
 
@@ -67,21 +66,14 @@ def load_and_preproc_csv(output_folder, filenames):
             dftmp = dftmp.loc[~dftmp.word.isin([":", ".", ","])].copy()
             
             # temporarily
-            dftmp.rename(columns= {"markers": "marker"}, inplace = True), 
-            
-            # HACK, for the recode_sentid_columns to work, temporarily
-            # call "dist_len" colmn "prompt_len" (inconsistent naming)
-            if dftmp.list.unique() == "ngram-random":
-                dftmp.rename(columns = {"dist_len": "prompt_len"}, inplace=True)
+            dftmp.rename(columns= {"markers": "marker"}, inplace = True)
             
             # only add the token markers and relative markers
             dftmp = preprocess_rnn_dataframe(dfin=dftmp)            
-            #print("Creating stimid column in {} dataframe".format(arc))
-            # dftmp = recode_sentid_columns(datain=dftmp)
             
             # TEMP rename column to make it consistent, consdier fixing
             # this upstream
-            if dftmp.list.unique() == "ngram-random":
+            if dftmp.list.isin(ngram_list_labels):
                 
                 dftmp.rename(columns={"list_len": "ngram_len", "prompt_len": "dist_len"}, inplace=True)
         
