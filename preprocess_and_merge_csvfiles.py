@@ -23,7 +23,8 @@ def load_and_preproc_csv(output_folder, filenames):
         dftmp = pd.read_csv(os.path.join(output_folder, file), sep=sep, header=0)
 
         # add information from filenames
-        dftmp["list"] = file.split("_")[-1].split(".")[0]  # add column on list composition
+        list_type = file.split("_")[-1].split(".")[0]
+        dftmp["list"] = list_type  # add column on list composition
         dftmp["second_list"] = file.split("_")[-2]  # store information on second list
         dftmp["scenario"] = file.split("_")[-3]
         dftmp["model_id"] = file.split("_")[-4]
@@ -45,7 +46,7 @@ def load_and_preproc_csv(output_folder, filenames):
                         "scenario", "list", "second_list", "model_id", "marker"]
             
             # ngram experiment doesn't have prompts, but distractors
-            if dftmp.list.isin(ngram_list_labels):
+            if list_type in ngram_list_labels:
                 
                 # we need these columns in the output after merging
                 columns = ["subtok", "subtok_markers", "sentid", "stimid", "list_len", "prompt_len", 
@@ -57,7 +58,7 @@ def load_and_preproc_csv(output_folder, filenames):
                                              keep_groups=columns)
             
             # change some column names for ngram experiment appropriately
-            if dftmp.list.isin(ngram_list_labels):
+            if list_type in ngram_list_labels:
                 
                 dftmp.rename(columns = {"prompt_len": "dist_len", "list_len": "ngram_len" }, inplace=True)
 
@@ -73,7 +74,7 @@ def load_and_preproc_csv(output_folder, filenames):
             
             # TEMP rename column to make it consistent, consdier fixing
             # this upstream
-            if dftmp.list.isin(ngram_list_labels):
+            if list_type in ngram_list_labels:
                 
                 dftmp.rename(columns={"list_len": "ngram_len", "prompt_len": "dist_len"}, inplace=True)
         
@@ -187,29 +188,6 @@ def preprocess_rnn_dataframe(dfin, has_subtoks=None, keep_groups=None):
     dfout["marker_pos_rel"] = np.concatenate(marker_pos_rel)
     
     return dfout
-
-def recode_sentid_columns(datain):
-    
-    datain["stimid"] = np.nan
-    
-    for model_id in datain.model_id.unique():
-    
-        for condition in datain.second_list.unique():
-        
-            for prompt_len in datain.prompt_len.unique():
-        
-                for llen in datain.list_len.unique():
-                    
-                    sel = (datain.model_id == model_id) &\
-                          (datain.second_list == condition) &\
-                          (datain.prompt_len == prompt_len) &\
-                          (datain.list_len == llen)
-                          
-                    for i, sentid in enumerate(datain.loc[sel].sentid.unique()):
-                        
-                        datain.loc[sel & (datain.sentid==sentid), "stimid"] = int(i)
-            
-    return datain
 
 #===== LOAD CSV FILES =====#
 
