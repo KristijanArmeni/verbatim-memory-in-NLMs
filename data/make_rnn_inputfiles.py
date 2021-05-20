@@ -157,13 +157,14 @@ def ensure_list2_notequal(list1, list2, start_seed, seed_increment):
 
 if args.paradigm == "with-context":
     
-    with open(fname) as f:
-        print("Loading {}".format(fname))
+    fname = os.path.join(input_dir, args.json_filename)
+    with open(args.json_filename) as f:
+        print("Loading {}".format(args.json_filename))
         stim = json.load(f)
     
 elif args.paradigm == "repeated-ngrams":
     
-    fname = os.path.join(input_dir, "ngram-random.json")
+    fname = os.path.join(input_dir, args.json_filename)
     with open(fname) as f:
         print("Loading {}".format(fname))
         stim = json.load(f)
