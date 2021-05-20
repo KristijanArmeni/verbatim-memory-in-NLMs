@@ -186,45 +186,56 @@ subsets = [3, 5, 7, 10]
 out_dict = {"n{}".format(n_items): [alist[0:n_items] for alist in lists_of_tokens_shifted]
             for n_items in subsets}
 
+n_grams = [2, 3, 5, 7, 10]
+n_reps = 5
+
 # for ngram lists sample the created lists repeatedly
 if argins.which in ["ngram-random", "ngram-categorized"] or argins.which=="ngram-distractors":
+        
+    # sample repeated ngram sequences from the lists of 10 items
+    tmp = {"n{}".format(n_gram): [list(chunk(np.tile(alist[0:n_gram], reps=n_reps).tolist(), n_gram, n_gram)) 
+                                      for alist in out_dict["n10"]]
+                                      for n_gram in n_grams}
+
+# for ngram lists sample the created lists repeatedly
+elif argins.which == "ngram-control":
     
-    n_grams = [2, 3, 5, 7, 10]
-    n_reps = 5
+    
     
     # sample repeated ngram sequences from the lists of 10 items
     tmp = {"n{}".format(n_gram): [list(chunk(np.tile(alist[0:n_gram], reps=n_reps).tolist(), n_gram, n_gram)) 
                                       for alist in out_dict["n10"]]
                                       for n_gram in n_grams}
+
     
     out_dict = tmp
 
-    if argins.which == "ngram-distractors":
-        
-        # create extra 4 lists which will be used for the
-        # interleaved items
-        lists_of_tokens = load_and_sample_noun_pool(path=path, 
-                                                    n_items=10, 
-                                                    n_lists=26,
-                                                    which="random", 
-                                                    model_vocab=rnn_vocab, 
-                                                    seed=12345)
-        
-        # store the pool of distractor nouns
-        # (not used for the regular lists)
-        distractor_set = [el for lst in lists_of_tokens[23::] for el in lst]
-        
-        # there needs to be n-1 interleaved items
-        ngram_reps = 5
-        n_reps_distractors = ngram_reps - 1
+elif argins.which == "ngram-distractors":
+    
+    # create extra 4 lists which will be used for the
+    # interleaved items
+    lists_of_tokens = load_and_sample_noun_pool(path=path, 
+                                                n_items=10, 
+                                                n_lists=26,
+                                                which="random", 
+                                                model_vocab=rnn_vocab, 
+                                                seed=12345)
+    
+    # store the pool of distractor nouns
+    # (not used for the regular lists)
+    distractor_set = [el for lst in lists_of_tokens[23::] for el in lst]
+    
+    # there needs to be n-1 interleaved items
+    ngram_reps = 5
+    n_reps_distractors = ngram_reps - 1
 
-        max_size = 7
-        
-        # sample repeated ngram sequences from the lists of 10 items
-        out_dict = {"n{}".format(size): [list(chunk(thelist[0:(n_reps_distractors*7)], size, 7)) 
-                                                   for thelist in [distractor_set]]
-                                                   for size in [2, 3, 5, 7]}
-        
+    max_size = 7
+    
+    # sample repeated ngram sequences from the lists of 10 items
+    out_dict = {"n{}".format(size): [list(chunk(thelist[0:(n_reps_distractors*7)], size, 7)) 
+                                               for thelist in [distractor_set]]
+                                               for size in [2, 3, 5, 7]}
+    
 
 # ===== SAVE .JSON OUTPUT ===== #
 
