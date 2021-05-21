@@ -12,7 +12,7 @@ log_dir = os.path.join(root_dir, 'logs')
 
 master_bash = open(os.path.join(scripts_dir, 'run_gpt2_surprisal_ngramex_scripts.sh'), 'w')
 
-for model_id in ["a-10", "r-10"]:
+for model_id in ["r-20"]:
     for scenario in ["sce1"]:
         for condition in ["repeat"]:
             for list_type in ["ngram-random", "ngram-categorized"]:
