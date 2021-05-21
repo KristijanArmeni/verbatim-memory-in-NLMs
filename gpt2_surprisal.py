@@ -22,6 +22,7 @@ from torch.nn import functional as F
 from tqdm import trange
 from typing import List
 from string import punctuation
+from tqdm import tqdm
 
 # own modules
 if "win" in sys.platform:
@@ -365,15 +366,6 @@ class Experiment(object):
 
         return token_prob, token_ids
 
-    def uniform_att(self, model):
-
-        # access transformer blocks
-        for block in self.model.transformer.h:
-
-            Q, K, V = block.attn.c_attn.weight
-
-        return model
-
     # loop over input list
     def ppl(self, input_ids, context_len, stride):
         """
@@ -459,6 +451,34 @@ class Experiment(object):
         return outputs
 
 
+def permute_attention_weights(model, seed):
+    
+    i=0
+    # access transformer blocks
+    for block in tqdm(model.transformer.h, desc="layer"):
+        
+        # make seed different for every layer
+        rng = np.random.RandomState(seed+(5*i))
+        
+        # .weight is a rect matrix of stacked square matrices
+        attn_dim = block.attn.c_attn.weight.shape[0]
+        
+        # spliting at dim 1 should result in 3 square matrices
+        Q, K, V = block.attn.c_attn.weight.split(split_size=attn_dim, dim=1)
+        
+        w_shuf = []
+        for w in (Q, K, V):
+            w_shuf.append(torch.tensor(rng.permutation(w.detach().numpy())))
+        
+        new_qkv = torch.nn.Parameter(data=torch.cat(w_shuf, dim=1),
+                                     requires_grad=False)
+        
+        block.attn.c_attn.weight = new_qkv
+        
+        i += 1
+        
+    return model
+
 # ===== RUNTIME CODE WRAPPER ===== #
 
 def runtime_code(): 
@@ -480,7 +500,7 @@ def runtime_code():
                         help="whether or not to permute the second word list")
     parser.add_argument("--context_len", type=int, default=1024,
                         help="length of context window in tokens for transformers")
-    parser.add_argument("--model_type", type=str, default="pretrained", choices=["pretrained", "random"],
+    parser.add_argument("--model_type", type=str, default="pretrained", choices=["pretrained", "random", "random-att"],
                         help="whether or not to load a pretrained model or initialize randomly")
     parser.add_argument("--model_seed", type=int, default=12345,
                         help="seed value to be used in torch.manual_seed() prior to calling GPT2Model()")
@@ -599,7 +619,17 @@ def runtime_code():
         # initialize with random weights
         torch.manual_seed(argins.model_seed)
         model = GPT2LMHeadModel(config=GPT2Config()) 
-    
+        
+    # or initialize a random model
+    elif argins.model_type == "random-att":
+        
+        # initialize with random weights
+        model = GPT2LMHeadModel.from_pretrained('gpt2')
+        model.eval()
+        
+        print("Permuting model attention weights ...")
+        model = permute_attention_weights(model, seed=argins.model_seed)
+        
     experiment = Experiment(model=model, tokenizer=tokenizer, 
                             context_len=argins.context_len,
                             device=device)
