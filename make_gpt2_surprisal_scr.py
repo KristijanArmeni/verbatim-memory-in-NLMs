@@ -11,7 +11,7 @@ log_dir = os.path.join(root_dir, 'logs')
 
 master_bash = open(os.path.join(scripts_dir, 'run_gpt2_surprisal_scripts.sh'), 'w')
 
-for model_id in ["a-10", "r-10"]:
+for model_id in ["a-10", "r-10", "r-20"]:
     for scenario in ["sce1", "sce1rnd", "sce2", "sce3"]:
         for condition in ["repeat", "permute", "control"]:
             for list_type in ["random", "categorized"]:
@@ -25,10 +25,18 @@ for model_id in ["a-10", "r-10"]:
                 output_path = os.path.join(root_dir, "output")
                 python_file = os.path.join(root_dir, "gpt2_surprisal.py")
                
+                # pretrained GPT-2 small
                 model_type = "pretrained"
                 model_seed = None
+                
+                # randomly initialized model
                 if model_id == "r-10":
                     model_type = "random"
+                    model_seed = 12345
+                
+                # model with Q, and K (attention) matrices permuted
+                elif model_id == "r-20":
+                    model_type = "random-att"
                     model_seed = 12345
                 
                 # create command string
