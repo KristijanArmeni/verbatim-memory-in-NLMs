@@ -451,7 +451,7 @@ class Experiment(object):
         return outputs
 
 
-def permute_attention_weights(model, seed):
+def permute_qk_weights(model=None, seed=None):
     
     i=0
     # access transformer blocks
@@ -466,11 +466,11 @@ def permute_attention_weights(model, seed):
         # spliting at dim 1 should result in 3 square matrices
         Q, K, V = block.attn.c_attn.weight.split(split_size=attn_dim, dim=1)
         
-        w_shuf = []
-        for w in (Q, K, V):
-            w_shuf.append(torch.tensor(rng.permutation(w.detach().numpy())))
+        qk_shuf = []
+        for w in (Q, K):
+            qk_shuf.append(torch.tensor(rng.permutation(w.detach().numpy())))
         
-        new_qkv = torch.nn.Parameter(data=torch.cat(w_shuf, dim=1),
+        new_qkv = torch.nn.Parameter(data=torch.cat(qk_shuf + [V], dim=1),
                                      requires_grad=False)
         
         block.attn.c_attn.weight = new_qkv
@@ -610,6 +610,8 @@ def runtime_code():
     # setup the model
     tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
     
+    print("Using {} model".format(argins.model_type))
+    
     # load pretrained small model
     if argins.model_type == "pretrained":
         model = GPT2LMHeadModel.from_pretrained('gpt2')
@@ -627,8 +629,8 @@ def runtime_code():
         model = GPT2LMHeadModel.from_pretrained('gpt2')
         model.eval()
         
-        print("Permuting model attention weights ...")
-        model = permute_attention_weights(model, seed=argins.model_seed)
+        print("Permuting model attention weights ...\n")
+        model = permute_qk_weights(model, seed=argins.model_seed)
         
     experiment = Experiment(model=model, tokenizer=tokenizer, 
                             context_len=argins.context_len,
