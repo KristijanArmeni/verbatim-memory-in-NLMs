@@ -1,6 +1,7 @@
 import numpy as np
 from nltk import word_tokenize
 import string
+import os, json
 
 # define prefixes
 prefixes = {
@@ -14,6 +15,8 @@ prefixes = {
 prefixes_repeated_ngrams = {
     "sce1": {"1": "In the newspaper, somebody wrote the following words:"},
 }
+
+# ===== VIGNETTES =====#
 
 # ===== MARY SCENARIO =====#
 
@@ -57,7 +60,8 @@ a5 = ["It was not a big park by any means, but it offered a quiet refuge where o
      "Mary said she had time over the weekend.",
      "After they said goodbye, Mary started walking towards home."]
 
-# ===== OCEAN SCENARIO ==== #
+
+# ===== INCONGRUENT OCEAN SCENARIO ==== #
 
 b1 = ["There is a voice in the waters of the great sea. It calls to man continually."]
 
@@ -92,9 +96,11 @@ b5 = ["Near the equator, the great heat carries up a larger proportion of water 
      "After having gladdened the heart of man by driving his mills and causing his food to grow, "
      "it finds its way again into the sea: and thus the good work goes on with ceaseless regularity."]
 
-# ===== SHORTER SCENARIO ===== #
+# ===== SHORTER INTERVENING CONTEXT ===== #
 
 c1 = ["And the other:"]
+
+# ===== FUNCTIONS ===== #
 
 def add_sections(chunks, skip_last_item=True):
 
@@ -203,3 +209,84 @@ prompts = {
     "sce2": sce2,
     "sce3": sce3,
 }
+
+if __name__ == "__main__":
+    
+    # save data for supplementary materials
+    
+    savedir = os.path.join(os.environ["homepath"],
+                           "project",
+                           "lm-mem",
+                           "src",
+                           "data")
+    
+    
+    noun_list_template = ["$W_{1}, W_{2}, ..., W_{N}$\n"]
+    
+    format_text = lambda nouns, intervening_texts: \
+                  ["\n".join(["$intervening\_text_{}$: ".format(i+1) + l + " " + 
+                             nouns[0] for i, l in enumerate(intervening_texts)])]
+    
+    # intact scenario
+    preface_string = prefixes["sce1"]["1"]
+    intervening_texts = "\n\n".join([preface_string] + 
+                                    noun_list_template +
+                                    format_text(noun_list_template,
+                                                list(prompts["sce1"].values())))
+    
+    fname = os.path.join(savedir, "intervening_text_intact.tex")
+    print("Writing {}".format(fname))
+    with open(fname, "w") as f:
+        f.writelines(intervening_texts)
+    
+    
+    # scrambled scneario
+    preface_string = prefixes["sce1rnd"]["1"]
+    intervening_texts = "\n\n".join([preface_string] + 
+                                    noun_list_template +
+                                    format_text(noun_list_template,
+                                                list(prompts["sce1rnd"].values())))
+    
+    fname = os.path.join(savedir, "intervening_text_scrambled.tex")
+    print("Writing {}".format(fname))
+    with open(fname, "w") as f:
+        f.writelines(intervening_texts)
+    
+    
+    # incongruent scneario
+    preface_string = prefixes["sce2"]["1"]
+    intervening_texts = "\n\n".join([preface_string] + 
+                                    noun_list_template + 
+                                    format_text(noun_list_template,
+                                                list(prompts["sce2"].values())))
+
+    fname = os.path.join(savedir, "intervening_text_incongruent.tex")
+    print("Writing {}".format(fname))
+    with open(fname, "w") as f:
+        f.writelines(intervening_texts)
+        
+
+    # short scenario
+    preface_string = prefixes["sce3"]["1"]
+    intervening_texts = "\n\n".join([preface_string] + 
+                                    noun_list_template +
+                                    format_text(noun_list_template,
+                                                list(prompts["sce3"].values())))
+    
+    fname = os.path.join(savedir, "intervening_text_short.tex")
+    print("Writing {}".format(fname))
+    with open(fname, "w") as f:
+        f.writelines(intervening_texts)
+    
+    
+    # save as .json files as well
+    fname_prefixes = os.path.join(savedir, "preface_text.json")
+    fname_intervening_texts = os.path.join(savedir, "intervening_texts.json")
+    
+    print("Writing {}".format(fname_prefixes))
+    with open(fname_prefixes, "w") as f:
+        json.dump(prefixes, f)
+    
+    print("Writing {}".format(fname_intervening_texts))
+    with open(fname_intervening_texts, "w") as f:
+        json.dump(prompts, f)
