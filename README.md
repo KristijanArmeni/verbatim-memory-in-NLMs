@@ -2,7 +2,7 @@
 
 - `./`         |  main scripts  
 - `/data`      |  scripts and .txt files for creating inputs
-- `/rnn` |  rnn code from  https://github.com/vansky/neural-complexity
+- `/rnn` |  rnn code by Van Schijndel et al https://github.com/vansky/neural-complexity
 - `/output`    |  LM script outputs (.txt files)  
 - `/notebooks` |  .ipynb notebooks with EDA analyses and prototyping
 
@@ -35,6 +35,97 @@ We used the conda management toolkit, so the easiest way to create the environme
 
 `conda create /path/to/where/dependencies/are/installed -f ./reqs_pytorch1.3.yaml`
 
-## Main scripts
+## Running [gpt2_surprisal.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/gpt2_surprisal.py)
 
-- [gpt2_surprisal.py](https://github.com/KristijanArmeni/gpt2-mem/blob/main/surprisal.py)  script for running (calls classes/methods defined in `experiment.py`)    
+Activate the installed conda enviroment with dependencies:  
+`conda activate /path/to/where/dependencies/are/installed`  
+
+You can run the job as follows:
+```bash
+python /root_folder_with_code/gpt2_surprisal.py 
+--condition control \  
+--scenario sce1 \  
+--paradigm with-context \  
+--input_filename /root_folder_with_code/data/categorized_lists.json \  
+--output_dir /home-3/karmeni1@jhu.edu/code/lm-mem/output \  
+--output_file name_of_the_output_file.csv \  
+--device cuda  
+```
+
+Input arguments are documented in the [gpt2_surprisal.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/gpt2_surprisal.py) script itself:
+
+```python
+# collect input arguments
+parser = argparse.ArgumentParser(description="surprisal.py runs perplexity experiment")
+
+parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3"],
+                    help="str, which scenario to use")
+parser.add_argument("--condition", type=str, choices=["repeat", "permute", "control"],
+                    help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
+parser.add_argument("--paradigm", type=str, choices=["with-context", "repeated-ngrams"],
+                    help="whether or not to permute the second word list")
+parser.add_argument("--context_len", type=int, default=1024,
+                    help="length of context window in tokens for transformers")
+parser.add_argument("--model_type", type=str, default="pretrained", choices=["pretrained", "random", "random-att"],
+                    help="whether or not to load a pretrained model or initialize randomly")
+parser.add_argument("--model_seed", type=int, default=12345,
+                    help="seed value to be used in torch.manual_seed() prior to calling GPT2Model()")
+parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
+                    help="whether to run on cpu or cuda")
+parser.add_argument("--input_filename", type=str,
+                    help="str, the name of the .json file containing word lists")
+parser.add_argument("--output_dir", type=str,
+                    help="str, the name of folder to write the output_filename in")
+parser.add_argument("--output_filename", type=str,
+                    help="str, the name of the output file saving the dataframe")
+```
+
+## Running an LSTM job
+
+In bash script, activate the conda environment with [LSTM dependencies](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/reqs_pytorch1.3.yaml):  
+`conda activate ~/code/conda_envs/lmpytorch1.3`
+
+```bash
+python /root_folder_with_code/rnn/main.py \  
+--model_file /root_folder_with_code/rnn_models/LSTM_400_40m_a_10-d0.2.pt \  
+--vocab_file /root_folder_with_code/rnn/vocab.txt \  
+--data_dir /root_folder_with_code/data/rnn_input_files \  
+--testfname categorized_lists_sce1_control.txt \  
+--csvfname surprisal_rnn_a-10_sce1_control_categorized.csv  \   
+--markersfname categorized_lists_sce1_control_markers.txt  \  
+--output_dir /root_folder_with_code/code/lm-mem/output  \  
+--lowercase \  
+--test \  
+--words  
+```
+
+Input args are defined in [rnn/main.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/rnn/main.py).
+The relevant are to this experiment are:  
+
+```python
+
+parser = argparse.ArgumentParser(description='PyTorch RNN/LSTM Language Model')
+
+# Data parameters
+parser.add_argument('--model_file', type=str, default='model.pt',
+                    help='path to save the final model')
+parser.add_argument('--data_dir', type=str, default='./data/wikitext-2',
+                    help='location of the corpus data')
+parser.add_argument('--vocab_file', type=str, default='vocab.txt',
+                    help='path to save the vocab file')
+parser.add_argument('--testfname', type=str, default='test.txt',
+                    help='name of the test file')
+parser.add_argument('--markersfname', type=str, default='markers.txt',
+                    help='name of the .txt file containting marker values for each token')
+parser.add_argument('--csvfname', type=str,
+                    help='filename for storing complexity output')
+parser.add_argument('--output_dir', type=str,
+                    help='path where csvfname is written to (word-by-word complexity output)')
+parser.add_argument('--test', action='store_true',
+                    help='test a trained LM')
+parser.add_argument('--words', action='store_true',
+                    help='evaluate word-level complexities (instead of sentence-level loss)')
+parser.add_argument('--lowercase', action='store_true',
+                    help='force all input to be lowercase')
+
+```
