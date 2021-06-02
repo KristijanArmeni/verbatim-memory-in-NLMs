@@ -451,9 +451,10 @@ class Experiment(object):
         return outputs
 
 
-def permute_qk_weights(model=None, seed=None):
+def permute_qk_weights(model=None, across_heads=False, seed=None):
     
     i=0
+    
     # access transformer blocks
     for block in tqdm(model.transformer.h, desc="layer"):
         
@@ -466,10 +467,34 @@ def permute_qk_weights(model=None, seed=None):
         # spliting at dim 1 should result in 3 square matrices
         Q, K, V = block.attn.c_attn.weight.split(split_size=attn_dim, dim=1)
         
+        # get the size of each head by diving the embedding size with
+        # the number of layers
+        head_size = model.config.n_embd//model.config.n_layer
+        
         qk_shuf = []
         for w in (Q, K):
-            qk_shuf.append(torch.tensor(rng.permutation(w.detach().numpy())))
+            
+            if across_heads:
+            
+                qk_shuf.append(torch.tensor(rng.permutation(w.detach().numpy())))
         
+            else:
+                
+                # split attn weights into n_layer x n_head square matrices
+                heads_shuf = []
+                
+                w_attn_heads = w.split(split_size=head_size, dim=1)\
+                                .detach().numpy()
+                
+                # permute weights within each head
+                for j, head in enumerate(w_attn_heads):
+                    
+                    # pick different seed for layer and each head
+                    rng = np.random.RandomState(seed+(5*i+j))
+                    heads_shuf.append(rng.permutation(head))    
+                    
+                qk_shuf.append(torch.cat(heads_shuf, dim=1))
+                
         new_qkv = torch.nn.Parameter(data=torch.cat(qk_shuf + [V], dim=1),
                                      requires_grad=False)
         
