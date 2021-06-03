@@ -21,7 +21,7 @@ class Exp(object):
         self.model = model
         self.tokenizer = tokenizer
         self.device = device
-        self.context_len = config["context_len"]
+        self.input_sequences = input_sequences
 
         self.model.to(device)
 
@@ -71,7 +71,7 @@ class Exp(object):
         """
 
         llh = []  # variable storing token-by-token neg ll
-        id = []   # variable storing token strings to have along with -ll in the output
+        tokens = []   # variable storing token strings to have along with -ll in the output
 
         for i in trange(0, input_ids.size(1), stride, desc="Computing perplexity: "):
 
@@ -99,33 +99,24 @@ class Exp(object):
 
                llh.append(log_likelihood.tolist())
                toks = self.tokenizer.decode(target_ids[0][-stride::])
-               id.append(toks)  # store the last token (target_id)
+               tokens.append(toks)  # store the last token (target_id)
 
         # compute perplexity, divide by the lenth of the sequence
         # use np.nansum as token at position 0 will have -LL of nan
         ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc)
         print("Done")
-        return ppl, llh, id
-
-    def run_perplexity(self, prefixes: Dict, prompts: Dict, word_list1: List, word_list2: List) -> List:
-        """
-        experiment.run() will loop over prefixes, prompts, and word_lists and run the Sampler on them
-        It returns a list of tuples.
-        """
-
-        lst = []
-        count = 1
-
-        # store output in named tuple for more controle
-        Output = namedtuple(typename="Output",
-                            field_names=["ppl", "surp", "token", "trialID", "positionID", "list_len",
-                                         "prefix", "prompt"])
-
-        # quick check that the lengths match
-        assert len(word_list1) == len(word_list2)
-
-        total = len(prefixes.keys())*len(prompts.keys())*len(word_list1)
-
+        return ppl, llh, tokens
+    
+    def concat_and_tokenize_input_lists(prefixes, ):
+        
+        metadata = {
+            "trialID": []
+            "positionID": []
+            "list_len": []
+            "prefix": [],
+            "promopt": []
+            }
+        
         # loop over different prefixes:
         for prefix_key in prefixes.keys():
 
@@ -139,7 +130,7 @@ class Exp(object):
                     i1 = self.tokenizer.encode("<|endoftext|> " + prefixes[prefix_key], return_tensors="pt")   # prefix IDs, add eos token
                     i2 = self.tokenizer.encode(word_list1[i], return_tensors="pt")                             # word list IDs
                     i3 = self.tokenizer.encode(prompts[prompt_key], return_tensors="pt")                       # prompt IDs
-                    i4 = self.tokenizer.encode(word_list2[i] + " <|endoftext|>", return_tensors="pt")
+                    i4 = self.tokenizer.encode(word_list2[i] + "<|endoftext|>", return_tensors="pt")
 
                     # compose the input ids tensors
                     input_ids = torch.cat((i1, i2, i3, i4), dim=1)
@@ -156,19 +147,46 @@ class Exp(object):
                         positions.append(tmp2)
 
                     print("counter: {}/{}".format(count, total))
+                    
+                    metadata["trialID"].append(np.concatenate(trials).tolist())
+                    metadata["positionID"].append(np.concatenate(positions).tolist())
+                    metadata["list_len"].append(len([e.strip().replace(".", "") for e in word_list1[i].split(",")]))
+                    metadata["prefix"].append(prefix_key)
+                    metadata["prompt"].append(prompt_key)
+                    
+                    return input_ids, metadata
+    
+    
+    def run_perplexity(self, input_sequences_ids) -> List:
+        """
+        experiment.run() will loop over prefixes, prompts, and word_lists and run the Sampler on them
+        It returns a list of tuples.
+        """
+        
+        ouputs = {
+            "sequence_ppl": None,
+            "surp": None,
+            "token": None,
+            }
 
-                    # this returns surprisal (neg log ll)
-                    a, b, c = self.ppl(input_ids=input_ids.to(self.device), context_len=self.context_len, stride=1,
+        # loop over trials
+        for input_ids in range(len(input_sequences_ids)):
+
+            print("counter: {}/{}".format(count, total))
+
+            # this returns surprisal (neg log ll)
+            ppl, surp, toks = self.ppl(input_ids=input_ids.to(self.device), context_len=self.context_len, stride=1,
                                        device=self.device)
 
-                    # store the output tuple and
-                    lst.append(Output(ppl=a, surp=b, token=c,                            # perplexity output
-                                      trialID=np.concatenate(trials).tolist(),           # trial structure
-                                      positionID=np.concatenate(positions).tolist(),     # position index
-                                      list_len=len([e.strip().replace(".", "") for e in word_list1[i].split(",")]),
-                                      prefix=prefix_key,
-                                      prompt=prompt_key))
+            # store the output tuple and
+            outputs["sequence_ppl"].append(a)
+            outputs["surp"].append(surp)
+            outputs["tokens"].append(toks)
 
-                    count += 1  # increase counter for feedback
+            count += 1  # increase counter for feedback
 
         return lst
+    
+if __name__ == "__main__":
+
+    runtime_code()
