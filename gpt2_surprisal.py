@@ -451,9 +451,14 @@ class Experiment(object):
         return outputs
 
 
-def permute_qk_weights(model=None, across_heads=False, seed=None):
+def permute_qk_weights(model=None, per_head=False, seed=None):
     
     i=0
+    
+    if per_head:
+        print("shuffling within attn heads...")    
+    else:
+        print("shuffling across attn heads...")    
     
     # access transformer blocks
     for block in tqdm(model.transformer.h, desc="layer"):
@@ -474,24 +479,32 @@ def permute_qk_weights(model=None, across_heads=False, seed=None):
         qk_shuf = []
         for w in (Q, K):
             
-            if across_heads:
-            
-                qk_shuf.append(torch.tensor(rng.permutation(w.detach().numpy())))
+            if not per_head:
+                
+                s = w.shape # store original shape
+                
+                #flatten, permute across rows/cols and reshape back
+                wtmp = rng.permutation(w.detach().numpy().flatten()).reshape(s)
+                qk_shuf.append(torch.tensor(wtmp))
         
-            else:
+            elif per_head:
                 
                 # split attn weights into n_layer x n_head square matrices
                 heads_shuf = []
                 
-                w_attn_heads = w.split(split_size=head_size, dim=1)\
-                                .detach().numpy()
+                w_attn_heads = w.split(split_size=head_size, dim=1)
                 
                 # permute weights within each head
                 for j, head in enumerate(w_attn_heads):
                     
                     # pick different seed for layer and each head
                     rng = np.random.RandomState(seed+(5*i+j))
-                    heads_shuf.append(rng.permutation(head))    
+                    s = head.shape # store original shape
+                    
+                    # flatten, permute across cols/rows, then reshape
+                    wtmp = rng.permutation(head.detach().numpy().flatten()).reshape(s)
+                    
+                    heads_shuf.append(torch.tensor(wtmp))    
                     
                 qk_shuf.append(torch.cat(heads_shuf, dim=1))
                 
@@ -503,6 +516,7 @@ def permute_qk_weights(model=None, across_heads=False, seed=None):
         i += 1
         
     return model
+
 
 # ===== RUNTIME CODE WRAPPER ===== #
 
@@ -525,7 +539,8 @@ def runtime_code():
                         help="whether or not to permute the second word list")
     parser.add_argument("--context_len", type=int, default=1024,
                         help="length of context window in tokens for transformers")
-    parser.add_argument("--model_type", type=str, default="pretrained", choices=["pretrained", "random", "random-att"],
+    parser.add_argument("--model_type", type=str, default="pretrained", 
+                        choices=["pretrained", "random", "random-att", "random-att-per-head", "shuff-wpe"],
                         help="whether or not to load a pretrained model or initialize randomly")
     parser.add_argument("--model_seed", type=int, default=12345,
                         help="seed value to be used in torch.manual_seed() prior to calling GPT2Model()")
@@ -655,7 +670,35 @@ def runtime_code():
         model.eval()
         
         print("Permuting model attention weights ...\n")
-        model = permute_qk_weights(model, seed=argins.model_seed)
+        model = permute_qk_weights(model, per_head=False, 
+                                   seed=argins.model_seed)
+        
+    elif argins.model_type == "random-att-per-head":
+        
+        # load pretrained weights
+        model = GPT2LMHeadModel.from_pretrained('gpt2')
+        model.eval()
+        
+        print("Permuting Q and K weights ...\n")
+        model = permute_qk_weights(model, per_head=True,
+                                   seed=argins.model_seed)
+        
+    elif argins.model_type == "shuff-wpe":
+        
+        # load pretrained weights
+        model = GPT2LMHeadModel.from_pretrained('gpt2')
+        model.eval()
+        
+        print("Permuting token positions in wpe...")
+        rng = np.random.RandomState(seed=argins.model_seed)
+        
+        wpe = model.transformer.wpe.weight # shape = (token_positions, embedding_dim)
+        
+        # permutation only permutes across 0 dim (rows=token_positions)
+        wpe_shuf = torch.tensor(rng.permutation(wpe.detach().numpy()))
+        model.transformer.wpe.weight = torch.nn.Parameter(data=wpe_shuf,
+                                                          requires_grad=False)
+                                                          
         
     experiment = Experiment(model=model, tokenizer=tokenizer, 
                             context_len=argins.context_len,
