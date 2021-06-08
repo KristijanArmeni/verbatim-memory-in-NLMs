@@ -1760,10 +1760,10 @@ if savefigs:
             f.writelines(tex)
 
 # %% [markdown]
-# # Random attention GPT-2
+# # Shuffled attention (across heads) GPT-2
 
 # %%
-model_id = "r-20"
+model_id = "r-25"
 gptrnd = pd.read_csv(os.path.join(data_dir, "output_gpt2_{}_sce1.csv".format(model_id)), sep="\t", index_col=None)
 
 # %%
@@ -1796,7 +1796,7 @@ l = data.loc[data.stimid==sentid].token.to_numpy()
 # %%
 sns.set_style("ticks")
 h, w = 1.5, 15
-f, a = plot_example(x=x, y=y, markers=m, xlabels=l, ylabel="surprisal", fh=h, fw=w, title="GPT-2 (shuffled attn.)")
+f, a = plot_example(x=x, y=y, markers=m, xlabels=l, ylabel="surprisal", fh=h, fw=w, title="GPT-2 (shuffled attn. within heads)")
 
 # %%
 if savefigs:
@@ -1906,6 +1906,378 @@ p2B.fig.subplots_adjust(top=0.8)
 # %%
 basename = "set-size"
 arch = "gpt2_r-20"
+hasstat = False
+if savefigs:
+    
+    #p1.savefig(os.path.join(savedir, "{}_{}.pdf".format(basename, arch)), transparent=True, bbox_inches="tight")
+    #p1.savefig(os.path.join(savedir, "{}_{}.png".format(basename, arch)), dpi=300, bbox_inches="tight")
+    
+    print("Saving {}".format(os.path.join(savedir, "{}_{}_B".format(basename, arch))))
+    p2B.savefig(os.path.join(savedir, "{}_{}_B.pdf".format(basename, arch)), transparent=True, bbox_inches="tight")
+    p2B.savefig(os.path.join(savedir, "{}_{}_B.png".format(basename, arch)), dpi=300, bbox_inches="tight")
+    
+    if hasstat:
+        # create a column with string formateed and save the table as well
+        stat = stat.round({"ci_min": 1, "ci_max": 1, "median": 1})
+        strfunc = lambda x: str(x["median"]) + "% " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        stat["report_str"] = stat.apply(strfunc, axis=1)
+        stat.list_len = stat.list_len.astype(int)
+        stat.sort_values(by="list_len")
+
+        # save the original .csv
+        fname = os.path.join(table_savedir, "{}_{}_table.csv".format(basename, arch))
+        print("Writing {}".format(fname))
+        stat.to_csv(fname)
+
+        # save for latex
+        stat.rename(columns={"list_len": "set size"}, inplace=True)
+        tex = stat.pivot(index=["list", "condition"], columns=["set size"], values="report_str")\
+                  .to_latex(bold_rows=True,
+                            caption="GPT-2 (shuffled attention) word list surprisal per set size. "
+                                    "We report the percentage of median surprisal on second lists relative to first list. " 
+                                    "Ranges are 95\% confidence intervals around the observed mean " 
+                                    "(bootstrap estimate). "
+                                    "The length of filler string is fixed at 8 tokens.")
+
+        # now save as .tex file
+        fname = os.path.join(table_savedir, "{}_{}.tex".format(basename, arch))
+        print("Writing {}".format(fname))
+        with open(fname, "w") as f:
+            f.writelines(tex)
+
+# %% [markdown]
+# # Random attention (within head) GPT-2
+
+# %%
+model_id = "r-25"
+gptrnd = pd.read_csv(os.path.join(data_dir, "output_gpt2_{}_sce1.csv".format(model_id)), sep="\t", index_col=None)
+
+# %%
+# pick a random sentence
+rng = np.random.RandomState(12345)
+sentid = rng.randint(low=1, high=230)
+
+# %% [markdown]
+# ## Filter data
+
+# %% tags=[]
+sel = (gptrnd.prompt_len==8) & \
+      (gptrnd.list_len==10) & \
+      (gptrnd.second_list=="repeat") & \
+      (gptrnd.context=="intact") & \
+      (gptrnd.list=="random") & \
+      (gptrnd.stimid.isin([sentid])) & \
+      (gptrnd.model_id==model_id)
+data = gptrnd.loc[sel].copy()
+
+# %%
+x = data.loc[data.stimid==sentid].reset_index().index.values
+y = data.loc[data.stimid==sentid].surp.to_numpy()
+m = data.loc[data.stimid==sentid].marker.to_numpy()
+l = data.loc[data.stimid==sentid].token.to_numpy()
+
+# %% [markdown]
+# ## Plot example trial
+
+# %%
+sns.set_style("ticks")
+h, w = 1.5, 15
+f, a = plot_example(x=x, y=y, markers=m, xlabels=l, ylabel="surprisal", fh=h, fw=w, title="GPT-2 (shuffled attn. within head)")
+
+# %%
+if savefigs:
+    
+    f.set_size_inches(w=w, h=h)
+    
+    print("Saving {}".format(os.path.join(savedir, "example_gpt2-{}.pdf".format(model_id))))
+    f.savefig(os.path.join(savedir, "example_gpt2-{}.pdf".format(model_id)), transparent=True, bbox_inches="tight")
+    f.savefig(os.path.join(savedir, "example_gpt2-{}.png".format(model_id)), dpi=300, bbox_inches="tight")
+
+# %% [markdown]
+# ## Filter data for main plot
+
+# %%
+data = None
+data = gptrnd
+data["model"] = "gpt-2"
+
+# %%
+# select repeat condition and all list lengths
+context_len = 8                       # take only short context for now
+list_len = [3, 5, 7, 10]              # this is on the x-axis
+context = "intact"                    # only intact context (no permute, etc.)
+token_positions = list(range(1, 10))  # only select non-initial token positions
+
+# we drop the first token
+sel = (data.prompt_len==context_len) & \
+      (data.list_len.isin(list_len)) & \
+      (data.second_list.isin(["repeat", "permute", "control"])) & \
+      (data.list.isin(["random", "categorized"])) & \
+      (data.context==context) & \
+      (data.model_id==model_id) & \
+      (data.marker.isin([1, 3])) & \
+      (data.marker_pos_rel.isin(token_positions))
+
+d = data.loc[sel].copy()
+
+# %% [markdown]
+# ## Aggregate
+
+# %%
+# average separately per list_len, stimulus id (sentid), model (lstm or gpt2), marker (1 or 3), list (random, categorized) and second list (repeated, permuted or control)
+units = ["list_len", "stimid", "model", "marker", "list", "second_list"]
+dagg = d.groupby(units).agg({"surp": ["mean", "std"], "token": list}).reset_index()
+dagg.columns = ['_'.join(col_v) if col_v[-1] != '' else col_v[0] for col_v in dagg.columns.values]
+
+# %% [markdown]
+# ## Compute metric
+
+# %%
+# apply relatvie change computation and apply to 
+df_list = []
+for model in ["gpt-2"]:
+    for length in [3, 5, 7, 10]:
+        for condition in ["repeat", "permute", "control"]:
+            for list_type in ["categorized", "random"]:
+            
+                cols = ["x1", "x2", "x_del"]
+                df = pd.DataFrame(columns=cols)
+
+                select = (dagg.model == model) & (dagg.list_len == length) & (dagg.second_list == condition) & (dagg.list == list_type)
+                tmp = dagg.loc[select].copy()
+
+                x1=tmp.loc[tmp.marker==1].surp_mean.to_numpy()           # average per sentence surprisal on first list
+                x2=tmp.loc[tmp.marker==3].surp_mean.to_numpy()           # average per sentence surprisal on second list
+                labels1 = tmp.loc[tmp.marker==1].stimid.to_numpy()  # use sentence id for check
+                labels2 = tmp.loc[tmp.marker==3].stimid.to_numpy()
+
+                x_del, x_perc = get_relative_change(x1=x1, x2=x2, labels1=labels1, labels2=labels2)
+
+                df["x1"] = x1
+                df["x2"] = x2
+                df["x_del"] = x_del
+                df["x_perc"] = x_perc
+                df["model"] = model
+                df["list_len"] = length
+                df["list"] = list_type
+                df["condition"] = condition
+
+                df_list.append(df)
+
+# %%
+# concatenate relative scores
+data = None
+data = pd.concat(df_list)
+
+data.list = data.list.map({"categorized": "semantic", "random": "arbitrary"})
+data.condition = data.condition.map({"control": "Novel", "repeat": "Repeated", "permute": "Permuted"})
+
+# %% [markdown]
+# ## Point plot
+
+# %%
+arch="gpt-2"
+sns.set_style("ticks")
+sns.set_context("paper", font_scale=1.5)
+p2B, ax, _ = make_point_plot(data_frame=data.loc[data.model==arch], 
+                           x="list_len", y="x_perc", hue="condition", col="list", ylim=(70, None),
+                           xlabel="set-size\n(n. tokens)", ylabel="repeat surprisal\n(%)", 
+                           scale=0.8,
+                           suptitle="{} {}".format(arch, model_id).replace(model_id, "shuffled att. (within head)"), legend_title="second list",
+                           size_inches=(4.5, 3.5))
+ax[0].set_title("Arbitrary list")
+ax[1].set_title("Semantically coherent list")
+p2B.fig.subplots_adjust(top=0.8)
+
+# %%
+basename = "set-size"
+arch = "gpt2_{}".format(model_id)
+hasstat = False
+if savefigs:
+    
+    #p1.savefig(os.path.join(savedir, "{}_{}.pdf".format(basename, arch)), transparent=True, bbox_inches="tight")
+    #p1.savefig(os.path.join(savedir, "{}_{}.png".format(basename, arch)), dpi=300, bbox_inches="tight")
+    
+    print("Saving {}".format(os.path.join(savedir, "{}_{}_B".format(basename, arch))))
+    p2B.savefig(os.path.join(savedir, "{}_{}_B.pdf".format(basename, arch)), transparent=True, bbox_inches="tight")
+    p2B.savefig(os.path.join(savedir, "{}_{}_B.png".format(basename, arch)), dpi=300, bbox_inches="tight")
+    
+    if hasstat:
+        # create a column with string formateed and save the table as well
+        stat = stat.round({"ci_min": 1, "ci_max": 1, "median": 1})
+        strfunc = lambda x: str(x["median"]) + "% " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        stat["report_str"] = stat.apply(strfunc, axis=1)
+        stat.list_len = stat.list_len.astype(int)
+        stat.sort_values(by="list_len")
+
+        # save the original .csv
+        fname = os.path.join(table_savedir, "{}_{}_table.csv".format(basename, arch))
+        print("Writing {}".format(fname))
+        stat.to_csv(fname)
+
+        # save for latex
+        stat.rename(columns={"list_len": "set size"}, inplace=True)
+        tex = stat.pivot(index=["list", "condition"], columns=["set size"], values="report_str")\
+                  .to_latex(bold_rows=True,
+                            caption="GPT-2 (shuffled attention) word list surprisal per set size. "
+                                    "We report the percentage of median surprisal on second lists relative to first list. " 
+                                    "Ranges are 95\% confidence intervals around the observed mean " 
+                                    "(bootstrap estimate). "
+                                    "The length of filler string is fixed at 8 tokens.")
+
+        # now save as .tex file
+        fname = os.path.join(table_savedir, "{}_{}.tex".format(basename, arch))
+        print("Writing {}".format(fname))
+        with open(fname, "w") as f:
+            f.writelines(tex)
+
+# %% [markdown]
+# # Shuffled position embeddings GPT-2
+
+# %%
+model_id = "r-30"
+gptrnd = pd.read_csv(os.path.join(data_dir, "output_gpt2_{}_sce1.csv".format(model_id)), sep="\t", index_col=None)
+
+# %%
+# pick a random sentence
+rng = np.random.RandomState(12345)
+sentid = rng.randint(low=1, high=230)
+
+# %% [markdown]
+# ## Filter data
+
+# %% tags=[]
+sel = (gptrnd.prompt_len==8) & \
+      (gptrnd.list_len==10) & \
+      (gptrnd.second_list=="repeat") & \
+      (gptrnd.context=="intact") & \
+      (gptrnd.list=="random") & \
+      (gptrnd.stimid.isin([sentid])) & \
+      (gptrnd.model_id==model_id)
+data = gptrnd.loc[sel].copy()
+
+# %%
+x = data.loc[data.stimid==sentid].reset_index().index.values
+y = data.loc[data.stimid==sentid].surp.to_numpy()
+m = data.loc[data.stimid==sentid].marker.to_numpy()
+l = data.loc[data.stimid==sentid].token.to_numpy()
+
+# %% [markdown]
+# ## Plot example trial
+
+# %%
+sns.set_style("ticks")
+h, w = 1.5, 15
+f, a = plot_example(x=x, y=y, markers=m, xlabels=l, ylabel="surprisal", fh=h, fw=w, title="GPT-2 (shuffled position embeddings)")
+
+# %%
+if savefigs:
+    
+    f.set_size_inches(w=w, h=h)
+    
+    print("Saving {}".format(os.path.join(savedir, "example_gpt2-{}.pdf".format(model_id))))
+    f.savefig(os.path.join(savedir, "example_gpt2-{}.pdf".format(model_id)), transparent=True, bbox_inches="tight")
+    f.savefig(os.path.join(savedir, "example_gpt2-{}.png".format(model_id)), dpi=300, bbox_inches="tight")
+
+# %% [markdown]
+# ## Filter data for main plot
+
+# %%
+data = None
+data = gptrnd
+data["model"] = "gpt-2"
+
+# %%
+# select repeat condition and all list lengths
+context_len = 100                       # take only short context for now
+list_len = [3, 5, 7, 10]              # this is on the x-axis
+context = "intact"                    # only intact context (no permute, etc.)
+token_positions = list(range(1, 10))  # only select non-initial token positions
+
+# we drop the first token
+sel = (data.prompt_len==context_len) & \
+      (data.list_len.isin(list_len)) & \
+      (data.second_list.isin(["repeat", "permute", "control"])) & \
+      (data.list.isin(["random", "categorized"])) & \
+      (data.context==context) & \
+      (data.model_id==model_id) & \
+      (data.marker.isin([1, 3])) & \
+      (data.marker_pos_rel.isin(token_positions))
+
+d = data.loc[sel].copy()
+
+# %% [markdown]
+# ## Aggregate
+
+# %%
+# average separately per list_len, stimulus id (sentid), model (lstm or gpt2), marker (1 or 3), list (random, categorized) and second list (repeated, permuted or control)
+units = ["list_len", "stimid", "model", "marker", "list", "second_list"]
+dagg = d.groupby(units).agg({"surp": ["mean", "std"], "token": list}).reset_index()
+dagg.columns = ['_'.join(col_v) if col_v[-1] != '' else col_v[0] for col_v in dagg.columns.values]
+
+# %% [markdown]
+# ## Compute metric
+
+# %%
+# apply relatvie change computation and apply to 
+df_list = []
+for model in ["gpt-2"]:
+    for length in [3, 5, 7, 10]:
+        for condition in ["repeat", "permute", "control"]:
+            for list_type in ["categorized", "random"]:
+            
+                cols = ["x1", "x2", "x_del"]
+                df = pd.DataFrame(columns=cols)
+
+                select = (dagg.model == model) & (dagg.list_len == length) & (dagg.second_list == condition) & (dagg.list == list_type)
+                tmp = dagg.loc[select].copy()
+
+                x1=tmp.loc[tmp.marker==1].surp_mean.to_numpy()           # average per sentence surprisal on first list
+                x2=tmp.loc[tmp.marker==3].surp_mean.to_numpy()           # average per sentence surprisal on second list
+                labels1 = tmp.loc[tmp.marker==1].stimid.to_numpy()  # use sentence id for check
+                labels2 = tmp.loc[tmp.marker==3].stimid.to_numpy()
+
+                x_del, x_perc = get_relative_change(x1=x1, x2=x2, labels1=labels1, labels2=labels2)
+
+                df["x1"] = x1
+                df["x2"] = x2
+                df["x_del"] = x_del
+                df["x_perc"] = x_perc
+                df["model"] = model
+                df["list_len"] = length
+                df["list"] = list_type
+                df["condition"] = condition
+
+                df_list.append(df)
+
+# %%
+# concatenate relative scores
+data = None
+data = pd.concat(df_list)
+
+data.list = data.list.map({"categorized": "semantic", "random": "arbitrary"})
+data.condition = data.condition.map({"control": "Novel", "repeat": "Repeated", "permute": "Permuted"})
+
+# %% [markdown]
+# ## Point plot (shuff. attn. gpt-2)
+
+# %%
+arch="gpt-2"
+sns.set_style("ticks")
+sns.set_context("paper", font_scale=1.5)
+p2B, ax, _ = make_point_plot(data_frame=data.loc[data.model==arch], 
+                           x="list_len", y="x_perc", hue="condition", col="list", ylim=(30, 100),
+                           xlabel="set-size\n(n. tokens)", ylabel="repeat surprisal\n(%)", 
+                           scale=0.8,
+                           suptitle="{} {}".format(arch, model_id).replace(model_id, "shuffled wpe"), legend_title="second list",
+                           size_inches=(4.5, 3.5))
+ax[0].set_title("Arbitrary list")
+ax[1].set_title("Semantically coherent list")
+p2B.fig.subplots_adjust(top=0.8)
+
+# %%
+basename = "set-size"
+arch = "gpt2_{}".format(model_id)
 hasstat = False
 if savefigs:
     
