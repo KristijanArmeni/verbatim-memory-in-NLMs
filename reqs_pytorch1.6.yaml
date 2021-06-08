@@ -17,7 +17,7 @@ dependencies:
   - pytorch::pytorch=1.6
   - cudatoolkit=10.2
   - huggingface::transformers=4.6
-  - spyder
+  - conda-forge::wandb=0.10.31
   - nb_conda_kernels
   - h5py
   - pip
