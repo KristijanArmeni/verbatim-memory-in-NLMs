@@ -14,8 +14,9 @@ dependencies:
   - plotly
   - seaborn
   - jupyterlab
-  - pytorch::pytorch=1.6=*cuda9.2*
-  - huggingface::transformers=4.2.2
+  - pytorch::pytorch=1.6
+  - cudatoolkit=10.2
+  - huggingface::transformers=4.6
   - spyder
   - nb_conda_kernels
   - h5py

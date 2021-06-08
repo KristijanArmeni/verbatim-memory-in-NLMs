@@ -15,7 +15,7 @@ dependencies:
   - seaborn
   - jupyterlab
   - pytorch::pytorch=1.6
-  - huggingface::transformers=4.2.2
+  - huggingface::transformers=4.6
   - nb_conda_kernels
   - spyder-kernels
   - h5py
