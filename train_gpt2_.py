@@ -22,6 +22,9 @@ from transformers import GPT2Config, GPT2TokenizerFast, GPT2LMHeadModel, \
                         Trainer, TrainingArguments, DataCollatorForLanguageModeling, \
                         logging
 
+# own module
+from dataset import WikiTextDataset
+
 # ============================== #
 # ===== DATASET MANAGEMENT ===== #
 # ============================== #
@@ -324,65 +327,7 @@ class Experiment(object):
             print("Counter: {}".format(self.counter))
 
 
-class WikiTextDataset(Dataset):
-    
-    def __init__(self, tokenizer):
-        
-        self.x = None  # input samples
-        self.tokenizer = tokenizer
-    
-    # split dataset into chunks of 1024 tokens
-    def chunk_list(self, l, n, equal_len=True, bos=None, eos=None):
-        
-        n = max(1, n)
-        
-        if (bos is not None) and (eos is not None):
-            
-            # if bos and eos need to be added adjust selected n to not exceed
-            # the allowed maximum
-            print("Adding bos and eos setting {} to {}".format(n, n-2))
-            n -= 2
-        
-        if equal_len:
-            total_len = (len(l)//n)*n
-        else:
-            total_len = len(l)
-        
-        output_list =([bos] + l[i:i+n] + [eos] for i in range(0, total_len, n))
-        
-        return output_list    
-    
-    def read_and_preprocess_txt(self, path, sequence_length):
-            
-    
-        with open(path, "r", encoding="utf-8") as file:
-            
-            lines = file.readlines()
-        
-        # retokenize the entire test set
-        print("Retokenizing {}".format(path))
-        ds_retok = []
-        for l in tqdm(lines, desc="line"):
-            ds_retok += self.tokenizer.encode(l)
-        
-        # clear lines for memory
-        lines = None
-        
-        # split list of input tokens into list of elements of size max_len
-        print("Chunking samples in self.x to length of {}".format(sequence_length))
-        self.x = list(self.chunk_list(ds_retok, 
-                                      n=sequence_length,
-                                      bos=self.tokenizer.bos_token_id,
-                                      eos=self.tokenizer.eos_token_id))
-        
 
-    def __len__(self):
-        
-        return len(self.x)
-    
-    def __getitem__(self, index):
-        
-        return torch.tensor(self.x[index])
 
 # ======================== #
 # ===== RUNTIME CODE ===== #
@@ -406,6 +351,8 @@ def runtime_code():
                         help="path to tokenized file")
     parser.add_argument("--model_name", type=str,
                         help="filename for saving model checkpoint to --savedir")
+    parser.add_argument("--tokenizer_path", type=str,
+                        help="path to mergex.txt and vocab.json files")
     parser.add_argument("--device", type=str, default="cpu", choices=["cpu", "cuda"],
                         help="device used for training")
 
@@ -459,40 +406,25 @@ def runtime_code():
         
         print_cuda_mem_info()
     
-    # own modules
-    if "win" in sys.platform:
-        datapath = os.path.join(os.environ['homepath'], 'project', 'lm-mem', 'data')
-    elif "linux" in sys.platform:
-        datapath = os.path.join(os.environ['HOME'], 'code', 'lm-mem', 'data')
     
     # set logging verbosity output
     logging.set_verbosity_info()
     
-    #tokenizer = ByteLevelBPETokenizer()
+    tokenizer = GPT2TokenizerFast.from_pretrained(args.tokenizer_path)
     
-    #tokenizer.train(files=[os.path.join(datapath, "wikitext-103", "wiki.train.tokens")],
-    #                vocab_size=28439, 
-    #                min_frequency=1, 
-    #                special_tokens=["<|endoftext|>", "<pad>"])
+    # load in retokenized files
+    train_ds = WikiTextDataset.load_and_retokenize_txt(path=args.train_ds,
+                                                       retokenize=False,
+                                                       sequence_length=args.sequence_len)
     
-    # Save files to disk
-    #tokenizer.save_model(datapath, "wikitext-103")
+    eval_ds = WikiTextDataset.load_and_retokenize_txt(path=args.val_ds,
+                                                     retokenize=False,
+                                                     sequence_length=args.sequence_len)
     
-    # load the pretrained tokenizer
-    tokenizer = GPT2TokenizerFast.from_pretrained(os.path.join(datapath, "GPT2_wikitext103"), max_len=512)
-
-
-    train_ds = WikiTextDataset(tokenizer=tokenizer)
-    train_ds.read_and_preprocess_txt(path=os.path.join(datapath, "wikitext-103", args.test_ds),
-                                     sequence_length=args.sequence_len)
+    test_ds = WikiTextDataset.load_and_retokenize_txt(path=args.test_ds,
+                                                      retokenize=False,
+                                                      sequence_length=args.sequence_len)
     
-    eval_ds = WikiTextDataset(tokenizer=tokenizer)
-    eval_ds.read_and_preprocess_txt(path=os.path.join(datapath, "wikitext-103", args.val_ds),
-                                    sequence_length=args.sequence_len)
-    
-    # initialize model with default config and move to device
-    print("Loading model to {}".format(args.device))
-    torch.manual_seed(args.seed)
     
     # set up some GPT2Config parametersqq
     # we keep n_positions and n_ctx equal 
@@ -524,6 +456,7 @@ def runtime_code():
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer,
                                                     mlm=False)
     
+    torch.manual_seed(args.seed)
     trainer = Trainer(args=train_args,
                       model=GPT2LMHeadModel(config=config).to(device),
                       data_collator=data_collator,
