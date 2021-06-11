@@ -444,6 +444,7 @@ def runtime_code():
     parser.add_argument("--es_patience", type=int,
                         help="nr of consecutive epochs to wait for decreasing loss" 
                         "before stopping training")
+    parser.add_argument("--wandb_key", type=str, help="authorization key to loging to wandb")
     parser.add_argument("--savedir", type=str,
                         help="path where the model weights will be stored")
     parser.add_argument("--logdir", type=str,
@@ -522,9 +523,6 @@ def runtime_code():
     
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer,
                                                     mlm=False)
-    
-    wandb.login()
-    wandb.init(project="test")
     
     trainer = Trainer(args=train_args,
                       model=GPT2LMHeadModel(config=config).to(device),
