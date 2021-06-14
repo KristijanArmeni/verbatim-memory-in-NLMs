@@ -67,7 +67,7 @@ class WikiTextDataset(Dataset):
                 json.dump(tokens, fname)
                 
             # save tokens as .json
-            print("Saving {}".format(save_retokenized))
+            print("Saving {}".format(save_retokenized.replace("tokens.bpe", "inds.bpe")))
             with open(save_retokenized.replace("tokens.bpe", "inds.bpe"), "w") as fname:
                 json.dump(ids, fname)
                 
