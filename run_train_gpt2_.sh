@@ -4,12 +4,12 @@ login_key=$1
 ml anaconda
 conda activate ~/code/conda_envs/core_env
 
-python $HOME/code/lm-mem/train_gpt2_.py --datadir "C:\Users\karmeni1\project\lm-mem\data\wikitext-103\" \
-                                        --train_ds "wiki.train.tokens" \
-                                        --val_ds "wiki.valid.tokens" \
-                                        --test_ds  "wiki.test.tokens" \
+python $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-103 \
+                                        --train_ds wiki.train.inds_40m.bpe.json \
+                                        --val_ds wiki.valid.inds.bpe.json \
+                                        --test_ds wiki.test.inds.bpe.json \
                                         --sequence_len 12 \
-                                        --model_name "gpt2_40M_a.pth" \
+                                        --model_name gpt2_40M_a.pth \
                                         --seed 12345 \
                                         --device "cuda" \
                                         --train_batch_size 10 \
@@ -23,6 +23,6 @@ python $HOME/code/lm-mem/train_gpt2_.py --datadir "C:\Users\karmeni1\project\lm-
                                         --num_lr_warmup_steps 5 \
                                         --es_patience 3 \
                                         --wandb_key $login_key \
-                                        --savedir "C:\Users\karmeni1\project\lm-mem\data\checkpoints\" \
-                                        --logdir "C:\Users\karmeni1\project\lm-mem\data\logs\
+                                        --savedir $HOME/work/karmeni1/lm-mem/checkpoints \
+                                        --logdir $HOME/work/karmeni1/lm-mem/logs \
                                         
