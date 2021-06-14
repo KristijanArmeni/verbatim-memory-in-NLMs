@@ -112,7 +112,7 @@ def runtime_code():
     parser.add_argument("--train_tokenizer", action="store_false",
                          help="boolean, whether or not to train BPE tokenizer" 
                          "on wikitext103 (default: false)")
-    parser.add_argument("--tokenizer_train_tokens", type=str,)
+    parser.add_argument("--tokenizer_train_tokens", type=str)
     parser.add_argument("--tokenizer_savedir", type=str,
                         help="folder where merges.txt and vocab.txt are saved")
     parser.add_argument("--savedir", type=str, 
