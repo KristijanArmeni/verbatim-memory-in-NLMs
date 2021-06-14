@@ -142,6 +142,7 @@ def runtime_code():
             raise ValueError("Tokenizer directory is empty. Use --train_tokenizer.)
                              
         else:    
+            print("Loading tokenizer from {}".format(args.tokenizer_savedir))
             tokenizer = GPT2TokenizerFast.from_pretrained(args.tokenizer_savedir, max_len=1024)
     else:
         print("{} directory doesn't exist".format(tokenizer.savedir))
