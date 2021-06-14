@@ -139,7 +139,7 @@ def runtime_code():
                     tokenizer.save_model(args.tokenizer_savedir)
                     
         elif not os.listdir(args.tokenizer_savedir) and not args.train_tokenizer:
-            raise ValueError("Tokenizer directory is empty. Use --train_tokenizer.)
+            raise ValueError("Tokenizer directory is empty. Use --train_tokenizer.")
                              
         else:    
             print("Loading tokenizer from {}".format(args.tokenizer_savedir))
