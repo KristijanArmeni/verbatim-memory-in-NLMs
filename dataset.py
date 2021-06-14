@@ -120,27 +120,27 @@ def runtime_code():
     
     args = parser.parse_args()
     
-    if args.train_tokenizer:
-        
-        print("Training BPE tokenizer...")
-        
-        tokenizer = ByteLevelBPETokenizer()
-        
-        tokenizer.train(files=[args.tokenizer_train_tokens, args.valid_tokens, args.test_tokens],
-                        vocab_size=28439, 
-                        min_frequency=2, 
-                        special_tokens=["<|endoftext|>", "<pad>"])
-        
-        # Save files to disk
-        tokenizer.save_model(args.tokenizer_savedir)
-    
-    # load the pretrained tokenizer
+    # load the pretrained tokenizer or traine one from scracth
     # max len is not crucial here as we only want to retokenize the dataset, not
     # create the final sequences
     if os.path.exists(args.tokenizer_savedir) and os.path.isdir(args.tokenizer_savedir):
         
-        if not os.listdir(args.tokenizer_savedir):
-            print("{} is empty. You must train tokenizer first. Use --train_tokenizer argument.")
+        if not os.listdir(args.tokenizer_savedir) and args.train_tokenizer:
+            
+                    print("Training BPE tokenizer...")
+                    tokenizer = ByteLevelBPETokenizer()
+                    tokenizer.train(files=[args.tokenizer_train_tokens, args.valid_tokens, args.test_tokens],
+                                    vocab_size=28439, 
+                                    min_frequency=2, 
+                                    special_tokens=["<|endoftext|>", "<pad>"])
+
+                    # Save files to disk
+                    print("Saving merges.txt and vocab.json to {}".format(args.tokenizer_savedir))
+                    tokenizer.save_model(args.tokenizer_savedir)
+                    
+        elif not os.listdir(args.tokenizer_savedir) and not args.train_tokenizer:
+            raise ValueError("Tokenizer directory is empty. Use --train_tokenizer.)
+                             
         else:    
             tokenizer = GPT2TokenizerFast.from_pretrained(args.tokenizer_savedir, max_len=1024)
     else:
