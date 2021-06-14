@@ -126,7 +126,7 @@ def runtime_code():
         
         tokenizer = ByteLevelBPETokenizer()
         
-        tokenizer.train(files=[args.tokenizer_train_tokens, args.valid_ds, args.test_ds],
+        tokenizer.train(files=[args.tokenizer_train_tokens, args.valid_tokens, args.test_tokens],
                         vocab_size=28439, 
                         min_frequency=2, 
                         special_tokens=["<|endoftext|>", "<pad>"])
