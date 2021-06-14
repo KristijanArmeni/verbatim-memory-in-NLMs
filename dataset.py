@@ -100,7 +100,6 @@ def runtime_code():
      
     parser = argparse.ArgumentParser()
     
-    parser.add_argument("")
     parser.add_argument("--train_tokens", type=str,
                         help="path to training dataset")
     parser.add_argument("--valid_tokens", type=str,
