@@ -1,12 +1,4 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jun 14 11:22:52 2021
-
-@author: karmeni1
-
-bash script for training wikitext-103 tokenizer and retokenizing wikitext-103 dataset
-
-"""
+#!/bin/bash
 
 ml anaconda
 conda activate ~/code/conda_envs/core_env
