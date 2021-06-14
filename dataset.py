@@ -151,19 +151,19 @@ def runtime_code():
     train_ds = WikiTextDataset(tokenizer=tokenizer)
     
     # training set
-    train_ds.read_and_preprocess_txt(path=args.train_tokens,
+    train_ds.load_and_retokenize_txt(path=args.train_tokens,
                                      retokenize=True,
                                      save_retokenized=args.train_tokens.replace("tokens", "tokens.bpe"))
     
     # validation set
     eval_ds = WikiTextDataset(tokenizer=tokenizer)
-    eval_ds.read_and_preprocess_txt(path=args.val_tokens,
+    eval_ds.load_and_retokenize_txt(path=args.val_tokens,
                                     retokenize=True,
                                     save_retokenized=args.valid_tokens.replace("tokens", "tokens.bpe"))
     
     # validation set
     eval_ds = WikiTextDataset(tokenizer=tokenizer)
-    eval_ds.read_and_preprocess_txt(path=args.test_tokens,
+    eval_ds.load_and_retokenize_txt(path=args.test_tokens,
                                     retokenize=True,
                                     save_retokenized=args.valid_tokens.replace("tokens", "tokens.bpe"))
     
