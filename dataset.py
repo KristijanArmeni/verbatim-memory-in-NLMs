@@ -11,6 +11,7 @@ import torch
 from tqdm import tqdm
 import argparse
 import os
+import json
 
 class WikiTextDataset(Dataset):
     
@@ -41,50 +42,46 @@ class WikiTextDataset(Dataset):
         return output_list    
     
     
-    def load_and_retokenize_txt(self, path, retokenize=False, 
-                                save_retokenized=None,
-                                sequence_length=None):
+    def retokenize_txt(self, path, save_retokenized=False):
             
 
         with open(path, "r", encoding="utf-8") as file:
             
             lines = file.readlines()
         
-        if retokenize:
-            
-            # retokenize the entire test set
-            print("Retokenizing {}".format(path))
-            tokens = []
-            ids = []
-            for l in tqdm(lines, desc="line"):
-                tokens += self.tokenizer.tokenize(l)
-                ids += self.tokenizer.encode(l)
-                
-            if save_retokenized:
-                
-                # save tokens as .json
-                print("Saving {}".format(save_retokenized))
-                with open(save_retokenized, "w") as fname:
-                    fname.writelines(tokens)
-                    
-                # save tokens as .json
-                print("Saving {}".format(save_retokenized + "ids"))
-                with open(save_retokenized + "_ids", "w") as fname:
-                    fname.writelines(ids)
-                    
-        else:
-            
-            tokens = lines
+        # retokenize the entire test set
+        print("Retokenizing {}".format(path))
         
-        if sequence_length is not None:
-            # split list of input tokens into list of elements of size max_len
-            print("Chunking samples in self.x to length of {}".format(sequence_length))
-            self.x = list(self.chunk_list(tokens, 
-                                          n=sequence_length,
-                                          bos=self.tokenizer.bos_token_id,
-                                          eos=self.tokenizer.eos_token_id))
-        elif sequence_length is None:
-            print("sequence_length == None, not populating self.x")
+        tokens = []
+        ids = []
+        
+        for l in tqdm(lines, desc="line"):
+            tokens += self.tokenizer.tokenize(l)
+            ids += self.tokenizer.encode(l)
+            
+        if save_retokenized:
+            
+            # save tokens as .json
+            print("Saving {}".format(save_retokenized))
+            with open(save_retokenized, "w") as fname:
+                json.dump(tokens, fname)
+                
+            # save tokens as .json
+            print("Saving {}".format(save_retokenized))
+            with open(save_retokenized.replace("tokens.bpe", "token_ids.bpe"), "w") as fname:
+                json.dump(ids, fname)
+                
+    def make_input_sequences(self, json_path, sequence_length=1024):
+        
+        with open(json, "r") as f:
+            ids = json.load(f)
+        
+        # split list of input tokens into list of elements of size max_len
+        print("Chunking samples in self.x to length of {}".format(sequence_length))
+        self.x = list(self.chunk_list(ids, 
+                                      n=sequence_length,
+                                      bos=self.tokenizer.bos_token_id,
+                                      eos=self.tokenizer.eos_token_id))
         
 
     def __len__(self):
@@ -145,28 +142,25 @@ def runtime_code():
             print("Loading tokenizer from {}".format(args.tokenizer_savedir))
             tokenizer = GPT2TokenizerFast.from_pretrained(args.tokenizer_savedir, max_len=1024)
     else:
-        print("{} directory doesn't exist".format(tokenizer.savedir))
+        raise Exception("{} directory doesn't exist".format(args.tokenizer_savedir))
     
     
     # now retokenize wikitext and save
     train_ds = WikiTextDataset(tokenizer=tokenizer)
     
     # training set
-    train_ds.load_and_retokenize_txt(path=args.train_tokens,
-                                     retokenize=True,
-                                     save_retokenized=args.train_tokens.replace("tokens", "tokens.bpe"))
+    train_ds.retokenize_txt(path=args.train_tokens,
+                            save_retokenized=args.train_tokens.replace("tokens", "tokens.bpe.json"))
     
     # validation set
     eval_ds = WikiTextDataset(tokenizer=tokenizer)
-    eval_ds.load_and_retokenize_txt(path=args.val_tokens,
-                                    retokenize=True,
-                                    save_retokenized=args.valid_tokens.replace("tokens", "tokens.bpe"))
+    eval_ds.retokenize_txt(path=args.val_tokens,
+                           save_retokenized=args.valid_tokens.replace("tokens", "tokens.bpe.json"))
     
     # validation set
-    eval_ds = WikiTextDataset(tokenizer=tokenizer)
-    eval_ds.load_and_retokenize_txt(path=args.test_tokens,
-                                    retokenize=True,
-                                    save_retokenized=args.valid_tokens.replace("tokens", "tokens.bpe"))
+    test_ds = WikiTextDataset(tokenizer=tokenizer)
+    test_ds.retokenize_txt(path=args.test_tokens,
+                           save_retokenized=args.valid_tokens.replace("tokens", "tokens.bpe.json"))
     
 if __name__ == "__main__":
     
