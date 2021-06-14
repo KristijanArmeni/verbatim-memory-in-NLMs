@@ -413,13 +413,13 @@ def runtime_code():
     tokenizer = GPT2TokenizerFast.from_pretrained(args.tokenizer_path)
     
     # load in retokenized files
-    train_ds = WikiTextDataset.make_input_sequences(path=args.train_ds,
+    train_ds = WikiTextDataset.make_input_sequences(json_path=args.train_ds,
                                                     sequence_length=args.sequence_len)
     
-    eval_ds = WikiTextDataset.make_input_sequences(path=args.val_ds,
+    eval_ds = WikiTextDataset.make_input_sequences(json_path=args.val_ds,
                                                    sequence_length=args.sequence_len)
     
-    test_ds = WikiTextDataset.make_input_sequences(path=args.test_ds,
+    test_ds = WikiTextDataset.make_input_sequences(json_path=args.test_ds,
                                                    sequence_length=args.sequence_len)
     
     
