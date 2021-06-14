@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 import torch
 from tqdm import tqdm
 import argparse
+import os
 
 class WikiTextDataset(Dataset):
     
@@ -136,8 +137,16 @@ def runtime_code():
     # load the pretrained tokenizer
     # max len is not crucial here as we only want to retokenize the dataset, not
     # create the final sequences
-    tokenizer = GPT2TokenizerFast.from_pretrained(args.tokenizer_savedir, max_len=1024)
-
+    if os.path.exists(args.tokenizer_savedir) and os.path.isdir(args.tokenizer_savedir):
+        
+        if not os.listdir(args.tokenizer_savedir):
+            print("{} is empty. You must train tokenizer first. Use --train_tokenizer argument.")
+        else:    
+            tokenizer = GPT2TokenizerFast.from_pretrained(args.tokenizer_savedir, max_len=1024)
+    else:
+        print("{} directory doesn't exist".format(tokenizer.savedir))
+    
+    
     # now retokenize wikitext and save
     train_ds = WikiTextDataset(tokenizer=tokenizer)
     
