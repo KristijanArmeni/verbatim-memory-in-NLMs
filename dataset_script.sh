@@ -12,4 +12,4 @@ python $sourcedir/dataset.py --train_tokens $datadir/wiki.train.tokens_40m \
                              --train_tokenizer \
                              --tokenizer_train_tokens $datadir/wiki.train.tokens \
                              --tokenizer_savedir $HOME/work/karmeni1/lm-mem/gpt2_wikitext103 \
-                             --saveidr $datadir
+                             --savedir $datadir
