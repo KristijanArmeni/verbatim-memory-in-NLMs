@@ -69,7 +69,7 @@ class WikiTextDataset(Dataset):
                 # save tokens as .json
                 print("Saving {}".format(save_retokenized + "ids"))
                 with open(save_retokenized + "_ids", "w") as fname:
-                    fname.writelines(tokens)
+                    fname.writelines(ids)
                     
         else:
             
@@ -121,6 +121,8 @@ def runtime_code():
     args = parser.parse_args()
     
     if args.train_tokenizer:
+        
+        print("Training BPE tokenizer...")
         
         tokenizer = ByteLevelBPETokenizer()
         
