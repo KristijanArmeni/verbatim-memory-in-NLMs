@@ -5,7 +5,7 @@ Created on Fri Jun 11 14:03:44 2021
 """
 
 from tokenizers.implementations import ByteLevelBPETokenizer
-from tokenizers import GPT2TokenizerFast
+from transformers import GPT2TokenizerFast
 from torch import Dataset
 import torch
 from tqdm import tqdm
