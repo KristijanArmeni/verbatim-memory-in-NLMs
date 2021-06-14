@@ -154,7 +154,7 @@ def runtime_code():
     
     # validation set
     eval_ds = WikiTextDataset(tokenizer=tokenizer)
-    eval_ds.retokenize_txt(path=args.val_tokens,
+    eval_ds.retokenize_txt(path=args.valid_tokens,
                            save_retokenized=args.valid_tokens.replace("tokens", "tokens.bpe.json"))
     
     # validation set
