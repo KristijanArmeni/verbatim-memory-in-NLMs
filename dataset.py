@@ -68,7 +68,7 @@ class WikiTextDataset(Dataset):
                 
             # save tokens as .json
             print("Saving {}".format(save_retokenized))
-            with open(save_retokenized.replace("tokens.bpe", "token_ids.bpe"), "w") as fname:
+            with open(save_retokenized.replace("tokens.bpe", "inds.bpe"), "w") as fname:
                 json.dump(ids, fname)
                 
     def make_input_sequences(self, json_path, sequence_length=1024):
@@ -150,17 +150,17 @@ def runtime_code():
     
     # training set
     train_ds.retokenize_txt(path=args.train_tokens,
-                            save_retokenized=args.train_tokens.replace("tokens", "tokens.bpe.json"))
+                            save_retokenized=args.train_tokens + ".bpe.json")
     
     # validation set
     eval_ds = WikiTextDataset(tokenizer=tokenizer)
     eval_ds.retokenize_txt(path=args.valid_tokens,
-                           save_retokenized=args.valid_tokens.replace("tokens", "tokens.bpe.json"))
+                           save_retokenized=args.valid_tokens + ".bpe.json")
     
     # validation set
     test_ds = WikiTextDataset(tokenizer=tokenizer)
     test_ds.retokenize_txt(path=args.test_tokens,
-                           save_retokenized=args.valid_tokens.replace("tokens", "tokens.bpe.json"))
+                           save_retokenized=args.test_tokens + ".bpe.json")
     
 if __name__ == "__main__":
     
