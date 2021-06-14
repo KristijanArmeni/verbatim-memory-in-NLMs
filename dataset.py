@@ -108,7 +108,7 @@ def runtime_code():
                         help="path to test dataset")
     parser.add_argument("--train_set_sizes", type=str,
                         help="size of the training set (in M tokens)")
-    parser.add_argument("--train_tokenizer", action="store_false",
+    parser.add_argument("--train_tokenizer", action="store_true",
                          help="boolean, whether or not to train BPE tokenizer" 
                          "on wikitext103 (default: false)")
     parser.add_argument("--tokenizer_train_tokens", type=str)
