@@ -367,6 +367,8 @@ def runtime_code():
                         help="number of layers, passed to GPT2Config() class")
     parser.add_argument("--n_head", type=int, default=12,
                         help="number of attention heads, passed to GPT2Config() class")
+    parser.add_argument("--embed_dim", type=int, default=100,
+                        help="number of attention heads, passed to GPT2Config() class")
     
     # training set arguments
     parser.add_argument("--train_batch_size", type=int,
@@ -391,7 +393,15 @@ def runtime_code():
     parser.add_argument("--es_patience", type=int,
                         help="nr of consecutive epochs to wait for decreasing loss" 
                         "before stopping training")
+    
+    # wandb params
     parser.add_argument("--wandb_key", type=str, help="authorization key to loging to wandb")
+    parser.add_argument("--wandb_dir", type=str, help="directory where wandb files are written to")
+    parser.add_argument("--wandb_notes", type=str, default="", help="notes for wandb logging")
+    parser.add_argument("--wandb_name", type=str, help="run name for wandb logging")
+    parser.add_argument("--wandb_project", type=str, help="project name for wandb logging")
+    
+    # savedir params
     parser.add_argument("--savedir", type=str,
                         help="path where the model weights will be stored")
     parser.add_argument("--logdir", type=str,
@@ -430,7 +440,7 @@ def runtime_code():
     # we keep n_positions and n_ctx equal 
     config = GPT2Config(n_positions=args.sequence_len,
                         n_ctx=args.sequence_len,
-                        n_embed=100,
+                        n_embed=args.embed_dim,
                         n_layer=args.n_layer,
                         n_head=args.n_head,
                         vocab_size=len(tokenizer.get_vocab()),
@@ -467,6 +477,13 @@ def runtime_code():
     
     # add authorization token for wandb logging
     os.environ["WANDB_API_KEY"] = args.wandb_key
+    os.environ["WANDB_NOTES"] = args.wandb_notes
+    if args.wandb_dir:
+      os.environ["WANDB_DIR"] = args.wandb_dir
+    if args.wandb_name:
+      os.environ["WANDB_NAME"] = args.wandb_name  # run name if spacified
+    if args.wandb_project:     
+      os.environ["WANDB_PROJECT"] = args.wandb_project
     
     # call training routine
     trainer.train()
