@@ -436,11 +436,11 @@ def runtime_code():
                                  sequence_length=args.sequence_len)
     
     
-    # set up some GPT2Config parametersqq
+    # set up some GPT2Config parametersq
     # we keep n_positions and n_ctx equal 
     config = GPT2Config(n_positions=args.sequence_len,
                         n_ctx=args.sequence_len,
-                        n_embed=args.embed_dim,
+                        n_embd=args.embed_dim,
                         n_layer=args.n_layer,
                         n_head=args.n_head,
                         vocab_size=len(tokenizer.get_vocab()),
