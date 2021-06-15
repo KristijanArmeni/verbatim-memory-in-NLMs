@@ -413,14 +413,17 @@ def runtime_code():
     tokenizer = GPT2TokenizerFast.from_pretrained(args.tokenizer_path)
     
     # load in retokenized files
-    train_ds = WikiTextDataset.make_input_sequences(json_path=args.train_ds,
-                                                    sequence_length=args.sequence_len)
+    train_ds = WikiTextDataset(tokenizer=tokenizer)
+    train_ds = train_ds.make_input_sequences(json_path=args.train_ds,
+                                             sequence_length=args.sequence_len)
     
-    eval_ds = WikiTextDataset.make_input_sequences(json_path=args.val_ds,
-                                                   sequence_length=args.sequence_len)
+    eval_ds = WikiTextDataset(tokenizer=tokenizer)
+    eval_ds = eval_ds.make_input_sequences(json_path=args.val_ds,
+                                           sequence_length=args.sequence_len)
     
-    test_ds = WikiTextDataset.make_input_sequences(json_path=args.test_ds,
-                                                   sequence_length=args.sequence_len)
+    test_ds = WikiTextDataset(tokenizer=tokenizer)
+    test_ds = test_ds.make_input_sequences(json_path=args.test_ds,
+                                           sequence_length=args.sequence_len)
     
     
     # set up some GPT2Config parametersqq
@@ -450,9 +453,11 @@ def runtime_code():
         run_name="test",
         )
     
+    # initialize data collator class
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer,
                                                     mlm=False)
     
+    # initialize trainer class and model form config
     torch.manual_seed(args.seed)
     trainer = Trainer(args=train_args,
                       model=GPT2LMHeadModel(config=config).to(device),
@@ -460,6 +465,10 @@ def runtime_code():
                       train_dataset=train_ds,
                       eval_dataset=eval_ds)
     
+    # add authorization token for wandb logging
+    os.environ["WANDB_API_KEY"] = args.wandb_key
+    
+    # call training routine
     trainer.train()
 
 
