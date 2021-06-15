@@ -415,7 +415,7 @@ def runtime_code():
     # load in retokenized files
     train_ds = WikiTextDataset(tokenizer=tokenizer)
     train_ds.make_input_sequences(json_path=args.train_ds,
-                                  equence_length=args.sequence_len)
+                                  sequence_length=args.sequence_len)
     
     eval_ds = WikiTextDataset(tokenizer=tokenizer)
     eval_ds.make_input_sequences(json_path=args.val_ds,
