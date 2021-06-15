@@ -4,10 +4,12 @@ login_key=$1
 ml anaconda
 conda activate ~/code/conda_envs/core_env
 
+dataset_dir=$HOME/work/karmeni1/wikitext-103
+
 python $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-103 \
-                                        --train_ds wiki.train.inds_40m.bpe.json \
-                                        --val_ds wiki.valid.inds.bpe.json \
-                                        --test_ds wiki.test.inds.bpe.json \
+                                        --train_ds $dataset_dir/wiki.train.inds_40m.bpe.json \
+                                        --val_ds $dataset_dir/wiki.valid.inds.bpe.json \
+                                        --test_ds $dataset_dir/wiki.test.inds.bpe.json \
                                         --sequence_len 12 \
                                         --model_name gpt2_40M_a.pth \
                                         --tokenizer_path $HOME/work/karmeni1/lm-mem/gpt2_wikitext103 \
