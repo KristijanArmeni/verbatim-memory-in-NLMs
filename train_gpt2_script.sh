@@ -10,6 +10,7 @@ python $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-1
                                         --test_ds wiki.test.inds.bpe.json \
                                         --sequence_len 12 \
                                         --model_name gpt2_40M_a.pth \
+                                        --tokenizer_path $HOME/work/karmeni1/lm-mem/gpt2_wikitext103 \
                                         --seed 12345 \
                                         --device "cuda" \
                                         --train_batch_size 10 \
