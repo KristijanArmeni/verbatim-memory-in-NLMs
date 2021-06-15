@@ -1,4 +1,7 @@
 login_key=$1
+wandb_name=$2
+wandb_notes=$3
+wandb_project="gpt2_40m"
 
 # activate conda enviroment
 ml anaconda
@@ -26,6 +29,9 @@ python $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-1
                                         --num_lr_warmup_steps 5 \
                                         --es_patience 3 \
                                         --wandb_key $login_key \
+                                        --wandb_dir $HOME/work/karmeni1/lm-mem/wandb \
+                                        --wandb_project $wandb_project \
+                                        --wandb_name $wandb_name \
                                         --savedir $HOME/work/karmeni1/lm-mem/checkpoints \
                                         --logdir $HOME/work/karmeni1/lm-mem/logs \
                                         
