@@ -73,8 +73,11 @@ class WikiTextDataset(Dataset):
                 
     def make_input_sequences(self, json_path, sequence_length=1024):
         
-        with open(json, "r") as f:
+        with open(json_path, "r") as f:
             ids = json.load(f)
+        
+        print(type(ids))
+        print(ids[0:10])
         
         # split list of input tokens into list of elements of size max_len
         print("Chunking samples in self.x to length of {}".format(sequence_length))
