@@ -453,6 +453,8 @@ def runtime_code():
     train_args = TrainingArguments(
         output_dir=args.savedir,
         num_train_epochs=args.max_epochs,
+        per_device_train_batch_size=args.train_batch_size,
+        per_device_eval_batch_size=args.eval_batch_size,
         adam_beta1=literal_eval(args.betas)[0],
         adam_beta2=literal_eval(args.betas)[1],
         learning_rate=args.lr,
@@ -462,7 +464,6 @@ def runtime_code():
         evaluation_strategy="steps",
         disable_tqdm=False,
         report_to="wandb",
-        run_name="test",
         )
     
     # initialize data collator class
