@@ -18,8 +18,8 @@ python $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-1
                                         --tokenizer_path $HOME/work/karmeni1/lm-mem/gpt2_wikitext103 \
                                         --seed 12345 \
                                         --device "cuda" \
-                                        --train_batch_size 10 \
-                                        --eval_batch_size 10 \
+                                        --train_batch_size 16 \
+                                        --eval_batch_size 16 \
                                         --test_batch_size 1 \
                                         --n_layer 1 \
                                         --n_head 3 \
