@@ -414,16 +414,16 @@ def runtime_code():
     
     # load in retokenized files
     train_ds = WikiTextDataset(tokenizer=tokenizer)
-    train_ds = train_ds.make_input_sequences(json_path=args.train_ds,
-                                             sequence_length=args.sequence_len)
+    train_ds.make_input_sequences(json_path=args.train_ds,
+                                  equence_length=args.sequence_len)
     
     eval_ds = WikiTextDataset(tokenizer=tokenizer)
-    eval_ds = eval_ds.make_input_sequences(json_path=args.val_ds,
-                                           sequence_length=args.sequence_len)
+    eval_ds.make_input_sequences(json_path=args.val_ds,
+                                 sequence_length=args.sequence_len)
     
     test_ds = WikiTextDataset(tokenizer=tokenizer)
-    test_ds = test_ds.make_input_sequences(json_path=args.test_ds,
-                                           sequence_length=args.sequence_len)
+    test_ds.make_input_sequences(json_path=args.test_ds,
+                                 sequence_length=args.sequence_len)
     
     
     # set up some GPT2Config parametersqq
