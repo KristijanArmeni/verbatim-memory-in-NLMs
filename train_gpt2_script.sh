@@ -23,7 +23,8 @@ python $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-1
                                         --test_batch_size 1 \
                                         --n_layer 1 \
                                         --n_head 3 \
-                                        --max_epochs 100 \
+                                        --embed_dim 90 \
+                                        --max_epochs 50 \
                                         --lr 10e3 \
                                         --betas "(0.99, 0.05)" \
                                         --num_lr_warmup_steps 5 \
