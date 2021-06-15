@@ -20,7 +20,7 @@ from torch.utils.data.dataset import Dataset
 import json
 from transformers import GPT2Config, GPT2TokenizerFast, GPT2LMHeadModel, \
                         Trainer, TrainingArguments, DataCollatorForLanguageModeling, \
-                        logging
+                        logging, set_seed
 
 # own module
 from dataset import WikiTextDataset
@@ -413,13 +413,15 @@ def runtime_code():
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     
     if args.device == "cuda":
-        
         print_cuda_mem_info()
     
+    # utility function from transformers (sets seed in torch and numpy)
+    set_seed(args.seed)  
     
     # set logging verbosity output
     logging.set_verbosity_info()
     
+    # load tokenizer trained in dataset.py
     tokenizer = GPT2TokenizerFast.from_pretrained(args.tokenizer_path)
     
     # load in retokenized files
@@ -447,7 +449,7 @@ def runtime_code():
                         bos_token_id=tokenizer.bos_token_id,
                         eos_token_id=tokenizer.eos_token_id)
     
-    # Training argumentns
+    # Training arguments
     train_args = TrainingArguments(
         output_dir=args.savedir,
         num_train_epochs=args.max_epochs,
@@ -468,7 +470,6 @@ def runtime_code():
                                                     mlm=False)
     
     # initialize trainer class and model form config
-    torch.manual_seed(args.seed)
     trainer = Trainer(args=train_args,
                       model=GPT2LMHeadModel(config=config).to(device),
                       data_collator=data_collator,
