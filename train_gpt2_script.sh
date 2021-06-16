@@ -9,7 +9,7 @@ conda activate ~/code/conda_envs/core_env
 
 dataset_dir=$HOME/work/karmeni1/wikitext-103
 
-if [ $4 == "d"]; then
+if [ $4 = "d" ]; then
   command="ipython -d"
 else
   command="python"
