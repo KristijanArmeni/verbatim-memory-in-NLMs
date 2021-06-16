@@ -10,12 +10,12 @@ conda activate ~/code/conda_envs/core_env
 dataset_dir=$HOME/work/karmeni1/wikitext-103
 
 if [ $4 = "d" ]; then
-  command="ipython -d"
+  command="ipython %run -d"
 else
   command="python"
 fi
 
-eval "$command" $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-103 \
+eval "$comomand" -d $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-103 \
                                                 --train_ds $dataset_dir/wiki.train.inds_40m.bpe.json \
                                                 --val_ds $dataset_dir/wiki.valid.inds.bpe.json \
                                                 --test_ds $dataset_dir/wiki.test.inds.bpe.json \
