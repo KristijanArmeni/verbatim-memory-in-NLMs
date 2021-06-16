@@ -15,7 +15,7 @@ else
   command="python"
 fi
 
-eval "$comomand" -d $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-103 \
+eval "$command" -d $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-103 \
                                                 --train_ds $dataset_dir/wiki.train.inds_40m.bpe.json \
                                                 --val_ds $dataset_dir/wiki.valid.inds.bpe.json \
                                                 --test_ds $dataset_dir/wiki.test.inds.bpe.json \
