@@ -498,7 +498,7 @@ def runtime_code():
       os.environ["WANDB_NAME"] = args.wandb_name  # run name if spacified
     if args.wandb_project:     
       os.environ["WANDB_PROJECT"] = args.wandb_project
-    if args.wandb_off:
+    if args.wandb_disabled:
       os.environ["WANDB_DISABLED"] = args.wandb_disabled
 
     # call training routine
