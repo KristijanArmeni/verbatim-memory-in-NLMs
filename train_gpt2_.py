@@ -393,8 +393,7 @@ def runtime_code():
     parser.add_argument("--num_eval_steps", type=int, 
                         help="number of steps after which evaluation is performed")
     parser.add_argument("--num_logging_steps", type=int,
-                        help="number of steps after which to perform logging to
-                        wandb")
+                        help="number of steps after which to perform logging to wandb")
     parser.add_argument("--num_save_steps", type=int,
                         help="number of steps after which checkpoints are saved")
     parser.add_argument("--es_patience", type=int,
