@@ -9,7 +9,7 @@ conda activate ~/code/conda_envs/core_env
 
 dataset_dir=$HOME/work/karmeni1/wikitext-103
 
-python -m pdb $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-103 \
+python $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-103 \
                                                 --train_ds $dataset_dir/wiki.train.inds_40m.bpe.json \
                                                 --val_ds $dataset_dir/wiki.valid.inds.bpe.json \
                                                 --test_ds $dataset_dir/wiki.test.inds.bpe.json \
@@ -30,6 +30,7 @@ python -m pdb $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wik
                                                 --num_lr_warmup_steps 5 \
                                                 --num_eval_steps 1000 \
                                                 --num_logging_steps 1000 \
+                                                --num_save_steps 1000 \
                                                 --es_patience 3 \
                                                 --wandb_key $login_key \
                                                 --wandb_dir $HOME/work/karmeni1/lm-mem/ \
