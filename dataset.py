@@ -12,6 +12,10 @@ from tqdm import tqdm
 import argparse
 import os
 import json
+import logging
+
+logging.basicConfig(format="INFO: %(message)s", level=logging.INFO)
+
 
 class WikiTextDataset(Dataset):
     
@@ -29,7 +33,7 @@ class WikiTextDataset(Dataset):
             
             # if bos and eos need to be added adjust selected n to not exceed
             # the allowed maximum
-            print("Adding bos and eos setting {} to {}".format(n, n-2))
+            logging.info("Adding bos and eos setting {} to {}".format(n, n-2))
             n -= 2
         
         if equal_len:
@@ -37,7 +41,8 @@ class WikiTextDataset(Dataset):
         else:
             total_len = len(l)
         
-        output_list =([bos] + l[i:i+n] + [eos] for i in range(0, total_len, n))
+        logging.info("Creating {} input sequences of length {}".format(total_len, n))
+        output_list = ([bos] + l[i:i+n] + [eos] for i in tqdm(range(0, total_len, n)))
         
         return output_list    
     
@@ -50,7 +55,7 @@ class WikiTextDataset(Dataset):
             lines = file.readlines()
         
         # retokenize the entire test set
-        print("Retokenizing {}".format(path))
+        logging.info("Retokenizing {}".format(path))
         
         tokens = []
         ids = []
@@ -62,12 +67,12 @@ class WikiTextDataset(Dataset):
         if save_retokenized:
             
             # save tokens as .json
-            print("Saving {}".format(save_retokenized))
+            logging.info("Saving {}".format(save_retokenized))
             with open(save_retokenized, "w") as fname:
                 json.dump(tokens, fname)
                 
             # save tokens as .json
-            print("Saving {}".format(save_retokenized.replace("tokens", "inds")))
+            logging.info("Saving {}".format(save_retokenized.replace("tokens", "inds")))
             with open(save_retokenized.replace("tokens", "inds"), "w") as fname:
                 json.dump(ids, fname)
                 
@@ -76,11 +81,8 @@ class WikiTextDataset(Dataset):
         with open(json_path, "r") as f:
             ids = json.load(f)
         
-        print(type(ids))
-        print(ids[0:10])
-        
         # split list of input tokens into list of elements of size max_len
-        print("Chunking samples in self.x to length of {}".format(sequence_length))
+        logging.info("Chunking samples in self.x to length of {}".format(sequence_length))
         self.x = list(self.chunk_list(ids, 
                                       n=sequence_length,
                                       bos=self.tokenizer.bos_token_id,
@@ -127,7 +129,7 @@ def runtime_code():
         
         if not os.listdir(args.tokenizer_savedir) and args.train_tokenizer:
             
-                    print("Training BPE tokenizer...")
+                    logging.info("Training BPE tokenizer...")
                     tokenizer = ByteLevelBPETokenizer()
                     tokenizer.train(files=[args.tokenizer_train_tokens, args.valid_tokens, args.test_tokens],
                                     vocab_size=28439, 
@@ -135,14 +137,14 @@ def runtime_code():
                                     special_tokens=["<|endoftext|>", "<pad>"])
 
                     # Save files to disk
-                    print("Saving merges.txt and vocab.json to {}".format(args.tokenizer_savedir))
+                    logging.info("Saving merges.txt and vocab.json to {}".format(args.tokenizer_savedir))
                     tokenizer.save_model(args.tokenizer_savedir)
                     
         elif not os.listdir(args.tokenizer_savedir) and not args.train_tokenizer:
             raise ValueError("Tokenizer directory is empty. Use --train_tokenizer.")
                              
         else:    
-            print("Loading tokenizer from {}".format(args.tokenizer_savedir))
+            logging.info("Loading tokenizer from {}".format(args.tokenizer_savedir))
             tokenizer = GPT2TokenizerFast.from_pretrained(args.tokenizer_savedir, max_len=1024)
     else:
         raise Exception("{} directory doesn't exist".format(args.tokenizer_savedir))
