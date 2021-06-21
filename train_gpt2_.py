@@ -390,6 +390,13 @@ def runtime_code():
     parser.add_argument("--num_lr_warmup_steps", type=int,
                         help="number of consecutive epochs for which learning" 
                         "rate is increased linearly")
+    parser.add_argument("--num_eval_steps", type=int, 
+                        help="number of steps after which evaluation is performed")
+    parser.add_argument("--num_logging_steps", type=int,
+                        help="number of steps after which to perform logging to
+                        wandb")
+    parser.add_argument("--num_save_steps", type=int,
+                        help="number of steps after which checkpoints are saved")
     parser.add_argument("--es_patience", type=int,
                         help="nr of consecutive epochs to wait for decreasing loss" 
                         "before stopping training")
@@ -440,7 +447,7 @@ def runtime_code():
                                  sequence_length=args.sequence_len)
     
     
-    # set up some GPT2Config parametersq
+    # set up some GPT2Config parameters
     # we keep n_positions and n_ctx equal 
     config = GPT2Config(n_positions=args.sequence_len,
                         n_ctx=args.sequence_len,
@@ -451,6 +458,7 @@ def runtime_code():
                         bos_token_id=tokenizer.bos_token_id,
                         eos_token_id=tokenizer.eos_token_id)
     
+
     # Training arguments
     train_args = TrainingArguments(
         output_dir=args.savedir,
@@ -462,9 +470,9 @@ def runtime_code():
         learning_rate=args.lr,
         warmup_steps=args.num_lr_warmup_steps,
         evaluation_strategy="steps",
-        logging_steps=10,
-        eval_steps=10,
-        save_steps=5000,
+        logging_steps=args.num_logging_steps,
+        eval_steps=args.num_eval_steps,
+        save_steps=args.num_save_steps,
         fp16=True,
         disable_tqdm=False,
         report_to="wandb",

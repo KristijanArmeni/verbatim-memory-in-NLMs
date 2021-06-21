@@ -28,6 +28,8 @@ python -m pdb $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wik
                                                 --lr 5e-5 \
                                                 --betas "(0.99, 0.05)" \
                                                 --num_lr_warmup_steps 5 \
+                                                --num_eval_steps 1000 \
+                                                --num_logging_steps 1000 \
                                                 --es_patience 3 \
                                                 --wandb_key $login_key \
                                                 --wandb_dir $HOME/work/karmeni1/lm-mem/ \
