@@ -398,9 +398,11 @@ def runtime_code():
     parser.add_argument("--wandb_key", type=str, help="authorization key to loging to wandb")
     parser.add_argument("--wandb_dir", type=str, help="directory where wandb files are written to")
     parser.add_argument("--wandb_notes", type=str, default="", help="notes for wandb logging")
-    parser.add_argument("--wandb_name", type=str, help="run name for wandb logging")
+    parser.add_argument("--wandb_name", type=str, default="run-name", help="run name for wandb logging")
     parser.add_argument("--wandb_project", type=str, help="project name for wandb logging")
-    
+    parser.add_argument("--wandb_disabled", action='store_true', 
+                        help="whether to turn wandb loggin off")
+
     # savedir params
     parser.add_argument("--savedir", type=str,
                         help="path where the model weights will be stored")
@@ -459,11 +461,14 @@ def runtime_code():
         adam_beta2=literal_eval(args.betas)[1],
         learning_rate=args.lr,
         warmup_steps=args.num_lr_warmup_steps,
-        do_train=True,
-        do_eval=True,
         evaluation_strategy="steps",
+        logging_steps=10,
+        eval_steps=10,
+        save_steps=5000,
+        fp16=True,
         disable_tqdm=False,
         report_to="wandb",
+        run_name=args.wandb_name,
         )
     
     # initialize data collator class
@@ -486,7 +491,9 @@ def runtime_code():
       os.environ["WANDB_NAME"] = args.wandb_name  # run name if spacified
     if args.wandb_project:     
       os.environ["WANDB_PROJECT"] = args.wandb_project
-    
+    if args.wandb_off:
+      os.environ["WANDB_DISABLED"] = args.wandb_disabled
+
     # call training routine
     trainer.train()
 
