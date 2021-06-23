@@ -82,12 +82,15 @@ class WikiTextDataset(Dataset):
             ids = json.load(f)
         
         # split list of input tokens into list of elements of size max_len
-        logging.info("Chunking samples in self.x to length of {}".format(sequence_length))
-        self.x = list(self.chunk_list(ids, 
-                                      n=sequence_length,
-                                      bos=self.tokenizer.bos_token_id,
-                                      eos=self.tokenizer.eos_token_id))
-        
+        if sequence_length:
+            logging.info("Chunking samples in self.x to length of {}".format(sequence_length))
+            self.x = list(self.chunk_list(ids, 
+                                          n=sequence_length,
+                                          bos=self.tokenizer.bos_token_id,
+                                          eos=self.tokenizer.eos_token_id))
+        elif sequence_length is None:
+            logging.info("Not doing any chunking to .x")
+            self.x = ids
 
     def __len__(self):
         
