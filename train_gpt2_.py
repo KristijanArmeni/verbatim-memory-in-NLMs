@@ -11,13 +11,10 @@ import argparse
 import os
 import time
 from ast import literal_eval
-import sys
 from datetime import timedelta
-from tqdm import tqdm
+from tqdm import tqdm, trange
 import numpy as np
 import torch
-from torch.utils.data.dataset import Dataset
-import json
 from transformers import GPT2Config, GPT2TokenizerFast, GPT2LMHeadModel, \
                         Trainer, TrainingArguments, DataCollatorForLanguageModeling, \
                         logging, set_seed
@@ -67,267 +64,55 @@ def print_cuda_mem_info(device_id=0):
     print("allocated GPU mem (gb): {}".format(a*gb_factor))
     print("available GPU mem (gb): {}".format(f*gb_factor))
 
-# create helper config classes
-class TrainConfig(object):
-    
-    def __init__(self, max_epochs, bs):
-    
-        self.max_epochs = max_epochs
-        self.batch_size = bs
 
-
-class EvalConfig(object):
-    
-    def __init__(self, es_patience, bs):
-    
-        self.es_patience = es_patience
-        self.batch_size = bs
-
-
-class Experiment(object):
-    
-    """
-    Main high-level class holding all necessary components for training (model, train_ds etc.)
-    and associated methods (.train(), evaluate(), .savecheckpoint() etc.)
-    """
-    
-    def __init__(self,
-                 model=None, 
-                 x_train=None, x_eval=None, x_test=None,
-                 train_config=None, eval_config=None, 
-                 optimizer=None,
-                 device = None,
-                 lr_scheduler=None,
-                 model_name=None,
-                 savedir=None,
-                 logdir=None):
-        
-        self.x_train = x_train
-        self.x_eval = x_eval
-        self.x_test = x_test
-        self.model = model
-        self.optimizer = optimizer
-        self.lr_scheduler = lr_scheduler
-        self.device = device
-        self.cfg_train = train_config
-        self.cfg_eval = eval_config
-        
-        self.log = {
-            "train_loss": [],
-            "batch_id": [],
-            "eval_loss": [],
-            "test_ppl": [],
-            }
-        
-    def start(self, do_test=False):
-        
-        # initialize early stopping class 
-        early_stopping = self.EarlyStopping(model=self.model,
-                                            patience=self.cfg_eval.es_patience)
-        
-        print("Starting training...\n")
-        
-        n_epochs = self.cfg_train.max_epochs
-
-        # loop over epochs
-        for n in list(range(0, n_epochs)):
-            
-            print("Epoch {}/{} ({}%).".format(n, n_epochs, 
-                                             (n/n_epochs)*100))
-            
-            start_time = time.perf_counter()
-
-            # run .train and .evaluate routines
-            train_loss = self.train(x=self.x_train.to(self.device))
-            val_loss = self.evaluate(x=self.x_eval.to(self.device))
-            
-            # check if best loss is reached and save model weights if so
-            early_stopping.check(epoch_id=n, 
-                                 current_eval_loss=val_loss)
-            
-            # measure time after train and eval routines have finished
-            end_time = time.perf_counter()
-            
-            # format elapsed time as HH:MM:SS (and round the seconds)
-            elapsed = str(timedelta(seconds=round(end_time-start_time)))
-            print("Epoch {} took {} (HH:MM:SS)".format(n, elapsed))
-            
-            if early_stopping.improvement:
-                
-                self.save_checkpoint()
-            
-            if early_stopping.stop:
-                
-               print("No improvement after {} consec. epochs"
-                     .format(early_stopping.patience))
-               print("Exiting training at epoch {}..."
-                     .format(n))
-                
-               break
-           
-        if do_test:
-            
-            print("Evaluating model on test set ...")
-            
-            test_loss = self.evaluate(x=self.test_ds)
-            self.log["test_ppl"].append(np.exp(test_loss))
-
-        
-    def train(self, x):
+def compute_perplexity(self, input_ids, context_len, stride):
         """
-        .train(input_dataset) calls .train_step() on all 
-        batches in the training dataset (x).
-        """            
-        
-        # set to train mode
-        self.model.train()
-        
-        # assume batch id is in second dimension
-        # shape = (batch_size, batch_id, sequence_len)
-        n_batches = x.shape[1]  
-        
-        # set loss to 0 at the start of the epoch
-        summed_loss = 0
-        
-        # loop over training samples
-        for batch_idx in tqdm(range(0, n_batches), desc="train set", unit="batch"):
-            
-            batch_loss = self.train_step(x_batch=x[:, batch_idx, :])
-            summed_loss += batch_loss.numpy().item()
-            
-            
-        # append average loss over batches for this epoch
-        self.log["train_loss"].append(summed_loss/n_batches)
-         
-        return summed_loss/n_batches
-    
-    def train_step(self, x_batch):
+        method for computing token-by-token negative log likelihood on input_ids
+        taken from: https://huggingface.co/transformers/perplexity.html
         """
-        .train_step() performs a single single trianing step, 
-        from input to output and a backward pass. It assumes HuggingFace syntax
-        where the call to output = self.model(x=x, labels=x) shifts the labels
-        <labels> and returns language modeling loss for the sequence 
-        (accessible in output.loss).
-        """
-        # compute predictions for all sequences in a batch
-        output = self.model(input_ids=x_batch, labels=x_batch)
-        
-        # compute gradients
-        output.loss.backward()
-        
-        # update weights
-        self.optimizer.step()
-        
-        # change learning rate according to chosen scheduler
-        self.lr_scheduler.step()
-        
-        # clear the gradients
-        self.model.zero_grad()
-        
-        return output.loss.detach().cpu()
-        
-    def evaluate(self, x):
-        
-        self.model.eval()
-        
-        with torch.no_grad():
-            
-            # assume batch id is in second dimension
-            n_batches = x.shape[1]
-            
-            # set loss to 0 at the start of the epoch
-            summed_loss = 0
-            
-            # loop over training samples
-            for batch_idx in tqdm(range(0, n_batches), desc="validation set:",
-                                  unit="batch"):
-                
-                x_batch = x[:, batch_idx, :]
-                
-                output = self.model(input_ids=x_batch, labels=x_batch)
-                
-                # first tuple element is loss
-                batch_loss = output[0]
-                
-                summed_loss += batch_loss.cpu().numpy().item()
-            
-            # store average eval loss for this epoch
-            self.log["eval_loss"].append(summed_loss/n_batches)
-        
-        return summed_loss/n_batches
-    
-    def save_checkpoint(self, savename=None):
-        
-        if savename is None:
-            savename = os.path.join(self.savedir, self.model_name)
-        
-        print("Saving checkpoint as:\n{}".format(savename))
-        
-        torch.save(self.model.cpu().state_dict(), 
-                   savename)
 
-    def save_configs(self, full_filename):
+        llh = []  # variable storing token-by-token neg ll
+        tokens = []   # variable storing token strings to have along with -ll in the output
         
-        pass
+        # loop over tokens in input sequence
+        for i in trange(0, input_ids.size(1), stride, desc="Computing perplexity: "):
 
-    class EarlyStopping(object):
-        
-        """
-        EarlyStopping() is a helpher class that keeps track of evaluation loss.
-        EarlyStopping.check() halts Experiment().start() subroutine if evaluation 
-        set loss has not decreased for n == EarlyStopping().patience epochs in a row.
-        """
-        
-        def __init__(self, model=None, patience=None):
+            # define the start and endpoints of input indices for current loop
+            begin_loc = max(i + stride - context_len, 0)  # define the non-negative onset location
+            end_loc = min(i + stride, input_ids.size(1))
+            trg_len = end_loc - i  # may be different from stride on last loop
+
+            # select the current input index span
+            sel_input_ids = input_ids[:, begin_loc: end_loc].to(self.device)
+
+            # define target labels, use input ids as target outputs
+            target_ids = sel_input_ids.clone()
             
-            self.model = model     # placeholder for self.model object form the Experiment() class
-            self.best_score = None
-            self.patience = patience
-            self.improvement = False
-            self.counter = 0
-            self.previous = None
-            self.when = None
-            self.stop = False
-        
-        def check_and_save(self, epoch_id, current_val_loss):
-            
-            """
-            EarlyStopping().check(epoch_id[int], current_eval_loss[float]) keeps
-            track of the eval loss and halts training at epoch <epoch_id> if 
-            <current_eval_loss> has not decreased in <EarlyStopping().patience>
-            consecutive epochs.
-            """
-                
-            # check if lowest loss was reached and log it
-            if (self.best_score is None) or (self.best_score > current_val_loss):
-                
-                self.best = current_val_loss # log current loss as best
-                self.counter = 0             # start counting again
-                self.improvement = True
-                self.save_checkpoint()
-            
-            # if not, increase counter and check for early stopping condition
-            elif (self.best < current_val_loss):
-                
-                self.counter += 1
-                self.improvement = False
-                
-                # check if there's we've reached the threshold of no improvement
-                if self.counter >= self.patience:
-                    
-                    # setting this to True halts Experiment().start()
-                    # routine
-                    self.stop = True
-                    self.when = epoch_id
-            
-            # print some feedback
-            print("Epoch: {}".format(epoch_id))
-            print("Current loss: {}".format(current_val_loss))
-            print("Best loss: {}".format(self.best))
-            print("Counter: {}".format(self.counter))
+            # do not compute the loss on  tokens (-100) that are used for context
+            target_ids[:, :-trg_len] = -100  
 
 
+            # set model to evaluation mode
+            self.model.eval()
+            
+            # get model output
+            with torch.no_grad():
 
+               # compute neg log likelihood over target ids (n+1 in our case)
+               # indices are shifted under the hood by model.__call__()
+               outputs = self.model(sel_input_ids, labels=target_ids)
+               
+               # first element of the tuple contains the loss
+               log_likelihood = outputs.loss.item() * trg_len  # not sure about this multiplication here (undoing averaging?)
+
+               llh.append(log_likelihood)
+               toks = self.tokenizer.decode(target_ids[0][-stride::])
+               tokens.append(toks)  # store the last token (target_id)
+               
+        # compute perplexity, divide by the lenth of the sequence
+        # use np.nansum as token at position 0 will have -LL of nan
+        ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc).cpu()
+        return ppl, llh, tokens
 
 # ======================== #
 # ===== RUNTIME CODE ===== #
@@ -355,6 +140,8 @@ def runtime_code():
                         help="path to mergex.txt and vocab.json files")
     parser.add_argument("--device", type=str, default="cpu", choices=["cpu", "cuda"],
                         help="device used for training")
+    parser.add_argument("--do_train", action='store_true', default=True)
+    parser.add_argument("--do_test", action='store_true', default=True)
 
     # GPTConfig arguments
     parser.add_argument("--seed", type=int,
@@ -406,6 +193,10 @@ def runtime_code():
     parser.add_argument("--wandb_notes", type=str, default="", help="notes for wandb logging")
     parser.add_argument("--wandb_name", type=str, default="run-name", help="run name for wandb logging")
     parser.add_argument("--wandb_project", type=str, help="project name for wandb logging")
+    parser.add_argument("--wandb_group", type=str, help="label to group runs into")
+    parser.add_argument("--wandb_tags", type=str, help="wandb tags to add to the run")
+    parser.add_argument("--wandb_mode", type=str, choices=["help", "offline", "online"], 
+                        help="control of wandb logging mode")
     parser.add_argument("--wandb_disabled", action='store_true', 
                         help="whether to turn wandb loggin off")
 
@@ -443,7 +234,7 @@ def runtime_code():
     
     test_ds = WikiTextDataset(tokenizer=tokenizer)
     test_ds.make_input_sequences(json_path=args.test_ds,
-                                 sequence_length=args.sequence_len)
+                                 sequence_length=None)
     
     
     # set up some GPT2Config parameters
@@ -482,28 +273,58 @@ def runtime_code():
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer,
                                                     mlm=False)
     
-    # initialize trainer class and model form config
-    trainer = Trainer(args=train_args,
-                      model=GPT2LMHeadModel(config=config).to(device),
-                      data_collator=data_collator,
-                      train_dataset=train_ds,
-                      eval_dataset=eval_ds)
-    
     # add authorization token for wandb logging
     os.environ["WANDB_API_KEY"] = args.wandb_key
-    os.environ["WANDB_NOTES"] = args.wandb_notes
-    if args.wandb_dir:
-      os.environ["WANDB_DIR"] = args.wandb_dir
-    if args.wandb_name:
-      os.environ["WANDB_NAME"] = args.wandb_name  # run name if spacified
-    if args.wandb_project:     
-      os.environ["WANDB_PROJECT"] = args.wandb_project
-    if args.wandb_disabled:
-      os.environ["WANDB_DISABLED"] = args.wandb_disabled
+    
+    # init wandb before Trainer, this will override the default callback in Trainer
+    wandb.init(
+        dir=args.wandb_dir if args.wandb_dir else None,
+        project=args.wandb_project if args.wandb_project else None,
+        name=args.wandb_name if args.wandb_name else None,
+        tags=args.wandb_tags if args.wandb_tags else None,
+        notes=args.wandb_notes if args.wandb_notes else None,
+        group=args.wandb_group if args.wandb_group else None,
+        mode=args.wandb_mode if args.wandb_mode else "online",
+        )
+    
+    # initialize model
+    model = GPT2LMHeadModel(config=config).to(device)
+    
+    # run training routine
+    if args.do_train:
+        
+        # initialize trainer class and model form config
+        trainer = Trainer(args=train_args,
+                          model=model,
+                          data_collator=data_collator,
+                          train_dataset=train_ds,
+                          eval_dataset=eval_ds)
+    
+        # hyper-param search here if needed
+        # best_trial = trainer.hyperparameter_search(
+        #                               direction='minimize',
+        #                               search_alg='something')
+        
+        # call training routine
+        trainer.train()
 
-    # call training routine
-    trainer.train()
-
+    # compute and log test perplexity
+    if args.do_test:
+        
+        ppl, _, _ = compute_perplexity(model=model,
+                                       context_len=args.test_context_len,
+                                       stride=args.test_stride,
+                                       test_dataset=test_ds)
+        
+        # log some info from testing
+        wandb.log(
+            data={'test-ppl': ppl, 
+                  'test-stride': args.test_stride, 
+                  'test-context-len':args.test_context_len}
+            )
+    
+    # end logging
+    wandb.finish()
 
 if __name__ == "__main__":
 
