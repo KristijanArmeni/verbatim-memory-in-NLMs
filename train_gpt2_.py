@@ -13,11 +13,14 @@ import time
 from ast import literal_eval
 from datetime import timedelta
 from tqdm import tqdm, trange
+import logging
 import numpy as np
 import torch
+import torch.nn as nn
+import transformers
 from transformers import GPT2Config, GPT2TokenizerFast, GPT2LMHeadModel, \
                         Trainer, TrainingArguments, DataCollatorForLanguageModeling, \
-                        logging, set_seed
+                        EarlyStoppingCallback
 
 # own module
 from dataset import WikiTextDataset
@@ -195,7 +198,7 @@ def runtime_code():
     parser.add_argument("--wandb_project", type=str, help="project name for wandb logging")
     parser.add_argument("--wandb_group", type=str, help="label to group runs into")
     parser.add_argument("--wandb_tags", type=str, help="wandb tags to add to the run")
-    parser.add_argument("--wandb_mode", type=str, choices=["help", "offline", "online"], 
+    parser.add_argument("--wandb_mode", type=str, choices=["disabled", "offline", "online"], 
                         help="control of wandb logging mode")
     parser.add_argument("--wandb_disabled", action='store_true', 
                         help="whether to turn wandb loggin off")
@@ -215,11 +218,11 @@ def runtime_code():
         print_cuda_mem_info()
     
     # utility function from transformers (sets seed in torch and numpy)
-    set_seed(args.seed)  
+    transformers.set_seed(args.seed)  
     
     # set logging verbosity output
-    logging.set_verbosity_info()
-    
+    transformers.logging.set_verbosity_info()
+
     # load tokenizer trained in dataset.py
     tokenizer = GPT2TokenizerFast.from_pretrained(args.tokenizer_path)
     
@@ -259,6 +262,7 @@ def runtime_code():
         adam_beta2=literal_eval(args.betas)[1],
         learning_rate=args.lr,
         warmup_steps=args.num_lr_warmup_steps,
+        gradient_accumulation_steps=1,
         evaluation_strategy="steps",
         logging_steps=args.num_logging_steps,
         eval_steps=args.num_eval_steps,
@@ -286,10 +290,18 @@ def runtime_code():
         group=args.wandb_group if args.wandb_group else None,
         mode=args.wandb_mode if args.wandb_mode else "online",
         )
-    
-    # initialize model
-    model = GPT2LMHeadModel(config=config).to(device)
-    
+   
+    # initialize the model from configuration
+    model = GPT2LMHeadModel(config=config)
+
+    # initialize model and use data parallelism if multiple GPUs are avaiilable
+    if torch.cuda.device_count() > 1:
+        logging.info("Found {} GPUs, using nn.DataParallel".format(torch.cuda.device_count()))
+        model = nn.DataParallel(model)
+
+    # move to gpus
+    model.to(device)
+
     # run training routine
     if args.do_train:
         
@@ -298,7 +310,10 @@ def runtime_code():
                           model=model,
                           data_collator=data_collator,
                           train_dataset=train_ds,
-                          eval_dataset=eval_ds)
+                          eval_dataset=eval_ds,
+                          callbacks=[EarlyStoppingCallback(early_stopping_patience=3
+                                                           early_stopping_threshold=0.05)]
+                          )
     
         # hyper-param search here if needed
         # best_trial = trainer.hyperparameter_search(
