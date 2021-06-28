@@ -68,7 +68,7 @@ def print_cuda_mem_info(device_id=0):
     print("available GPU mem (gb): {}".format(f*gb_factor))
 
 
-def compute_perplexity(self, input_ids, context_len, stride):
+def compute_perplexity(model, input_ids, tokenizer, context_len, stride, device):
         """
         method for computing token-by-token negative log likelihood on input_ids
         taken from: https://huggingface.co/transformers/perplexity.html
@@ -86,7 +86,7 @@ def compute_perplexity(self, input_ids, context_len, stride):
             trg_len = end_loc - i  # may be different from stride on last loop
 
             # select the current input index span
-            sel_input_ids = input_ids[:, begin_loc: end_loc].to(self.device)
+            sel_input_ids = input_ids[:, begin_loc: end_loc].to(device)
 
             # define target labels, use input ids as target outputs
             target_ids = sel_input_ids.clone()
@@ -96,22 +96,26 @@ def compute_perplexity(self, input_ids, context_len, stride):
 
 
             # set model to evaluation mode
-            self.model.eval()
+            model.eval()
             
             # get model output
             with torch.no_grad():
 
                # compute neg log likelihood over target ids (n+1 in our case)
                # indices are shifted under the hood by model.__call__()
-               outputs = self.model(sel_input_ids, labels=target_ids)
+               outputs = model(sel_input_ids, labels=target_ids)
                
                # first element of the tuple contains the loss
                log_likelihood = outputs.loss.item() * trg_len  # not sure about this multiplication here (undoing averaging?)
 
                llh.append(log_likelihood)
-               toks = self.tokenizer.decode(target_ids[0][-stride::])
-               tokens.append(toks)  # store the last token (target_id)
-               
+                
+               # only output tokens if we are computing token-by-token ppl
+               # (i.e. stride == 1)
+               if stride == 1:
+                  toks = tokenizer.decode(target_ids[0][-stride::])
+                  tokens.append(toks)  # store the last token (target_id)
+
         # compute perplexity, divide by the lenth of the sequence
         # use np.nansum as token at position 0 will have -LL of nan
         ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc).cpu()
@@ -143,7 +147,7 @@ def runtime_code():
                         help="path to mergex.txt and vocab.json files")
     parser.add_argument("--device", type=str, default="cpu", choices=["cpu", "cuda"],
                         help="device used for training")
-    parser.add_argument("--do_train", action='store_true', default=True)
+    parser.add_argument("--do_train", action='store_true', default=False)
     parser.add_argument("--do_test", action='store_true', default=True)
 
     # GPTConfig arguments
@@ -190,6 +194,10 @@ def runtime_code():
                         help="nr of consecutive epochs to wait for decreasing loss" 
                         "before stopping training")
     
+    # test arguments
+    parser.add_argument("--test_stride", type=int, 
+                        help="stride to use on ppl computation")
+
     # wandb params
     parser.add_argument("--wandb_key", type=str, help="authorization key to loging to wandb")
     parser.add_argument("--wandb_dir", type=str, help="directory where wandb files are written to")
@@ -267,6 +275,8 @@ def runtime_code():
         logging_steps=args.num_logging_steps,
         eval_steps=args.num_eval_steps,
         save_steps=args.num_save_steps,
+        load_best_model_at_end=True,
+        metric_for_best_model="loss",
         fp16=True,
         disable_tqdm=False,
         report_to="wandb",
@@ -311,7 +321,7 @@ def runtime_code():
                           data_collator=data_collator,
                           train_dataset=train_ds,
                           eval_dataset=eval_ds,
-                          callbacks=[EarlyStoppingCallback(early_stopping_patience=3
+                          callbacks=[EarlyStoppingCallback(early_stopping_patience=3,
                                                            early_stopping_threshold=0.05)]
                           )
     
@@ -322,20 +332,27 @@ def runtime_code():
         
         # call training routine
         trainer.train()
+    
+        # this must hold, so that we just refer to <model> name below
+        assert id(model) == id(trainer.model)
 
     # compute and log test perplexity
     if args.do_test:
         
         ppl, _, _ = compute_perplexity(model=model,
-                                       context_len=args.test_context_len,
+                                       tokenizer=tokenizer,
+                                       input_ids=torch.tensor([test_ds.x]),
+                                       context_len=args.sequence_len,
                                        stride=args.test_stride,
-                                       test_dataset=test_ds)
+                                       device=device)
         
+        logging.info("Test ppl: {}".format(ppl))
+
         # log some info from testing
         wandb.log(
             data={'test-ppl': ppl, 
                   'test-stride': args.test_stride, 
-                  'test-context-len':args.test_context_len}
+                  'test-context-len':args.sequence_len}
             )
     
     # end logging
