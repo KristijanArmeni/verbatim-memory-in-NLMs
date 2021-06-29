@@ -176,9 +176,11 @@ def runtime_code():
     parser.add_argument("--train_set_size", type=str, default="40",
                         help="size of the traininset (in million tokens)")
     
-    # training regime input args
+    # training regime input args (input to TrainingArguments() class)
     parser.add_argument("--lr", type=float,
                         help="starting learning rate")
+    parser.add_argument("--lr_scheduler_type", type=str, default="linear",
+                        help="the scheduler for learning rate changes during learning")
     parser.add_argument("--betas", type=str,
                         help="betas parameter for Adam optimizer")
     parser.add_argument("--num_lr_warmup_steps", type=int,
@@ -268,6 +270,7 @@ def runtime_code():
         per_device_eval_batch_size=args.eval_batch_size,
         adam_beta1=literal_eval(args.betas)[0],
         adam_beta2=literal_eval(args.betas)[1],
+        lr_scheduler_type=args.lr_scheduler_type,
         learning_rate=args.lr,
         warmup_steps=args.num_lr_warmup_steps,
         gradient_accumulation_steps=1,
