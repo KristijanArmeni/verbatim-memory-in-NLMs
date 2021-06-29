@@ -42,40 +42,40 @@ for model_id in ["a-10"]:
                 
                 
                 # create command string
-                command = "python {}" \
-                            "--train_ds $dataset_dir/wiki.train.inds_{}.bpe.json" \
-                            "--val_ds $dataset_dir/wiki.valid.inds.bpe.json" \
-                            "--test_ds $dataset_dir/wiki.test.inds.bpe.json" \
-                            "--sequence_len 1024" \
-                            "--do_train" \
-                            "--model_name gpt2_40M_a.pth" \
-                            "--tokenizer_path $HOME/work/karmeni1/lm-mem/gpt2_wikitext103" \
-                            "--seed 12345" \
-                            "--device cuda" \
-                            "--train_batch_size {}" \
-                            "--eval_batch_size {}" \
-                            "--test_batch_size 1" \
-                            "--n_layer {}" \
-                            "--n_head {}" \
-                            "--embed_dim {}" \
-                            "--max_epochs 10" \
-                            "--lr_scheduler_type cosine" \
-                            "--lr 1e-5" \
-                            '--betas "(0.5, 0.05)"' \
-                            "--num_lr_warmup_steps 0" \
-                            "--num_eval_steps 1000" \
-                            "--num_logging_steps 1000" \
+                command = "python {} " \
+                            "--train_ds $dataset_dir/wiki.train.inds_{}.bpe.json " \
+                            "--val_ds $dataset_dir/wiki.valid.inds.bpe.json " \
+                            "--test_ds $dataset_dir/wiki.test.inds.bpe.json " \
+                            "--sequence_len 1024 " \
+                            "--do_train " \
+                            "--model_name gpt2_40M_a.pth " \
+                            "--tokenizer_path $HOME/work/karmeni1/lm-mem/gpt2_wikitext103 " \
+                            "--seed 12345 " \
+                            "--device cuda " \
+                            "--train_batch_size {} " \
+                            "--eval_batch_size {} " \
+                            "--test_batch_size 1 " \
+                            "--n_layer {} " \
+                            "--n_head {} " \
+                            "--embed_dim {} " \
+                            "--max_epochs 10 " \
+                            '--lr_scheduler_type "cosine" ' \
+                            "--lr 1e-5 " \
+                            '--betas "(0.5, 0.05) "' \
+                            "--num_lr_warmup_steps 0 " \
+                            "--num_eval_steps 1000 " \
+                            "--num_logging_steps 1000 " \
                             "--num_save_steps 1000 "\
-                            "--es_patience 3" \
-                            "--test_stride 512" \
-                            "--wandb_key $login_key" \
-                            "--wandb_dir $HOME/work/karmeni1/lm-mem/" \
-                            "--wandb_project $wandb_project" \
-                            "--wandb_group $wandb_group" \
-                            "--wandb_name $wandb_name" \
-                            "--wandb_notes $wandb_notes" \
-                            "--wandb_mode online" \
-                            "--savedir $HOME/work/karmeni1/lm-mem/checkpoints/$3" \
+                            "--es_patience 3 " \
+                            "--test_stride 512 " \
+                            "--wandb_key $login_key " \
+                            "--wandb_dir $HOME/work/karmeni1/lm-mem/ " \
+                            "--wandb_project $wandb_project " \
+                            "--wandb_group $wandb_group " \
+                            "--wandb_name $wandb_name " \
+                            "--wandb_notes $wandb_notes " \
+                            "--wandb_mode online " \
+                            "--savedir $HOME/work/karmeni1/lm-mem/checkpoints/$3 " \
                             "--logdir $HOME/work/karmeni1/lm-mem/logs/$3" \
                           .format(python_file,
                                   dataset_size,
@@ -107,13 +107,13 @@ for model_id in ["a-10"]:
                 f.write("#SBATCH --error=" + os.path.join(log_dir, scr_filename) + ".err\n\n\n")
     
                 # linux input arguments
-                f.write("login_key=$1")
-                f.write("wandb_group=$2")
-                f.write("wandb_name=$3")
-                f.write("wandb_notes=$4")
-                f.write('wandb_project="gpt2_{}"'.format(dataset_size))
+                f.write("login_key=$1\n")
+                f.write("wandb_group=$2\n")
+                f.write("wandb_name=$3\n")
+                f.write("wandb_notes=$4\n")
+                f.write('wandb_project="gpt2_{}\n"'.format(dataset_size))
                 
-                f.write("dataset_dir=$HOME/work/karmeni1/wikitext-103")
+                f.write("dataset_dir=$HOME/work/karmeni1/wikitext-103\n")
                 
                 f.write("ml anaconda\n")
     
