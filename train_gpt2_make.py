@@ -20,7 +20,7 @@ args = parser.parse_args()
 # home directory on marcc compute cluster
 # this is git versioned repo:
 root_dir = os.path.expanduser("~/code/lm-mem")
-scripts_dir = os.path.join(root_dir, "marcc_scripts/training")
+scripts_dir = os.path.join(root_dir, "marcc_scripts/train")
 log_dir = os.path.join(root_dir, 'logs')
 
 master_bash = open(os.path.join(scripts_dir, 'train_gpt2_scripts.sh'), 'w')
@@ -83,7 +83,7 @@ for model_id in ["a-10"]:
                                   per_gpu_batch_size,
                                   n_layer_n_head,
                                   n_layer_n_head,
-                                  embed_dim)
+                                  model_dim)
     
                 scr_filename = "train_gpt2_{}_{}_{}_{}".format(model_id,
                                                                dataset_size, 
@@ -124,7 +124,7 @@ for model_id in ["a-10"]:
                 # format arguments for the scr script
                 scr_arguments = " ".join([args.wandb_key,
                                           "{}".format(dataset_size),
-                                          "{}-layer".format(n_layer_n_head)),
+                                          "{}-layer".format(n_layer_n_head),
                                           "notes-here"])
     
                 print("Writing {}".format(scr_filename))
