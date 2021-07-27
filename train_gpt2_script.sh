@@ -4,20 +4,16 @@ wandb_name=$3
 wandb_notes=$4
 wandb_project="gpt2_40m"
 
-# activate conda enviroment
-ml anaconda
-conda activate ~/code/conda_envs/core_env
+dataset_dir=$HOME/project/lm-mem/data/wikitext-103
 
-dataset_dir=$HOME/work/karmeni1/wikitext-103
-
-python $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-103 \
+python $HOME/project/lm-mem/src/train_gpt2_.py --datadir $dataset_dir \
                                                 --train_ds $dataset_dir/wiki.train.inds_40m.bpe.json \
                                                 --val_ds $dataset_dir/wiki.valid.inds.bpe.json \
                                                 --test_ds $dataset_dir/wiki.test.inds.bpe.json \
                                                 --sequence_len 1024 \
                                                 --do_train \
                                                 --model_name gpt2_40M_a.pth \
-                                                --tokenizer_path $HOME/work/karmeni1/lm-mem/gpt2_wikitext103 \
+                                                --tokenizer_path $HOME/project/lm-mem/data/wikitext-103_tokenizer \
                                                 --seed 12345 \
                                                 --device "cuda" \
                                                 --train_batch_size 12 \
@@ -37,12 +33,12 @@ python $HOME/code/lm-mem/train_gpt2_.py --datadir $HOME/work/karmeni1/wikitext-1
                                                 --es_patience 3 \
                                                 --test_stride 512 \
                                                 --wandb_key $login_key \
-                                                --wandb_dir $HOME/work/karmeni1/lm-mem/ \
+                                                --wandb_dir $SCRATCH/project/lm-mem/data/wandb \
                                                 --wandb_project $wandb_project \
                                                 --wandb_group "$wandb_group" \
                                                 --wandb_name "$wandb_name" \
                                                 --wandb_notes "$wandb_notes" \
                                                 --wandb_mode "online" \
-                                                --savedir $HOME/work/karmeni1/lm-mem/checkpoints/$3 \
-                                                --logdir $HOME/work/karmeni1/lm-mem/logs/$3 
+                                                --savedir $SCRATCH/project/lm-mem/checkpoints/$3 \
+                                                --logdir $SCRATCH/project/lm-mem/logs/$3 
                                         
