@@ -181,7 +181,7 @@ def runtime_code():
                         help="starting learning rate")
     parser.add_argument("--lr_scheduler_type", type=str, default="linear",
                         help="the scheduler for learning rate changes during learning")
-    parser.add_argument("--betas", type=str,
+    parser.add_argument("--betas", type=str, default="(0.5, 0.05)",
                         help="betas parameter for Adam optimizer")
     parser.add_argument("--num_lr_warmup_steps", type=int,
                         help="number of consecutive epochs for which learning" 
@@ -220,7 +220,8 @@ def runtime_code():
                         help="path where the model weights will be stored")
     
     args = parser.parse_args()
-    
+    print(args)
+
     # use cuda if available
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     
