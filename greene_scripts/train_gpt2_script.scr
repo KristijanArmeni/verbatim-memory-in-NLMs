@@ -56,6 +56,8 @@ python $HOME/project/lm-mem/src/train_gpt2_.py --train_ds $dataset_dir/wiki.trai
 					       --max_epochs $max_epochs \
 					       --lr_scheduler_type $lr_scheduler_type \
 					       --lr $lr \
+					       --adam_beta1 $adam_beta1 \
+					       --adam_beta2 $adam_beta2 \
 					       --num_lr_warmup_steps 0 \
 					       --num_eval_steps 500 \
 					       --num_logging_steps 500 \

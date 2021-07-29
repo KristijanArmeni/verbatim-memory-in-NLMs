@@ -181,8 +181,10 @@ def runtime_code():
                         help="starting learning rate")
     parser.add_argument("--lr_scheduler_type", type=str, default="linear",
                         help="the scheduler for learning rate changes during learning")
-    parser.add_argument("--betas", type=str, default="(0.5, 0.05)",
-                        help="betas parameter for Adam optimizer")
+    parser.add_argument("--adam_beta1", type=float, default=0.5,
+                        help="beta1 parameter for Adam optimizer")
+    parser.add_argument("--adam_beta2", type=float, default=0.05,
+                        help="beta2 parameter for Adam optimizer")
     parser.add_argument("--num_lr_warmup_steps", type=int,
                         help="number of consecutive epochs for which learning" 
                         "rate is increased linearly")
@@ -269,8 +271,8 @@ def runtime_code():
         num_train_epochs=args.max_epochs,
         per_device_train_batch_size=args.train_batch_size,
         per_device_eval_batch_size=args.eval_batch_size,
-        adam_beta1=literal_eval(args.betas)[0],
-        adam_beta2=literal_eval(args.betas)[1],
+        adam_beta1=args.adam_beta1,
+        adam_beta2=args.adam_beta2,
         lr_scheduler_type=args.lr_scheduler_type,
         learning_rate=args.lr,
         warmup_steps=args.num_lr_warmup_steps,
