@@ -197,7 +197,9 @@ def runtime_code():
     parser.add_argument("--es_patience", type=int,
                         help="nr of consecutive epochs to wait for decreasing loss" 
                         "before stopping training")
-    
+    parser.add_argument("--es_delta", type=float, default=0.01,
+                        help="the smallest change in loss between two evaluations that still counts as improvement, if c                        hange is less than this value, otherwise early stopping counter starts")
+
     # test arguments
     parser.add_argument("--test_stride", type=int, 
                         help="stride to use on ppl computation")
@@ -327,8 +329,8 @@ def runtime_code():
                           data_collator=data_collator,
                           train_dataset=train_ds,
                           eval_dataset=eval_ds,
-                          callbacks=[EarlyStoppingCallback(early_stopping_patience=3,
-                                                           early_stopping_threshold=0.05)]
+                          callbacks=[EarlyStoppingCallback(early_stopping_patience=args.es_patience,
+                                                           early_stopping_threshold=args.es_delta)]
                           )
     
         # hyper-param search here if needed
