@@ -14,6 +14,7 @@
 # collect input arguments
 login_key=$1
 config_file=$2
+model_name_suffix=$3
 
 # source config file which loads variables ($ds_size etc.)
 source $config_file
@@ -21,11 +22,11 @@ source $config_file
 # set wanbd variable names
 wandb_group=$ds_size
 wandb_name=$n_layer$"-"$n_embed"-"$seq_len
-wandb_notes=$3
+wandb_notes=$4
 wandb_project="gpt2"
 
 dataset_dir=$HOME/project/lm-mem/data/wikitext-103
-model_name="gpt2_"$ds_size"_"$wandb_name"_a"
+model_name="gpt2_"$ds_size"_"$wandb_name"_a_"$model_name_suffix
 model_filename=$model_name".pth"
 
 # set up singularity image
@@ -63,6 +64,7 @@ python $HOME/project/lm-mem/src/train_gpt2_.py --train_ds $dataset_dir/wiki.trai
 					       --num_logging_steps 500 \
 					       --num_save_steps 500 \
 					       --es_patience $es_patience \
+					       --es_delta $es_delta \
 					       --test_stride $test_stride \
 					       --wandb_key $login_key \
 					       --wandb_dir $SCRATCH/project/lm-mem/ \
