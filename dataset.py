@@ -114,9 +114,9 @@ def runtime_code():
                         help="path to test dataset")
     parser.add_argument("--train_set_sizes", type=str,
                         help="size of the training set (in M tokens)")
-    parser.add_argument("--train_tokenizer", action="store_true",
+    parser.add_argument("--train_tokenizer", action="store_true", default=False,
                          help="boolean, whether or not to train BPE tokenizer" 
-                         "on wikitext103 (default: false)")
+                         "on wikitext-103 (default: false)")
     parser.add_argument("--tokenizer_train_tokens", type=str)
     parser.add_argument("--tokenizer_savedir", type=str,
                         help="folder where merges.txt and vocab.txt are saved")
@@ -154,21 +154,22 @@ def runtime_code():
     
     
     # now retokenize wikitext and save
-    train_ds = WikiTextDataset(tokenizer=tokenizer)
-    
-    # training set
-    train_ds.retokenize_txt(path=args.train_tokens,
-                            save_retokenized=args.train_tokens + ".bpe.json")
-    
-    # validation set
-    eval_ds = WikiTextDataset(tokenizer=tokenizer)
-    eval_ds.retokenize_txt(path=args.valid_tokens,
-                           save_retokenized=args.valid_tokens + ".bpe.json")
+    if args.train_tokens:
+        train_ds = WikiTextDataset(tokenizer=tokenizer)
+        train_ds.retokenize_txt(path=args.train_tokens,
+                                save_retokenized=args.train_tokens + ".bpe.json")
     
     # validation set
-    test_ds = WikiTextDataset(tokenizer=tokenizer)
-    test_ds.retokenize_txt(path=args.test_tokens,
-                           save_retokenized=args.test_tokens + ".bpe.json")
+    if args.valid_tokens:
+        eval_ds = WikiTextDataset(tokenizer=tokenizer)
+        eval_ds.retokenize_txt(path=args.valid_tokens,
+                               save_retokenized=args.valid_tokens + ".bpe.json")
+    
+    # validation set
+    if args.test_tokens:
+        test_ds = WikiTextDataset(tokenizer=tokenizer)
+        test_ds.retokenize_txt(path=args.test_tokens,
+                                save_retokenized=args.test_tokens + ".bpe.json")
     
 if __name__ == "__main__":
     
