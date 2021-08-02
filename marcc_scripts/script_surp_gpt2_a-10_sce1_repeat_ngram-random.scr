@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=script_surp_gpt2_a-10_sce1_repeat_ngram-random
-#SBATCH --time=12:00:00
-#SBATCH --mem=5gb
-#SBATCH --partition=gpuk80
+#SBATCH --time=08:00:00
+#SBATCH --mem=3gb
+#SBATCH --partition=gpup100
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=6
 #SBATCH --nodes=1
