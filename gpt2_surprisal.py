@@ -23,6 +23,9 @@ from tqdm import trange
 from typing import List
 from string import punctuation
 from tqdm import tqdm
+import logging
+
+logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
 
 # own modules
 if "win" in sys.platform:
@@ -110,7 +113,7 @@ def concat_and_tokenize_inputs(prefixes=None, prompts=None, word_list1=None, wor
         for prompt_key in prompts.keys():
 
             # loop over trials
-            for i in range(len(input_seqs)):
+            for i in trange(len(input_seqs), desc="sequence: "):
                 
                 # tokenize strings separately to be able to construct markers for prefix, word lists etc.
                 i1 = tokenizer.encode("<|endoftext|> " + prefixes[prefix_key], return_tensors="pt")   # prefix IDs, add eos token
@@ -175,7 +178,7 @@ def concat_and_tokenize_inputs2(input_sets=None, ngram_size=None,
         input_lists = input_sets[dst_size]
         
         # loop each input sequence
-        for i in range(len(input_lists)):
+        for i in trange(len(input_lists), desc="sequence: "):
             
             # tokenize strings separately to be able to construct markers for prefix, word lists etc.
             #i1 = tokenizer.encode("<|endoftext|> " + prefixes[prefix_key], return_tensors="pt")   # prefix IDs, add eos token
@@ -522,9 +525,9 @@ def permute_qk_weights(model=None, per_head=False, seed=None):
 
 def runtime_code(): 
     
-    
+    sys.path.append("/home/ka2773/project/lm-mem/src/data/") 
     from stimuli import prefixes, prompts
-    
+
     
     # ===== INITIATIONS ===== #
     
@@ -539,9 +542,12 @@ def runtime_code():
                         help="whether or not to permute the second word list")
     parser.add_argument("--context_len", type=int, default=1024,
                         help="length of context window in tokens for transformers")
-    parser.add_argument("--model_type", type=str, default="pretrained", 
-                        choices=["pretrained", "random", "random-att", "random-att-per-head", "shuff-wpe"],
-                        help="whether or not to load a pretrained model or initialize randomly")
+    parser.add_argument("--model_type", type=str,
+                        help="model label controlling which checkpoint to load")
+    parser.add_argument("--checkpoint", type=str,
+                        help="the path to folder with pretrained models (expected to work with model.from_pretraiend() method)")
+    parser.add_argument("--path_to_tokenizer", type=str,
+                        help="the path to tokenizer folder (expected to work with tokenizer.from_pretrained() method")
     parser.add_argument("--model_seed", type=int, default=12345,
                         help="seed value to be used in torch.manual_seed() prior to calling GPT2Model()")
     parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
@@ -566,8 +572,8 @@ def runtime_code():
     elif "linux" in sys.platform:
         data_dir = os.path.join(os.environ["HOME"], "code", "lm-mem", "data")
 
-    print("condition == {}".format(argins.condition))
-    print("scenario == {}".format(argins.scenario))
+    logging.info("condition == {}".format(argins.condition))
+    logging.info("scenario == {}".format(argins.scenario))
     
     # ===== DATA MANAGEMENT ===== #
     
@@ -575,7 +581,7 @@ def runtime_code():
     fname = os.path.join(data_dir, argins.input_filename)
     with open(fname) as f:
         
-        print("Loading {} ...".format(fname))
+        logging.info("Loading {} ...".format(fname))
         stim = json.load(f)
     
         # convert word lists to strings and permute the second one if needed
@@ -585,7 +591,7 @@ def runtime_code():
     if argins.paradigm == "repeated-ngrams":
         
         fname = os.path.join(data_dir, "ngram-distractors.json")
-        print("Loading {} ...".format(fname))
+        logging.info("Loading {} ...".format(fname))
         with open(fname) as f:
             distractors = json.load(f)
     
@@ -615,7 +621,7 @@ def runtime_code():
         # This serves as a control conditions
         # Here list length is the only common factor between two lists
         
-        print("Creating control condition...")
+        logging.info("Creating control condition...")
     
         n_items_per_group = 10
         n_groups = len(word_lists1["n10"])//n_items_per_group
@@ -648,48 +654,37 @@ def runtime_code():
     device = torch.device(argins.device if torch.cuda.is_available() else "cpu") 
         
     # setup the model
-    tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
+    logging.info("Loading tokeninzer {}".format(argins.path_to_tokenizer))
+    tokenizer = GPT2TokenizerFast.from_pretrained(argins.path_to_tokenizer)
     
-    print("Using {} model".format(argins.model_type))
-    
-    # load pretrained small model
-    if argins.model_type == "pretrained":
-        model = GPT2LMHeadModel.from_pretrained('gpt2')
+    logging.info("Using {} model".format(argins.model_type))
+    logging.info("Loading checkpoint {}".format(argins.checkpoint))
+    model = GPT2LMHeadModel.from_pretrained(argins.checkpoint)
     
     # or initialize a random model
-    elif argins.model_type == "random":
+    if argins.model_type == "random":
         # initialize with random weights
         torch.manual_seed(argins.model_seed)
         model = GPT2LMHeadModel(config=GPT2Config()) 
         
-    # or initialize a random model
+    # permute the weights of gpt-small
     elif argins.model_type == "random-att":
         
-        # initialize with random weights
-        model = GPT2LMHeadModel.from_pretrained('gpt2')
-        model.eval()
-        
-        print("Permuting model attention weights ...\n")
+        logging.info("Permuting model attention weights ...\n")
         model = permute_qk_weights(model, per_head=False, 
                                    seed=argins.model_seed)
-        
+    
+    # permute attenion heads of gpt2 small
     elif argins.model_type == "random-att-per-head":
         
-        # load pretrained weights
-        model = GPT2LMHeadModel.from_pretrained('gpt2')
-        model.eval()
-        
-        print("Permuting Q and K weights ...\n")
+        logging.info("Permuting Q and K weights ...\n")
         model = permute_qk_weights(model, per_head=True,
                                    seed=argins.model_seed)
-        
+    
+    # shuffle embedding vectors of gpt2 small
     elif argins.model_type == "shuff-wpe":
         
-        # load pretrained weights
-        model = GPT2LMHeadModel.from_pretrained('gpt2')
-        model.eval()
-        
-        print("Permuting token positions in wpe...")
+        logging.info("Permuting token positions in wpe...")
         rng = np.random.RandomState(seed=argins.model_seed)
         
         wpe = model.transformer.wpe.weight # shape = (token_positions, embedding_dim)
@@ -697,9 +692,13 @@ def runtime_code():
         # permutation only permutes across 0 dim (rows=token_positions)
         wpe_shuf = torch.tensor(rng.permutation(wpe.detach().numpy()))
         model.transformer.wpe.weight = torch.nn.Parameter(data=wpe_shuf,
-                                                          requires_grad=False)
-                                                          
-        
+                                                          requires_grad=False)                              
+    
+    # set to evaluation mode
+    model.eval()
+
+
+    #initialize experiment class
     experiment = Experiment(model=model, tokenizer=tokenizer, 
                             context_len=argins.context_len,
                             device=device)
@@ -719,6 +718,7 @@ def runtime_code():
             
             # this routing loops over prompts and prefixes
             # it keeps track of that in meta_data
+            logging.info("Tokenizing and concatenating sequences...")
             input_sequences, meta_data = concat_and_tokenize_inputs(prompts=prompts[argins.scenario], 
                                                                     prefixes=prefixes[argins.scenario], 
                                                                     word_list1=word_lists1[n_words], 
@@ -728,7 +728,8 @@ def runtime_code():
         
         # prepare input sequences for the repeated ngrams paradigm
         elif argins.paradigm == "repeated-ngrams":
-
+            
+            logging.info("Interleaving and tokenizing input sequences...")
             word_lists = interleave_targets_and_distractors(word_lists1[n_words], distractors)
             
                         
