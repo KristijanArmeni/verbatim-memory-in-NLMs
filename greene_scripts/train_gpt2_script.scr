@@ -6,7 +6,7 @@
 #SBATCH --export=ALL
 #SBATCH --time=12:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --mem=40G
+#SBATCH --mem=44G
 #SBATCH -c 4
 #SBATCH --mail-type=end
 #SBATCH --mail-user=karmeni1@jhu.edu
