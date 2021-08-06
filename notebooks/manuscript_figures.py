@@ -272,7 +272,7 @@ def make_point_plot(data_frame, x, y, hue, col,
 # ### make_plot()
 
 # %%
-def make_plot(datain, x, style, col, col_order, style_order, title, xticks):
+def make_plot(datain, x, style, col, col_order, style_order, title, err_style, xticks):
     
     # annotate
     x_levels = datain.loc[:, x].unique()          # x group
@@ -280,12 +280,13 @@ def make_plot(datain, x, style, col, col_order, style_order, title, xticks):
     style_levels = datain.loc[:, style].unique()
     
     # find n rows (observations) for one plotted group
+    print(x_levels)
     one_group = (datain[x] == x_levels[-1]) & (datain[style] == style_levels[0]) & (datain[col] == col_levels[0])
     n = len(datain.loc[one_group])  
     
-    p = sns.relplot(kind="line", data=datain, x=x, y="surp", style=style, col=col, 
-                    estimator=np.median, ci=95.0, err_style="bars",
-                    markers=False, style_order=style_order, col_order=col_order,
+    p = sns.relplot(kind="line", data=datain, x=x, y="surp", style=style, hue=style, col=col, 
+                    estimator=np.median, ci=95.0, err_style=err_style,
+                    markers=True, style_order=style_order, col_order=col_order,
                     legend=True, linewidth=0.7)
     
     # get the data hre
@@ -2530,6 +2531,117 @@ if savefigs:
         print("Writing {}".format(fname))
         with open(fname, "w") as f:
             f.writelines(tex)
+
+# %% [markdown]
+# ## Breakdown per time point
+
+# %%
+model_id = "w-12"
+model_layers = model_id.split("-")[-1]
+gptwiki = pd.read_csv(os.path.join(data_dir, "output_gpt2_{}_sce1.csv".format(model_id)), sep="\t", index_col=None)
+
+# %%
+data=None
+data=gptwiki
+
+# add model column
+data["model"] = "gpt-2"
+
+# rename some row variables for plotting
+new_list_names = {"categorized": "semantic", "random": "arbitrary"}
+data.list = data.list.map(new_list_names)
+
+new_second_list_names = {"control": "novel", "repeat": "repeated", "permute": "permuted"}
+data.second_list = data.second_list.map(new_second_list_names)
+
+# %% tags=[]
+context_len = 8
+list_len = 10
+context = "intact"
+
+sel = (data.prompt_len==context_len) & \
+      (data.list_len==list_len) & \
+      (data.list.isin(["semantic", "arbitrary"])) & \
+      (data.context==context) & \
+      (data.model_id=="w-12") & \
+      (data.marker.isin([2, 3])) & \
+      (data.second_list.isin(["repeated", "permuted", "novel"])) &\
+      (data.marker_pos_rel.isin(list(range(-4, 10))))
+
+# %% tags=[]
+d = data.loc[sel].copy()
+
+# name column manually
+d.rename(columns={"list": "list structure", "second_list": "condition"}, inplace=True)
+
+# %%
+# common fig properties
+w, h, w_disp, h_disp = 10, 1.8, 17, 3
+
+# %%
+# this fontsize should work
+plt.rc("font", size=12)
+
+# %%
+new_second_list_names = {"novel": "Novel", "repeated": "Repeated", "permuted": "Permuted"}
+d.condition = d.condition.map(new_second_list_names)
+
+# %% [markdown]
+# ### Make time course plots (GPT-2 wikitext-103, 12 layer)
+
+# %%
+arch = "gpt-2"
+p, ax, stat = make_plot(d.loc[d["model"] == arch], x="marker_pos_rel", style="condition", col="list structure", 
+                        col_order=["arbitrary", "semantic"], style_order=["Repeated", "Permuted", "Novel"],
+                        title="{}".format(arch), xticks=list(range(-4, 10)), err_style="band")
+
+ax[0].set_title("Arbitrary list")
+ax[1].set_title("Semantically coherent list")
+ax[0].set_xlabel("token position relative to list onset", fontsize=12)
+ax[1].set_xlabel("token position relative to list onset", fontsize=12)
+p.fig.suptitle(arch.upper())
+p.fig.set_size_inches(w=w, h=h)
+p.fig.subplots_adjust(top=0.7)
+
+# %% tags=[]
+if savefigs:
+    p.fig.set_size_inches(w=w, h=h)
+    p.fig.subplots_adjust(top=0.70)
+    print("Saving {}".format(os.path.join(savedir, "word_order_{}".format(model_id))))
+    p.savefig(os.path.join(savedir, "word_order_{}.pdf".format(model_id)), transparent=True, bbox_inches="tight")
+    p.savefig(os.path.join(savedir, "word_order_{}.png".format(model_id)), dpi=300, bbox_inches="tight")
+
+# %% [markdown]
+# ### Export metrics (GPT-2)
+
+# %%
+basename = "time-course"
+if savefigs:
+    # create a column with string formateed and save the table as well
+    stat = stat.round({"ci_min": 1, "ci_max": 1, "median": 1})
+    strfunc = lambda x: str(x["median"]) + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+    stat["report_str"] = stat.apply(strfunc, axis=1)
+
+        # save the original .csv
+    fname = os.path.join(table_savedir, "{}_{}_table.csv".format(basename, arch))
+    print("Writing {}".format(fname))
+    stat.to_csv(fname)
+    
+    # save for latex
+    stat.rename(columns={"list structure": "list", "marker_pos_rel": "token position"}, inplace=True)
+    tex = stat.loc[stat["token position"].isin(list(range(0, 10))), :]\
+          .pivot(index=["token position"], columns=["list", "condition"], values="report_str")\
+          .to_latex(bold_rows=True,
+                    longtable=True,
+                    caption="Surprisal values (GPT-2) per token position, list type and condition.")
+    
+    # now save as .tex file
+    fname = os.path.join(table_savedir, "{}_{}_table.tex".format(basename, arch))
+    print("Writing {}".format(fname))
+    with open(fname, "w") as f:
+        f.writelines(tex)
+
+# %%
 
 # %% [markdown]
 # # Compare per layer
