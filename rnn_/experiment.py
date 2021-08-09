@@ -449,7 +449,7 @@ if __name__ == "__main__":
     
     import json
     import argparse
-    import panas as pd
+    import pandas as pd
     
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint_folder", type=str)
@@ -493,7 +493,7 @@ if __name__ == "__main__":
         config = json.load(f)
     
     # initialize model class and use the custom LSTMWithStates class
-    model = RNNModel(rnn_type='LSTMWithStates', 
+    model = RNNModel(rnn_type='LSTM', 
                      ntoken=config['n_vocab'], 
                      ninp=config['n_inp'], 
                      nhid=config['n_hid'], 
@@ -501,11 +501,11 @@ if __name__ == "__main__":
                      store_states=False)
     
     # initialize model class and use the custom LSTMWithStates class
-    #model2 = RNNModel(rnn_type='LSTM', 
+    #model2 = RNNModel(rnn_type='LSTMWithStates', 
     #                 ntoken=config['n_vocab'], 
     #                 ninp=config['n_inp'], 
     #                 nhid=config['n_hid'], 
-    #                 nlayers=config['n_layers'],
+    #                nlayers=config['n_layers'],
     #                 store_states=False)
     
     # make this input argument at some point
@@ -516,20 +516,20 @@ if __name__ == "__main__":
     #model2.eval()
     
     # ===== EXPERIMENT CLASS ===== #
-    exp = Experiment(model=model, dictionary=ds.dictionary)
-    # exp2 = Experiment(model=model2, dictionary=ds.dictionary)
+    #exp = Experiment(model=model, dictionary=ds.dictionary)
+    #exp2 = Experiment(model=model2, dictionary=ds.dictionary)
     
-    outputs = exp.run(input_set=ds.seq_ids, metainfo=ds.meta.__dict__)
-    # outputs2 = exp.run(input_set=ds.seq_ids)
+    #outputs = exp.run(input_set=ds.seq_ids, metainfo=ds.meta.__dict__)
+    #outputs2 = exp2.run(input_set=ds.seq_ids, metainfo=ds.meta.__dict__)
     
     # way to test implementations
-    # sent1, sent2 = 3, 6
-    # d1 = np.stack((outputs[sent1].log_probs[:, :, 0], outputs2[sent1].log_probs[:, :, 0]))
-    # d2 = np.stack((outputs[sent2].log_probs[:, :, 0], outputs2[sent2].log_probs[:, :, 0]))
+    #sent1, sent2 = 3, 6
+    #d1 = np.stack((outputs[sent1].log_probs[:, :, 0], outputs2[sent1].log_probs[:, :, 0]))
+    #d2 = np.stack((outputs[sent2].log_probs[:, :, 0], outputs2[sent2].log_probs[:, :, 0]))
     
     # test that all values are equal, except the first, which is nan
-    # assert (d1[1, 1::, 0] == d1[0, 1::, 0]).all()
-    # assert (d2[1, 1::, 0] == d2[0, 1::, 0]).all()
+    #assert (d1[1, 1::, 0] == d1[0, 1::, 0]).all()
+    #assert (d2[1, 1::, 0] == d2[0, 1::, 0]).all()
     
     # convert the list of ModelOuput() classes into a list of dicts
     # better serialize with built-in types
