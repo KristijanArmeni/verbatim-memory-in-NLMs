@@ -3,12 +3,81 @@ from nltk import word_tokenize
 import string
 import os, json
 
+# ===== FUNCTIONS ===== #
+
+def add_sections(chunks, skip_last_item=True):
+
+    out = []
+
+    if len(chunks) > 1:
+        out += chunks[0]
+        for chunk in chunks[1::]:
+            if skip_last_item:
+                out += chunk[0:-1]
+            else:
+                out += chunk[0::]
+    else:
+        out += chunks[0]
+    return out
+
+
+def permute_tokens(token_string):
+
+    # set random seed
+    rng = np.random.RandomState(12345)
+
+    # lower case the first character prior to shuffling, such that it can't appear capitalized
+    # in other positions, don't do that for proper names
+    # also strip the final punctuation
+    token_list = word_tokenize(token_string.strip("."))
+    first = token_list[0]
+    proper = ["Mary", "Sarah", "Ryan"]
+    if first not in proper:
+        token_list = [token_list[0].lower()] + token_list[1:]
+
+    shuf = rng.permutation(token_list)
+
+    if shuf[0] in string.punctuation:
+        pnct = shuf[0]
+        shuf[0] = shuf[1].capitalize()
+        shuf[1] = pnct
+    else:
+        shuf[0] = shuf[0].capitalize()
+
+    shuf = " ".join(shuf.tolist()).replace(" :", ":") \
+        .replace(" ,", ",") \
+        .replace(" .", ".")
+
+    return shuf
+
+
+def permute_sents(sent_list):
+    # set random seed
+    rng = np.random.RandomState(54321)
+
+    out_sents = []
+    for sent in sent_list:
+        shuf = permute_tokens(sent)
+        out_sents.append(shuf + ".")
+
+    return rng.permutation(out_sents).tolist()
+
+def replace_tokens(text, pairs_tuple):
+    
+    for pair in pairs_tuple:
+        text = text.replace(*pair)
+        
+    return text
+
 # define prefixes
 prefixes = {
     "sce1": {"1": "Before the meeting, Mary wrote down the following list of words:"},
     "sce1rnd": {"1": "Before the meeting, Mary wrote down the following list of words:"},
     "sce2": {"1": "Before the meeting, Mary wrote down the following list of words:"},
-    "sce3": {"1": "Before the meeting, Mary wrote down the following lists of words. One was:"}
+    "sce3": {"1": "Before the meeting, Mary wrote down the following lists of words. One was:"},
+    "sce4": {"1": permute_tokens("Before the meeting, Mary wrote down the following list of words:")},
+    "sce5": {"1": "Before the meeting, Mary wrote down the following list of words,"},
+    "sce6": {"1": "Before the meeting, John wrote down the following list of words:"}
 }
 
 # define prefixes for the n-gram experiment
@@ -100,65 +169,6 @@ b5 = ["Near the equator, the great heat carries up a larger proportion of water 
 
 c1 = ["And the other:"]
 
-# ===== FUNCTIONS ===== #
-
-def add_sections(chunks, skip_last_item=True):
-
-    out = []
-
-    if len(chunks) > 1:
-        out += chunks[0]
-        for chunk in chunks[1::]:
-            if skip_last_item:
-                out += chunk[0:-1]
-            else:
-                out += chunk[0::]
-    else:
-        out += chunks[0]
-    return out
-
-
-def permute_tokens(token_string):
-
-    # set random seed
-    rng = np.random.RandomState(12345)
-
-    # lower case the first character prior to shuffling, such that it can't appear capitalized
-    # in other positions, don't do that for proper names
-    # also strip the final punctuation
-    token_list = word_tokenize(token_string.strip("."))
-    first = token_list[0]
-    proper = ["Mary", "Sarah", "Ryan"]
-    if first not in proper:
-        token_list = [token_list[0].lower()] + token_list[1:]
-
-    shuf = rng.permutation(token_list)
-
-    if shuf[0] in string.punctuation:
-        pnct = shuf[0]
-        shuf[0] = shuf[1].capitalize()
-        shuf[1] = pnct
-    else:
-        shuf[0] = shuf[0].capitalize()
-
-    shuf = " ".join(shuf.tolist()).replace(" :", ":") \
-        .replace(" ,", ",") \
-        .replace(" .", ".")
-
-    return shuf
-
-
-def permute_sents(sent_list):
-    # set random seed
-    rng = np.random.RandomState(54321)
-
-    out_sents = []
-    for sent in sent_list:
-        shuf = permute_tokens(sent)
-        out_sents.append(shuf + ".")
-
-    return rng.permutation(out_sents).tolist()
-
 
 # define the prompts
 sce1 = {"1": " ".join(a1),
@@ -196,11 +206,51 @@ sce3 = {
         "1": c1[0],
         }
 
+# control with permuted prompt
+# define the prompts
+sce4 = {"1": " ".join(a1),
+        "2": " ".join(a2),
+        "3": " ".join(add_sections((a2, a3), skip_last_item=True)),
+        "4": " ".join(add_sections((a2, a3, a4), skip_last_item=True)),
+        "5": " ".join(add_sections((a2, a3, a4, a5), skip_last_item=True))
+    }
+
+# control with permuted prompt
+# define the prompts
+sce5 = {"1": " ".join(a1),
+        "2": " ".join(a2),
+        "3": " ".join(add_sections((a2, a3), skip_last_item=True)),
+        "4": " ".join(add_sections((a2, a3, a4), skip_last_item=True)),
+        "5": " ".join(add_sections((a2, a3, a4, a5), skip_last_item=True))
+    }
+
+# scenario
+token_pairs = (("Mary", "John"), 
+               ("her husband", "his wife"), ("her coworkers", "his coworkers"), 
+               ("her neighbors", "his neighbors"),
+               (" she ", " he "), 
+               ("She ", "He "), (" her ", " him "), ("herself", "himself"))
+
+sce6 = {
+    "1": replace_tokens(" ".join(a1), token_pairs),
+    "2": replace_tokens(" ".join(a2), token_pairs),
+    "3": replace_tokens(" ".join(add_sections((a2, a3), skip_last_item=False)), token_pairs),
+    "4": replace_tokens(" ".join(add_sections((a2, a3, a4), skip_last_item=False)), token_pairs),
+    "5": replace_tokens(" ".join(add_sections((a2, a3, a4, a5), skip_last_item=False)), token_pairs),
+}
+
 # Join the context and the prompt
 prompt_string = "When she got back, she read the list again:"
-for scen in (sce1, sce1rnd, sce2):
+for scen in (sce1, sce1rnd, sce2, sce4):
     for key in scen.keys():
         scen[key] = scen[key] + " " + prompt_string
+
+# treat sce5 separately and replace final column
+for key in sce5.keys():
+    sce5[key] = sce5[key] + " " + prompt_string.replace(":", ",")
+    
+for key in sce6.keys():
+    sce6[key] = sce6[key] + " " + replace_tokens(prompt_string, token_pairs)
 
 
 prompts = {
@@ -208,6 +258,9 @@ prompts = {
     "sce1rnd": sce1rnd,
     "sce2": sce2,
     "sce3": sce3,
+    "sce4": sce4,
+    "sce5": sce5,
+    "sce6": sce6,
 }
 
 if __name__ == "__main__":
