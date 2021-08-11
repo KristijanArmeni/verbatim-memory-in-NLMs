@@ -1,0 +1,32 @@
+#!/bin/bash
+#SBATCH --job-name=script_surp_gpt2_w-06_sce1_repeat_random
+#SBATCH --time=13:30:00
+#SBATCH --mem 4gb
+#SBATCH --gres=gpu:1
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=6
+#SBATCH --mail-type=end
+#SBATCH --mail-user=karmeni1@jhu.edu
+#SBATCH --output=/scratch/ka2773/project/lm-mem/logs/wm_eval/script_surp_gpt2_w-06_sce1_repeat_random.log
+#SBATCH --error=/scratch/ka2773/project/lm-mem/logs/wm_eval/script_surp_gpt2_w-06_sce1_repeat_random.err
+
+
+singularity exec --nv --overlay $SCRATCH/overlay-50G-10M.ext3:ro /scratch/work/public/singularity/cuda10.2-cudnn8-devel-ubuntu18.04.sif /bin/bash -c "
+source /ext3/env.sh
+conda activate core_env
+
+python /home/ka2773/project/lm-mem/src/gpt2_surprisal.py \
+--condition repeat \
+--scenario sce1 \
+--paradigm with-context \
+--model_type wikitext-06-layer \
+--checkpoint /scratch/ka2773/project/lm-mem/checkpoints/gpt2_40m_6-768-1024_a_/checkpoint-18000 \
+--path_to_tokenizer /home/ka2773/project/lm-mem/data/wikitext-103_tokenizer \
+--model_seed 12345 \
+--input_filename /home/ka2773/project/lm-mem/src/data/random_lists.json \
+--output_dir /scratch/ka2773/project/lm-mem/output \
+--output_file surprisal_gpt2_w-06_sce1_repeat_random.csv \
+--device cuda \
+"
+
