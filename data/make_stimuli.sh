@@ -1,10 +1,10 @@
 #!/bin/bash
 
-homedir=$HOME"/code/lm-mem"
+homedir=$HOME"/project/lm-mem/src"
 
 for cond in "repeat" "control" "permute";
 do
-    for sce in "sce1" "sce1rnd" "sce2" "sce3";
+    for sce in "sce4" "sce5" "sce6";
     do
         for l in "random" "categorized";
         do
