@@ -1,5 +1,6 @@
 *.err  # ignore job error outputs
 *.log  # ignore job log outputs
-notebooks/*.ipynb
-greene_scripts/train_gpt2_jobs.sh  # ignore the high-level script with login key info
-
+*.ipynb
+train_gpt2_jobs.sh  # ignore the high-level script with login key info
+/wandb/
+/notebooks/.ipynb_checkpoints/
