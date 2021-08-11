@@ -18,7 +18,7 @@ def load_and_preproc_csv(output_folder, filenames):
 
         arc = file.split("_")[1]  # "rnn" or "gpt2"
 
-        sep = "," if arc == "gpt2" else "\t"
+        sep = ","
 
         dftmp = pd.read_csv(os.path.join(output_folder, file), sep=sep, header=0)
 
@@ -62,7 +62,7 @@ def load_and_preproc_csv(output_folder, filenames):
                 
                 dftmp.rename(columns = {"prompt_len": "dist_len", "list_len": "ngram_len" }, inplace=True)
 
-        elif arc == "rnn":
+        elif "rnn" in arc:
             
             dftmp = dftmp.loc[~dftmp.word.isin([":", ".", ","])].copy()
             
@@ -199,25 +199,22 @@ parser.add_argument("--arch", type=str,
                     help="architecture to preprocess")
 parser.add_argument("--scenario", type=str,
                     help="which scenario data to load")
-argins = parser.parse_args()
+parser.add_argument("--output_dir", type=str,
+                    help="path for storing post-processed files")
 
-if "win" in sys.platform:
-    output_folder = os.path.join(os.environ['homepath'], "project", "lm-mem", 
-                                 "src", "output")
-elif "linux" in sys.platform:
-    output_folder = os.path.join(os.environ['HOME'], "code", "lm-mem", "output")
+argins = parser.parse_args()
 
 # file naming syntax:
 # metric_model_scenario_condition_list-type
-files = glob.glob(os.path.join(output_folder, "surprisal_{}_{}_{}_*.csv".format(argins.arch, argins.model_id, argins.scenario)))
+files = glob.glob(os.path.join(argins.output_dir, "surprisal_{}_{}_{}_*.csv".format(argins.arch, argins.model_id, argins.scenario)))
 
 if not files:
-    raise Exception("Can find any files that match pattern: {}".format(os.path.join(output_folder, "surprisal_{}_{}+{}*.csv".format(argins.arch, argins.model_id, argins.scenario))))
+    raise Exception("Can find any files that match pattern: {}".format(os.path.join(argins.output_dir, "surprisal_{}_{}+{}*.csv".format(argins.arch, argins.model_id, argins.scenario))))
 
 files.sort()
 
 print("Preprocessing {}_{}_{} output...".format(argins.arch, argins.model_id, argins.scenario))
-df = load_and_preproc_csv(output_folder=output_folder, filenames=files)
+df = load_and_preproc_csv(output_folder=argins.output_dir, filenames=files)
 
 # rename prompt length values to more meaningful ones
 prompt_len_map = {
@@ -243,6 +240,6 @@ df.scenario = df.scenario.map(scenario_map)
 df.rename(columns={"scenario": "context"}, inplace=True)
 
 # save back to csv (waste of memory but let's stick to this for now)
-fname = os.path.join(output_folder, "output_{}_{}_{}.csv".format(argins.arch, argins.model_id, argins.scenario))
+fname = os.path.join(argins.output_dir, "output_{}_{}_{}.csv".format(argins.arch, argins.model_id, argins.scenario))
 print("Saving {}".format(fname))
 df.to_csv(fname, sep="\t")
