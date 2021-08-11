@@ -220,12 +220,13 @@ class ModelOutput(object):
 
 class Experiment(object):
     
-    def __init__(self, model, dictionary):
+    def __init__(self, model, dictionary, device):
         
         self.model = model
         self.model_with_states = hasattr(model.rnn, 'states')
         self.dictionary = dictionary
-    
+        self.device = device
+
     def run(self, input_set, metainfo):
         """.run(input_set) is the highest-level loop that loops over
         the entire stimulus set (sentences, stories etc.)
@@ -237,23 +238,27 @@ class Experiment(object):
         logging.info("Extracing model outputs ...")
         
         output = []
-        
+
         for j, sequence in enumerate(input_set):
             
             if self.model_with_states and self.model.rnn.store_states:
                 self.model.rnn.init_state_logger()
+                states = self.model.rnn.states
+                store_states = self.model.rnn.store_states
+
             else:  # initiate empty lists otherwise
-                self.model.rnn.states = [[] for l in range(self.model.rnn.num_layers)]
-        
-            model_output = self.get_states(input_sequence=sequence)    
+                states = [[] for l in range(self.model.rnn.num_layers)]
+                store_states = False
+
+            model_output = self.get_states(input_sequence=sequence.to(self.device))    
             
              # log trial id and append to experiment output
             model_output.trial = j
             
-            if self.model_with_states:
-                model_output.states = [states.to_numpy_arrays() 
-                                       if self.model.rnn.store_states else states 
-                                       for states in self.model.rnn.states]
+            
+            model_output.states = [s.to_numpy_arrays() 
+                                   if store_states else s 
+                                   for s in states]
             
             model_output.meta = {key: metainfo[key][j] for key in metainfo.keys()}
             
@@ -462,25 +467,27 @@ if __name__ == "__main__":
     parser.add_argument("--list_type", type=str)
     parser.add_argument("--marker_file", type=str)
     parser.add_argument("--output_folder", type=str)
-    
-    args = parser.parse_args()
+    parser.add_argument("--output_filename", type=str)
 
+    args = parser.parse_args()
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logging.info("device = {}".format(device))
+    if device == "cuda":
+        logging.info("device name = {}".format(torch.cuda.get_device_name()))
     # load json file, should be a list of strings where eash string
     # (can be multiple sentences) is a single input stream to the model
     with open(args.input_file, "r") as f:
         
         if ".txt" in args.input_file:
-            input_set = [l.strip("\n").lower() for l in f.readlines()][0:10]
+            input_set = [l.strip("\n").lower() for l in f.readlines()]
         elif ".json" in args.input_file:
             input_set = json.load(f)
     
     markers = read_marker_file(args.marker_file)
     
     # initialize dataset class 
-    ds = Dataset(metadict={'markers': markers['markers'][0:10],
-                           'stimid': markers['stimid'][0:10],
-                           'list_len': markers['list_len'][0:10],
-                           'prompt_len': markers['prompt_len'][0:10]})
+    ds = Dataset(metadict=markers)
     ds.load_dict(path=args.vocab_file)
     
     # convert tokenized strings to torch.LongTensor, this will write to 
@@ -516,10 +523,10 @@ if __name__ == "__main__":
     #model2.eval()
     
     # ===== EXPERIMENT CLASS ===== #
-    #exp = Experiment(model=model, dictionary=ds.dictionary)
-    #exp2 = Experiment(model=model2, dictionary=ds.dictionary)
+    exp = Experiment(model=model.to(device), dictionary=ds.dictionary, device=device)
+#exp2 = Experiment(model=model2, dictionary=ds.dictionary)
     
-    #outputs = exp.run(input_set=ds.seq_ids, metainfo=ds.meta.__dict__)
+    outputs = exp.run(input_set=ds.seq_ids, metainfo=ds.meta.__dict__)
     #outputs2 = exp2.run(input_set=ds.seq_ids, metainfo=ds.meta.__dict__)
     
     # way to test implementations
@@ -536,12 +543,13 @@ if __name__ == "__main__":
     datadict = [{'trial': o.trial,
                  'token': o.labels, 
                  'step': o.step, 
+                 'stimid': o.meta['stimid'],
                  'markers': o.meta['markers'],
                  'list_len': o.meta['list_len'],
                  'prompt_len': o.meta['prompt_len'],
                  'ppl': o.ppl,
                  'log_probs': o.log_probs,
-                 'states': [SimpleNamespace(**vars(s)) if s else [] for s in o.states ],} 
+                 'states': [SimpleNamespace(**vars(s)) if s else [] for s in o.states],} 
                   for o in outputs]
     
     # convert dict to a SimpleNamespace to have dot indexing instead of brackets
@@ -554,16 +562,17 @@ if __name__ == "__main__":
         
         for el in data:
             
-            cols = ["word", "sentid", "corpuspos", "markers", "surp"]
+            cols = ["word", "corpuspos", "markers", "surp"]
             
-            input_arrays = [np.array(el.token), 
-                            np.full(shape=el.step.shape, fill_value=el.trial),
+            input_arrays = [np.array(el.token),
                             el.step,
                             el.markers,
                             el.log_probs[:, 0, 0]]
             
             tmp = pd.DataFrame(data=np.array(input_arrays).T, columns=cols)
             
+            tmp['sentid'] = el.trial     # this counds over entire experiment
+            tmp['stimid'] = el.stimid    # this counts over conditions (0-229)
             tmp['list_len'] = el.list_len
             tmp['prompt_len'] = el.prompt_len
             
@@ -573,8 +582,7 @@ if __name__ == "__main__":
     
     df = datanamespace_to_df(data)
     
-    savename = os.path.join(args.outputfolder, "surprisal_{}_{}_{}_{}.csv".format(config["model_name"], config["model_id"], 
-                                                                                args.scenario, args.condition, args.list_type))
+    savename = os.path.join(args.output_folder, args.output_filename)
 
     logging.info('Saving {}'.format(savename))
     df.to_csv(savename)
