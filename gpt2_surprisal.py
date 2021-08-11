@@ -31,7 +31,7 @@ logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
 if "win" in sys.platform:
     sys.path.append(os.path.join(os.environ['homepath'], 'project', 'lm-mem', 'src'))
 elif "linux" in sys.platform:
-    sys.path.append(os.path.join(os.environ['HOME'], 'code', 'lm-mem', 'data'))
+    sys.path.append(os.path.join(os.environ['HOME'], 'project', 'lm-mem', 'src'))
     
 
 # ===== WRAPPERS FOR DATASET CONSTRUCTION ===== #
@@ -534,7 +534,7 @@ def runtime_code():
     # collect input arguments
     parser = argparse.ArgumentParser(description="surprisal.py runs perplexity experiment")
     
-    parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3"],
+    parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3", "sce4", "sce5", "sce6"],
                         help="str, which scenario to use")
     parser.add_argument("--condition", type=str, choices=["repeat", "permute", "control"],
                         help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
