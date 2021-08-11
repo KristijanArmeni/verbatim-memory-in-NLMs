@@ -1,21 +1,26 @@
 #!/bin/bash
 #SBATCH --job-name=script_preprocess_and_merge_csvfiles.scr
-#SBATCH --time=02:30:00
+#SBATCH --time=03:30:00
 #SBATCH --mem=8gb
-#SBATCH --partition=express
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=5
 #SBATCH --mail-type=end
 #SBATCH --mail-user=karmeni1@jhu.edu
-#SBATCH --output=/home-3/karmeni1@jhu.edu/code/lm-mem/logs/script_preprocess_and_merge_csvfiles.err
-#SBATCH --error=/home-3/karmeni1@jhu.edu/code/lm-mem/logs/script_preprocess_and_merge_csvfiles.log
+#SBATCH --output=/scratch/ka2773/project/lm-mem/logs/wm_eval/script_preprocess_and_merge_csvfiles.err
+#SBATCH --error=/scratch/ka2773/project/lm-mem/logs/wm_eval/script_preprocess_and_merge_csvfiles.log
 
-ml anaconda
-conda activate ~/code/conda_envs/core_env
 
-for model_id in "r-25" "r-30"
-do
-    # python /home-3/karmeni1@jhu.edu/code/lm-mem/preprocess_and_merge_csvfiles.py --arch "gpt2" --model_id "a-10" --scenario $sce
-    python /home-3/karmeni1@jhu.edu/code/lm-mem/preprocess_and_merge_csvfiles.py --arch "gpt2" --model_id $model_id --scenario "sce1"
-    # python /home-3/karmeni1@jhu.edu/code/lm-mem/preprocess_and_merge_csvfiles.py --arch "rnn" --model_id "a-10" --scenario $sce
-done
+singularity exec --nv --overlay $SCRATCH/overlay-50G-10M.ext3:ro /scratch/work/public/singularity/cuda10.2-cudnn8-devel-ubuntu18.04.sif /bin/bash -c "
+
+source /ext3/env.sh
+conda activate core_env
+
+output_dir=/scratch/ka2773/project/lm-mem/output
+
+python /home/ka2773/project/lm-mem/src/preprocess_and_merge_csvfiles.py --arch gpt2 --model_id w-12 --scenario sce4 --output_dir /scratch/ka2773/project/lm-mem/output
+python /home/ka2773/project/lm-mem/src/preprocess_and_merge_csvfiles.py --arch gpt2 --model_id w-12 --scenario sce6 --output_dir /scratch/ka2773/project/lm-mem/output
+python /home/ka2773/project/lm-mem/src/preprocess_and_merge_csvfiles.py --arch gpt2 --model_id a-10 --scenario sce5 --output_dir /scratch/ka2773/project/lm-mem/output
+python /home/ka2773/project/lm-mem/src/preprocess_and_merge_csvfiles.py --arch gpt2 --model_id w-12 --scenario sce5 --output_dir /scratch/ka2773/project/lm-mem/output
+python /home/ka2773/project/lm-mem/src/preprocess_and_merge_csvfiles.py --arch gpt2 --model_id w-12b --scenario sce3 --output_dir /scratch/ka2773/project/lm-mem/output
+
+"
