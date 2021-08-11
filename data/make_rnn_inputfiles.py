@@ -8,7 +8,7 @@ import os, sys
 parser = argparse.ArgumentParser()
 parser.add_argument("--json_filename", type=str)
 parser.add_argument("--paradigm", type=str, choices=["with-context", "repeated-ngrams"])
-parser.add_argument("--scenario_key", choices=["sce1", "sce1rnd", "sce2", "sce3"], 
+parser.add_argument("--scenario_key", choices=["sce1", "sce1rnd", "sce2", "sce3", "sce4", "sce5", "sce6"], 
                     default="sce1", type=str)
 parser.add_argument("--condition", choices=["repeat", "permute", "control"],
                     default="repeat", type=str)
@@ -19,7 +19,7 @@ args = parser.parse_args()
 fname = args.json_filename
 
 if  "linux" in sys.platform:
-    input_dir = os.path.join(os.environ["HOME"], "code", "lm-mem", "data")
+    input_dir = os.path.join(os.environ["HOME"], "project", "lm-mem", "src", "data")
 elif  "win" in sys.platform:
     input_dir = os.path.join(os.environ["homepath"], "project", "lm-mem", "src", "data")
 
