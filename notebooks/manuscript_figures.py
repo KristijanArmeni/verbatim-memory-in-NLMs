@@ -433,30 +433,94 @@ def filter_and_aggregate_per_set_size(datain, model, model_id, context):
     return dataout
 
 
+# %%
+def make_example_plot(data, seed, model_id, title):
+    
+    # pick a random sentence
+    rng = np.random.RandomState(seed)
+    sentid = rng.randint(low=1, high=229)
+
+    sel = (data.prompt_len==8) & \
+          (data.list_len==5) & \
+          (data.second_list=="repeat") & \
+          (data.context=="intact") & \
+          (data.list=="random") & \
+          (data.stimid.isin([sentid])) & \
+          (data.model_id==model_id) & \
+          (~data.token.isin([" ", "<|endoftext|>"]))
+    
+    dat = data.loc[sel]
+    
+    x = dat.loc[dat.stimid==sentid].reset_index().index.values
+    y = dat.loc[dat.stimid==sentid].surp.to_numpy()
+    m = dat.loc[dat.stimid==sentid].marker.to_numpy()
+    l = dat.loc[dat.stimid==sentid].token.to_numpy()
+    
+    sns.set_style("ticks")
+    f, a = plot_example(x=x, y=y, markers=m, xlabels=l, ylabel="surprisal", fh=h, fw=w, title=title)
+    
+    return f, a
+
+
 # %% [markdown]
-# # Vignette 1 (sce1)
+# # 1) Example time courses (sce1)
 
 # %%
-data_rnn = pd.read_csv(os.path.join(data_dir, "output_rnn_a-10_sce1.csv"), sep="\t", index_col=None)
-data_rnn.rename(columns={"word":"token"}, inplace=True)
-
-data_gpt = pd.read_csv(os.path.join(data_dir, "output_gpt2_a-10_sce1.csv"), sep="\t", index_col=0)
-
-data_gpt["model"] = "gpt-2"
-data_rnn["model"] = "lstm"
+scenario = "sce1"
 
 # %% [markdown]
 # ## Check the data
 
 # %%
-# show that the original
-sel = (data_gpt.list_len==5) & (data_gpt.prompt_len==8) & (data_gpt.context=="intact") & (data_gpt.list=="random") & (data_gpt.second_list=="permute") & (data_gpt.marker.isin([1, 3]))
-d = data_gpt.loc[sel]
+# common fig properties
+w, h, w_disp, h_disp = 15, 1.5, 17, 3
+
+# %% [markdown]
+# ## Transformer
+
+# %%
+data_gpt = pd.read_csv(os.path.join(data_dir, "output_gpt2_a-10_sce1.csv"), sep="\t", index_col=0)
+data_40m = pd.read_csv(os.path.join(data_dir, "output_gpt2_w-12_sce1.csv"), sep="\t", index_col=0)
+data_gpt["model"] = "gpt-2"
+data_40m["model"] = "gpt-2"
 
 # %%
 # show original and target lists for stimulus input 11
-stimid=11
-d.loc[d.stimid==stimid, ["token", "marker", "model", "second_list"]]
+for dat in (data_gpt, data_40m):
+    sel = (dat.list_len==5) & (dat.prompt_len==8) & (dat.context=="intact") & (dat.list=="random") & (dat.second_list=="permute") & (dat.marker.isin([1, 3]))
+    d = dat.loc[sel]
+    stimid=11
+    display("Original and target lists for stimulus {}:".format(stimid))
+    display(d.loc[d.stimid==stimid, ["token", "marker", "model", "second_list"]])
+
+# %% [markdown]
+# ### Select data
+
+# %%
+scenario = "sce1"
+titles = ("GPT-2 small", "transformer (40M)")
+
+for dat, tag, title in zip((data_gpt, data_40m), ("a-10", "w-12"), titles):
+
+    f, a = make_example_plot(data=dat, seed=123, model_id=tag, title=title)
+    
+    if savefigs:
+        
+        artifact = "transformer-{}".format(tag)
+        
+        f.set_size_inches(w=w, h=h)
+        print("Saving {}".format(os.path.join(savedir, "example_{}.".format(artifact))))
+        f.savefig(os.path.join(savedir, "example_{}.pdf".format(artifact)), transparent=True, dpi=300, bbox_inches="tight")
+        f.savefig(os.path.join(savedir, "example_{}.png".format(artifact)), dpi=300, bbox_inches="tight")
+
+# %% [markdown]
+# ## LSTM
+
+# %%
+rnn_id = "a-10"
+data_rnn = pd.read_csv(os.path.join(data_dir, "output_rnn_{}_{}.csv".format(rnn_id, scenario)), sep="\t", index_col=None)
+data_rnn.rename(columns={"word":"token"}, inplace=True)
+data_rnn["model"] = "lstm"
 
 # %%
 # show that the original
@@ -466,84 +530,18 @@ d = data_rnn.loc[sel]
 # %%
 d.loc[d.stimid==stimid, ["token", "marker", "model", "second_list"]]
 
-# %% [markdown] tags=[]
-# ## Design figures
-
 # %%
-# common fig properties
-w, h, w_disp, h_disp = 15, 1.5, 17, 3
-
-# %% [markdown]
-# ### Select data (GPT-2 example)
-
-# %%
-# pick a random sentence
-rng = np.random.RandomState(123)
-sentid = rng.randint(low=1, high=229)
-
-# %% tags=[]
-sel = (data_gpt.prompt_len==8) & \
-      (data_gpt.list_len==5) & \
-      (data_gpt.second_list=="repeat") & \
-      (data_gpt.context=="intact") & \
-      (data_gpt.list=="random") & \
-      (data_gpt.stimid.isin([sentid])) & \
-      (data_gpt.model_id=="a-10") & \
-      (~data_gpt.token.isin([" ", "<|endoftext|>"]))
-data = data_gpt.loc[sel].copy()
-
-# %%
-x = data.loc[data.stimid==sentid].reset_index().index.values
-y = data.loc[data.stimid==sentid].surp.to_numpy()
-m = data.loc[data.stimid==sentid].marker.to_numpy()
-l = data.loc[data.stimid==sentid].token.to_numpy()
-
-# %% [markdown]
-# ### Plot figure (GPT-2)
-
-# %%
-sns.set_style("ticks")
-f, a = plot_example(x=x, y=y, markers=m, xlabels=l, ylabel="surprisal", fh=h, fw=w, title="GPT-2")
+f, a = make_example_plot(data=data_rnn, seed=123, model_id="a-10", title="LSTM")
 
 # %%
 if savefigs:
+    
+    artifact = "lstm-{}".format("a-10")
+    
     f.set_size_inches(w=w, h=h)
-    print("Saving {}".format(os.path.join(savedir, "example_gpt2.pdf")))
-    f.savefig(os.path.join(savedir, "example_gpt2.pdf"), transparent=True, dpi=300, bbox_inches="tight")
-    f.savefig(os.path.join(savedir, "example_gpt2.png"), dpi=300, bbox_inches="tight")
-
-# %% [markdown]
-# ### Select data (RNN example)
-
-# %%
-sel = (data_rnn.prompt_len==8) & \
-      (data_rnn.list_len==5) & \
-      (data_rnn.second_list=="repeat") & \
-      (data_rnn.context=="intact") & \
-      (data_rnn.list=="random") & \
-      (data_rnn.model_id=="a-10") & \
-      (data_rnn.stimid.isin([sentid]))
-data = data_rnn.loc[sel].copy()
-
-# %%
-x = data.loc[data.stimid==sentid].reset_index().index.values
-y = data.loc[data.stimid==sentid].surp.to_numpy()
-m = data.loc[data.stimid==sentid].marker.to_numpy()
-l = data.loc[data.stimid==sentid].token.to_numpy()
-
-# %% [markdown]
-# ### Plot (RNN example)
-
-# %%
-sns.set_style("ticks")
-f, a = plot_example(x=x, y=y, markers=m, xlabels=l, ylabel="surprisal", fh=h, fw=w, title="LSTM")
-
-# %%
-if savefigs:
-    f.set_size_inches(w=w, h=h)
-    print("Saving {}".format(os.path.join(savedir, "example_rnn")))
-    f.savefig(os.path.join(savedir, "example_rnn.pdf"), transparent=True, dpi=300, bbox_inches="tight")
-    f.savefig(os.path.join(savedir, "example_rnn.png"), dpi=300, bbox_inches="tight")
+    print("Saving {}".format(os.path.join(savedir, "example_{}".format(artifact))))
+    f.savefig(os.path.join(savedir, "example_{}.pdf".format(artifact)), transparent=True, dpi=300, bbox_inches="tight")
+    f.savefig(os.path.join(savedir, "example_{}.png".format(artifact)), dpi=300, bbox_inches="tight")
 
 # %% [markdown]
 # ## 2) Timecourse plots 
