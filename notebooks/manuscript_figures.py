@@ -45,7 +45,7 @@ plt.rc("font", size=11)
 # %%
 home_dir = os.path.join(os.environ['homepath'], "project", "lm-mem")
 data_dir = os.path.join(home_dir, "data", "output_cshift")
-savedir = os.path.join(home_dir, "fig", "cshift")
+savedir = os.path.join(home_dir, "fig", "raw")
 table_savedir = os.path.join(home_dir, "tables")
 savefigs = False
 
@@ -269,10 +269,10 @@ def make_point_plot(data_frame, x, y, hue, col,
 
 
 # %% [markdown]
-# ### make_plot()
+# ### make_timecourse_plot()
 
 # %%
-def make_plot(datain, x, style, col, col_order, style_order, title, err_style, xticks):
+def make_timecourse_plot(datain, x, style, col, col_order, style_order, title, err_style, xticks):
     
     # annotate
     x_levels = datain.loc[:, x].unique()          # x group
@@ -372,7 +372,7 @@ def relative_change_wrapper(df_agg, groups):
 
                     # compute change and populate output dfs
                     x_del, x_perc = get_relative_change(x1=x1, x2=x2, labels1=labels1, labels2=labels2)
-
+                    
                     df["x1"] = x1
                     df["x2"] = x2
                     df["x_del"] = x_del
@@ -405,6 +405,7 @@ def filter_and_aggregate_per_set_size(datain, model, model_id, context):
           (datain.list.isin(["random", "categorized"])) & \
           (datain.context==context) & \
           (datain.model_id==model_id) & \
+          (datain.model.isin(model))
           (datain.marker.isin([1, 3])) & \
           (datain.marker_pos_rel.isin(token_positions))
 
@@ -418,12 +419,12 @@ def filter_and_aggregate_per_set_size(datain, model, model_id, context):
 
     ## Compute metric
     dataout = relative_change_wrapper(df_agg=dagg, 
-                                   groups = [{"model": [model]}, 
-                                             {"list_len": [3, 5, 7, 10]},
-                                             {"second_list": ["repeat", "permute", "control"]},
-                                             {"list": ["categorized", "random"]}
-                                            ]
-                                  )
+                                       groups = [{"model": [model]}, 
+                                                 {"list_len": [3, 5, 7, 10]},
+                                                 {"second_list": ["repeat", "permute", "control"]},
+                                                 {"list": ["categorized", "random"]}
+                                                ]
+                                      )
 
     dataout.list = dataout.list.map({"categorized": "semantic", "random": "arbitrary"})
     dataout.rename(columns={"second_list": "condition"}, inplace=True)
@@ -433,7 +434,7 @@ def filter_and_aggregate_per_set_size(datain, model, model_id, context):
 
 
 # %% [markdown]
-# # Read scenario 1 data
+# # Vignette 1 (sce1)
 
 # %%
 data_rnn = pd.read_csv(os.path.join(data_dir, "output_rnn_a-10_sce1.csv"), sep="\t", index_col=None)
@@ -445,7 +446,7 @@ data_gpt["model"] = "gpt-2"
 data_rnn["model"] = "lstm"
 
 # %% [markdown]
-# # Check the data
+# ## Check the data
 
 # %%
 # show that the original
@@ -466,7 +467,7 @@ d = data_rnn.loc[sel]
 d.loc[d.stimid==stimid, ["token", "marker", "model", "second_list"]]
 
 # %% [markdown] tags=[]
-# # Design figures
+# ## Design figures
 
 # %%
 # common fig properties
@@ -478,7 +479,7 @@ w, h, w_disp, h_disp = 15, 1.5, 17, 3
 # %%
 # pick a random sentence
 rng = np.random.RandomState(123)
-sentid = rng.randint(low=1, high=21)
+sentid = rng.randint(low=1, high=229)
 
 # %% tags=[]
 sel = (data_gpt.prompt_len==8) & \
@@ -545,10 +546,7 @@ if savefigs:
     f.savefig(os.path.join(savedir, "example_rnn.png"), dpi=300, bbox_inches="tight")
 
 # %% [markdown]
-# # Main figures
-
-# %% [markdown]
-# ## Experiment 1 and 2: word order and semantic structure
+# ## 2) Timecourse plots 
 
 # %% [markdown]
 # ### Create data structure
@@ -577,21 +575,12 @@ sel = (data.prompt_len==context_len) & \
       (data.second_list.isin(["repeated", "permuted", "novel"])) &\
       (data.marker_pos_rel.isin(list(range(-4, 10))))
 
-# %% tags=[]
 d = data.loc[sel].copy()
 
+# %% tags=[]
 # name column manually
 d.rename(columns={"list": "list structure", "second_list": "condition"}, inplace=True)
-
-# %%
-# common fig properties
-w, h, w_disp, h_disp = 10, 1.8, 17, 3
-
-# %%
-# this fontsize should work
-plt.rc("font", size=12)
-
-# %%
+# capitalize row values
 new_second_list_names = {"novel": "Novel", "repeated": "Repeated", "permuted": "Permuted"}
 d.condition = d.condition.map(new_second_list_names)
 
@@ -599,16 +588,22 @@ d.condition = d.condition.map(new_second_list_names)
 # ### Make plots (GPT-2)
 
 # %%
+# common fig properties
+w, h, w_disp, h_disp = 10, 1.8, 17, 3
+# this fontsize should work
+plt.rc("font", size=12)
+
+# %%
 arch = "gpt-2"
-p, ax, stat = make_plot(d.loc[d["model"] == arch], x="marker_pos_rel", style="condition", col="list structure", 
-                        col_order=["arbitrary", "semantic"], style_order=["Repeated", "Permuted", "Novel"],
+p, ax, stat = make_timecourse_plot(d.loc[d["model"] == arch], x="marker_pos_rel", style="condition", col="list structure", 
+                        col_order=["arbitrary", "semantic"], err_style="band", style_order=["Repeated", "Permuted", "Novel"],
                         title="{}".format(arch), xticks=list(range(-4, 10)))
 
 ax[0].set_title("Arbitrary list")
 ax[1].set_title("Semantically coherent list")
 ax[0].set_xlabel("token position relative to list onset", fontsize=12)
 ax[1].set_xlabel("token position relative to list onset", fontsize=12)
-p.fig.suptitle(arch.upper())
+p.fig.suptitle("{} small".format(arch.upper()))
 p.fig.set_size_inches(w=w, h=h)
 p.fig.subplots_adjust(top=0.7)
 
@@ -661,8 +656,8 @@ stat_gpt_0 = stat.loc[stat["token position"].isin(list(range(0, 1))), :]\
 
 # %%
 arch="lstm"
-p, ax, stat = make_plot(d.loc[d["model"] == arch], x="marker_pos_rel", style="condition", col="list structure", 
-                        col_order=["arbitrary", "semantic"], style_order=["Repeated", "Permuted", "Novel"],
+p, ax, stat = make_timecourse_plot(d.loc[d["model"] == arch], x="marker_pos_rel", style="condition", col="list structure", 
+                        col_order=["arbitrary", "semantic"], err_style="band", style_order=["Repeated", "Permuted", "Novel"],
                         title="{}".format(arch), xticks=list(range(-4, 10)))
 
 ax[0].set_title("Arbitrary list")
@@ -741,11 +736,14 @@ with open(fname, "w") as f:
     f.writelines(stat0_tex)
 
 # %% [markdown]
-# ## Experiment 3: effect of set size
+# ## 3) Set size effect
 
 # %%
 data = None
 data = pd.concat([data_gpt, data_rnn])
+
+# %%
+filter_and_aggregate_per_set_size(datain=data)
 
 # %% [markdown]
 # ### Filter data
@@ -2705,7 +2703,7 @@ d.condition = d.condition.map(new_second_list_names)
 
 # %%
 arch = "gpt-2"
-p, ax, stat = make_plot(d.loc[d["model"] == arch], x="marker_pos_rel", style="condition", col="list structure", 
+p, ax, stat = make_timecourse_plot(d.loc[d["model"] == arch], x="marker_pos_rel", style="condition", col="list structure", 
                         col_order=["arbitrary", "semantic"], style_order=["Repeated", "Permuted", "Novel"],
                         title="{}".format(arch), xticks=list(range(-4, 10)), err_style="band")
 
