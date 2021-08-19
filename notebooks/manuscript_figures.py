@@ -681,11 +681,11 @@ dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10
 # %%
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
 suptitles = ("TRANSFORMER (40m)", "TRANSFORMER (Radford et al, 2019)", "LSTM")
-savetags = ("gpt-2-small", "gpt-2-40m", "lstm-40m")
+savetags = ("gpt-2-40m", "gpt2-small", "lstm-40m")
 ylims=((70, None), (0, None), (70, None))
 basename="set-size"
 
-for df, suptitle, ylim, tag in zip((dat_40m_, dat_gpt_, dat_rnn_), suptitles, ylims, savetags):
+for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     
     plot_size=(5, 3)
     sns.set_style("ticks")
@@ -706,290 +706,59 @@ for df, suptitle, ylim, tag in zip((dat_40m_, dat_gpt_, dat_rnn_), suptitles, yl
         grid.savefig(os.path.join(savedir, "{}_{}.pdf".format(basename, tag)), transparent=True, bbox_inches="tight")
         grid.savefig(os.path.join(savedir, "{}_{}.png".format(basename, tag)), dpi=300, bbox_inches="tight")
 
-# %% tags=[]
-basename = "set-size"
-if savefigs:
-    
-    print("Saving {}".format(os.path.join(savedir, "{}_{}.pdf".format(basename, arch))))
-    p2.savefig(os.path.join(savedir, "{}_{}.pdf".format(basename, arch)), transparent=True, bbox_inches="tight")
-    p2.savefig(os.path.join(savedir, "{}_{}.png".format(basename, arch)), dpi=300, bbox_inches="tight")
-    
-    print("Saving {}".format(os.path.join(savedir, "{}_{}_B.pdf".format(basename, arch))))
-    p2B.savefig(os.path.join(savedir, "{}_{}_B.pdf".format(basename, arch)), transparent=True, bbox_inches="tight")
-    p2B.savefig(os.path.join(savedir, "{}_{}_B.png".format(basename, arch)), dpi=300, bbox_inches="tight")
-    
-    # create a column with string formateed and save the table as well
-    #stat = stat.round({"ci_min": 1, "ci_max": 1, "median": 1})
-    #strfunc = lambda x: str(x["median"]) + "% " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
-    #stat["report_str"] = stat.apply(strfunc, axis=1)
-    #stat.list_len = stat.list_len.astype(int)
-    #stat.sort_values(by="list_len")
-    
-    # save the original .csv
-    #fname = os.path.join(table_savedir, "{}_{}_table.csv".format(basename, arch))
-    #print("Writing {}".format(fname))
-    #stat.to_csv(fname)
-    
-    # save for latex
-    #stat.rename(columns={"list_len": "set size"}, inplace=True)
-    #tex = stat.pivot(index=["list", "condition"], columns=["set size"], values="report_str")\
-    #          .to_latex(bold_rows=True,
-    #                    caption="LSTM word list surprisal as a function of set size. "
-    #                            "We report the percentage of median surprisal on second lists relative to first list. " 
-    #                            "Ranges are 95\% confidence intervals around the observed median " 
-    #                            "(bootstrap estimate obtainedby sampling with replacement ($N^{sample}=1000$). "
-    #                            "The length of filler string is fixed at 8 tokens.")
-    
-    # now save as .tex file
-    #fname = os.path.join(table_savedir, "{}_{}_table.tex".format(basename, arch))
-    #print("Writing {}".format(fname))
-    #with open(fname, "w") as f:
-    #    f.writelines(tex)
-
 # %% [markdown]
-# ## Experiment 4: effect of context length
-
-# %% [markdown]
-# ### Filter data
+# # 4): Context length effect
 
 # %%
-data = None
-data = pd.concat([data_gpt, data_rnn])
+variables = [{"prompt_len": [8, 100, 200, 400]},
+             {"list_len": [10]},
+             {"context": ["intact"]},
+             {"marker_pos_rel": list(range(1, 10))}]
+
+dat_40m_, dat_gpt_, dat_rnn_ = None, None, None
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
+dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables)
 
 # %%
-# select repeat condition and all list lengths
-context_len = [8, 100, 200, 400]
-list_len = 10
-context = "intact"
-token_positions = list(range(1, 10))
+dat_40m_.prompt_len = dat_40m_.prompt_len.astype(int)
+dat_gpt_.prompt_len = dat_gpt_.prompt_len.astype(int)
+dat_rnn_.prompt_len = dat_rnn_.prompt_len.astype(int)
 
-# we drop the first token
-sel = (data.prompt_len.isin(context_len)) & \
-      (data.list_len.isin([list_len])) & \
-      (data.second_list.isin(["repeat", "permute", "control"])) & \
-      (data.list.isin(["random", "categorized"])) & \
-      (data.context==context) & \
-      (data.model_id=="a-10") & \
-      (data.marker.isin([1, 3])) & \
-      (data.marker_pos_rel.isin(token_positions))
-
-
-# %%
-d = data.loc[sel].copy()
-d.prompt_len = d.prompt_len.astype(int)
 # rename prompt length values to more meaningful ones
-prompt_len_map = {
-    8: 26,
-    30: 47,
-    100: 99,
-    200: 194,
-    400: 435,
-}
-d.prompt_len = d.prompt_len.map(prompt_len_map)
+prompt_len_map = {8: 26, 30: 47, 100: 99, 200: 194, 400: 435}
 
-# %% [markdown]
-# ### Aggregate
+dat_40m_.prompt_len = dat_40m_.prompt_len.map(prompt_len_map)
+dat_gpt_.prompt_len = dat_gpt_.prompt_len.map(prompt_len_map)
+dat_rnn_.prompt_len = dat_rnn_.prompt_len.map(prompt_len_map)
 
 # %%
-# group by units/levels, then tage average per level combination
-units = ["prompt_len", "stimid", "model", "marker", "list", "second_list"]
-dagg = d.groupby(units).agg({"surp": ["mean", "std"], "token": list}).reset_index()
-dagg.columns = ['_'.join(col_v) if col_v[-1] != '' else col_v[0] for col_v in dagg.columns.values]
+dfs = (dat_40m_, dat_gpt_, dat_rnn_)
+suptitles = ("TRANSFORMER (40m)", "TRANSFORMER (Radford et al, 2019)", "LSTM")
+savetags = ("gpt2-40m", "gpt2-small" "lstm-40m")
+ylims=((80, None), (None, None), (80, None))
+basename="inter-text-size"
 
-# %% [markdown]
-# ### Compute metric
-
-# %%
-# apply relative change computation and apply to 
-df_list = []
-for model in ["gpt-2", "lstm"]:
-    for length in [26, 99, 194, 435]:
-        for condition in ["repeat", "permute", "control"]:
-            for list_type in ["categorized", "random"]:
-            
-                cols = ["x1", "x2", "x_del"]
-                df = pd.DataFrame(columns=cols)
-
-                select = (dagg.model == model) & (dagg.prompt_len == length) & (dagg.second_list == condition) & (dagg.list==list_type)
-                tmp = dagg.loc[select].copy()
-
-                x1=tmp.loc[tmp.marker==1].surp_mean.to_numpy()           # average per sentence surprisal on first list
-                x2=tmp.loc[tmp.marker==3].surp_mean.to_numpy()           # average per sentence surprisal on second list
-                labels1 = tmp.loc[tmp.marker==1].stimid.to_numpy()  # use sentence id for check
-                labels2 = tmp.loc[tmp.marker==3].stimid.to_numpy()
-
-                x_del, x_perc = get_relative_change(x1=x1, x2=x2, labels1=labels1, labels2=labels2)
-
-                df["x1"] = x1
-                df["x2"] = x2
-                df["x_del"] = x_del
-                df["x_perc"] = x_perc
-                df["model"] = model
-                df["prompt_len"] = length
-                df["list"] = list_type
-                df["condition"] = condition
-
-                df_list.append(df)
-
-# %%
-# concatenate relative scores
-data = None
-data = pd.concat(df_list)
-
-# %%
-# rename for ploting
-new_second_list_names = {"control": "Novel", "repeat": "Repeated", "permute": "Permuted"}
-data.condition = data.condition.map(new_second_list_names)
-data.list = data.list.map({"categorized": "semantic", "random": "arbitrary"})
-
-# %% [markdown]
-# ### Plot (GPT-2)
-
-# %%
-arch="gpt-2"
-sns.set_style("ticks")
-sns.set_context("paper", font_scale=1.2)
-plot_size = (4, 2)
-p3, _, stat = make_bar_plot(data_frame=data.loc[data.model==arch], 
-                      x="prompt_len", y="x_perc", hue="condition", col="list", ylim=(None, None),
-                      xlabel="filler size\n(n. tokens)", ylabel="repeat surprisal\n(%, $\\frac{repeat}{orig}$)", 
-                      suptitle="{}".format(arch), legend=False, legend_title="second list",
-                      size_inches=plot_size)
-p3.fig.subplots_adjust(top=0.8)
-
-# %% [markdown]
-# ### Point plot (GPT-2)
-
-# %%
-arch="gpt-2"
-sns.set_style("ticks")
-sns.set_context("paper", font_scale=1.5)
-plot_size = (4.5, 3.5)
-p3B, ax, _ = make_point_plot(data_frame=data.loc[data.model==arch], 
-                      x="prompt_len", y="x_perc", hue="condition", col="list", ylim=(None, None),
-                      xlabel="inter. text size\n(n. tokens)", ylabel="", scale=0.8,
-                      suptitle="{}".format(arch), legend=False, custom_legend=False, legend_title="second list",
-                      size_inches=plot_size)
-p3B.fig.subplots_adjust(top=0.8)
-ax[0].set_title("Arbitrary list")
-ax[1].set_title("Semantically coherent list")
-p3B.fig.suptitle(arch.upper())
-
-# %% [markdown]
-# ### Save plot, export metrics (GPT-2)
-
-# %%
-basename = "filler-size"
-if savefigs:
+for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     
-    print("Saving {}".format(os.path.join(savedir, "{}_{}".format(basename, arch))))
-    p3.savefig(os.path.join(savedir, "{}_{}.pdf".format(basename, arch)), transparent=True, bbox_inches="tight")
-    p3.savefig(os.path.join(savedir, "{}_{}.png".format(basename, arch)), dpi=300, bbox_inches="tight")
+    plot_size=(5, 3)
+    sns.set_style("ticks")
+    sns.set_context("paper", font_scale=1.6)
     
-    print("Saving {}".format(os.path.join(savedir, "{}_{}_B".format(basename, arch))))
-    p3B.savefig(os.path.join(savedir, "{}_{}_B.pdf".format(basename, arch)), transparent=True, bbox_inches="tight")
-    p3B.savefig(os.path.join(savedir, "{}_{}_B.png".format(basename, arch)), dpi=300, bbox_inches="tight")
-        
-    # create a column with string formateed and save the table as well
-    stat = stat.round({"ci_min": 1, "ci_max": 1, "median": 1})
-    strfunc = lambda x: str(x["median"]) + "% " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
-    stat["report_str"] = stat.apply(strfunc, axis=1)
-    stat.prompt_len = stat.prompt_len.astype(int)
-    stat.sort_values(by="prompt_len")
+    grid, ax, _ = make_point_plot(data_frame=df, x="prompt_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+                                 xlabel="filler size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
+                                 suptitle=suptitle, scale=0.8,
+                                 legend=False, legend_out=False, custom_legend=False, legend_title="second list",
+                                 size_inches=plot_size)
     
-    # save the original .csv
-    fname = os.path.join(table_savedir, "{}_{}_table.csv".format(basename, arch))
-    print("Writing {}".format(fname))
-    stat.to_csv(fname)
+    grid.fig.subplots_adjust(top=0.8)
+    ax[0].set_title("Arbitrary list")
+    ax[1].set_title("Semantically coherent list")
     
-    # save for latex
-    stat.rename(columns={"prompt_len": "filler size"}, inplace=True)
-    tex = stat.pivot(index=["list", "condition"], columns=["filler size"], values="report_str")\
-              .to_latex(bold_rows=True,
-                        caption="GPT-2 word list surprisal per filler size. " + 
-                                "Percent of median surprisal on second lists relative to first list. "
-                                "Ranges are 95\% confidence intervals around the observed median "
-                                "(bootstrap estimate). "
-                                "Set size is fixed at 10 tokens.")
-    
-    # now save as .tex file
-    fname = os.path.join(table_savedir, "{}_{}_table.tex".format(basename, arch))
-    print("Writing {}".format(fname))
-    with open(fname, "w") as f:
-        f.writelines(tex)
-
-# %% [markdown]
-# ### Plot (lstm)
-
-# %%
-arch = "lstm"
-sns.set_style("ticks")
-sns.set_context("paper", font_scale=1.2)
-p4, _, stat = make_bar_plot(data_frame=data.loc[data.model==arch], 
-                          x="prompt_len", y="x_perc", hue="condition", col="list",  ylim=(None, None),
-                          xlabel="context length (n. tokens)", ylabel="repeat surprisal\n(%, $\\frac{repeat}{orig}$)", 
-                          suptitle="{}".format(arch), legend_title="second list",
-                          size_inches=(4, 2))
-p4.fig.subplots_adjust(top=0.8)
-
-# %% [markdown]
-# ### Point plot (lstm)
-
-# %%
-arch = "lstm"
-sns.set_style("ticks")
-sns.set_context("paper", font_scale=1.5)
-p4B, ax, _ = make_point_plot(data_frame=data.loc[data.model==arch], 
-                          x="prompt_len", y="x_perc", hue="condition", col="list",  ylim=(70, None),
-                          xlabel="inter. text size\n(n. tokens)", ylabel="", scale=0.8,
-                          suptitle="{}".format(arch), custom_legend=False, legend_title="second list",
-                          size_inches=(4.5, 3.5))
-p4B.fig.subplots_adjust(top=0.8)
-ax[0].set_title("Arbitrary list")
-ax[1].set_title("Semantically coherent list")
-p4B.fig.suptitle(arch.upper())
-
-# %% [markdown]
-# ### Save plot, export metrics (lstm)
-
-# %%
-if savefigs:
-    
-    print("Saving {}".format(os.path.join(savedir, "{}_{}".format(basename, arch))))
-    p4.savefig(os.path.join(savedir, "{}_{}.pdf".format(basename, arch)), transparent=True, bbox_inches="tight")
-    p4.savefig(os.path.join(savedir, "{}_{}.png".format(basename, arch)), dpi=300,  bbox_inches="tight")
-    
-    print("Saving {}".format(os.path.join(savedir, "{}_{}_B".format(basename, arch))))
-    p4B.savefig(os.path.join(savedir, "{}_{}_B.pdf".format(basename, arch)), transparent=True, bbox_inches="tight")
-    p4B.savefig(os.path.join(savedir, "{}_{}_B.png".format(basename, arch)), dpi=300,  bbox_inches="tight")
-    
-    # create a column with string formated and save the table as well
-    stat = stat.round({"ci_min": 1, "ci_max": 1, "median": 1})
-    strfunc = lambda x: str(x["median"]) + "% " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
-    stat["report_str"] = stat.apply(strfunc, axis=1)
-    stat.prompt_len = stat.prompt_len.astype(int)
-    stat.sort_values(by="prompt_len")
-    
-    # save the original .csv
-    fname = os.path.join(table_savedir, "{}_{}_table.csv".format(basename, arch))
-    print("Writing {}".format(fname))
-    stat.to_csv(fname)
-    
-    # save for latex
-    stat.rename(columns={"prompt_len": "filler size"}, inplace=True)
-    tex = stat.pivot(index=["list", "condition"], columns=["filler size"], values="report_str")\
-              .to_latex(bold_rows=True,
-                        caption="LSTM word list surprisal per filler size. "
-                                "Percent of median surprisal on second lists relative to first list. " 
-                                "Ranges are 95\% confidence intervals around the observed median " 
-                                "(bootstrap estimate "
-                                "Set size is fixed at 10 tokens.")
-    
-    # now save as .tex file
-    fname = os.path.join(table_savedir, "{}_{}_table.tex".format(basename, arch))
-    print("Writing {}".format(fname))
-    with open(fname, "w") as f:
-        f.writelines(tex)
+    if savefigs:
+        print("Saving {}".format(os.path.join(savedir, "{}_{}.".format(basename, tag))))
+        grid.savefig(os.path.join(savedir, "{}_{}.pdf".format(basename, tag)), transparent=True, bbox_inches="tight")
+        grid.savefig(os.path.join(savedir, "{}_{}.png".format(basename, tag)), dpi=300, bbox_inches="tight")
 
 # %% [markdown]
 # ## Experiment 5: Effect of context structure
