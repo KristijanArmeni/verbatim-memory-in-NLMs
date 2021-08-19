@@ -32,6 +32,8 @@ import matplotlib
 from matplotlib.patches import Rectangle
 from stimuli import prefixes, prompts
 import json
+import logging
+logging.basicConfig(format="[INFO] %(message)s", level=logging.INFO)
 
 # %%
 # set some matplotlib options to handle text better
@@ -389,55 +391,6 @@ def relative_change_wrapper(df_agg, groups):
 # %% [markdown]
 # ### filter_and_aggregate_per_set_size()
 
-# %%
-def filter_and_aggregate_per_set_size(datain, model, model_id, context):
-
-    # select repeat condition and all list lengths
-    context_len = 8                       # take only short context for now
-    list_len = [3, 5, 7, 10]              # this is on the x-axis
-    token_positions = list(range(1, 10))  # only select non-initial token positions
-
-    # we drop the first token
-    sel = (datain.prompt_len==context_len) & \
-          (datain.list_len.isin(list_len)) & \
-          (datain.second_list.isin(["repeat", "permute", "control"])) & \
-          (datain.list.isin(["random", "categorized"])) & \
-          (datain.context==context) & \
-          (datain.model_id==model_id) & \
-          (datain.model==model) & \
-          (datain.marker.isin([1, 3])) & \
-          (datain.marker_pos_rel.isin(token_positions))
-    
-    display(sel)
-    
-    d = datain.loc[sel].copy()
-
-    display(d.head())
-    
-    ## Aggregate
-    # average separately per list_len, stimulus id (sentid), model (lstm or gpt2), marker (1 or 3), list (random, categorized) and second list (repeated, permuted or control)
-    units = ["list_len", "stimid", "model", "marker", "list", "second_list"]
-    dagg = d.groupby(units).agg({"surp": ["mean", "std"], "token": list}).reset_index()
-    dagg.columns = ['_'.join(col_v) if col_v[-1] != '' else col_v[0] for col_v in dagg.columns.values]
-
-    display(dagg.head())
-    
-    ## Compute metric
-    dataout = relative_change_wrapper(df_agg=dagg, 
-                                       groups = [{"model": [model]}, 
-                                                 {"list_len": [3, 5, 7, 10]},
-                                                 {"second_list": ["repeat", "permute", "control"]},
-                                                 {"list": ["categorized", "random"]}
-                                                ]
-                                      )
-
-    dataout.list = dataout.list.map({"categorized": "semantic", "random": "arbitrary"})
-    dataout.rename(columns={"second_list": "condition"}, inplace=True)
-    dataout.condition = dataout.condition.map({"control": "Novel", "repeat": "Repeated", "permute": "Permuted"})
-    
-    return dataout
-
-
 # %% [markdown]
 # ### make_example_plot()
 
@@ -598,7 +551,7 @@ for tag, title, arc in zip(tags, titles, arcs):
     
     p, ax, stat = make_timecourse_plot(d.loc[sel], x="marker_pos_rel", style="condition", col="list structure", 
                             col_order=["arbitrary", "semantic"], err_style="band", style_order=["Repeated", "Permuted", "Novel"],
-                            title="{}".format(arch), xticks=list(range(-4, 10)))
+                            title="{}".format(arc), xticks=list(range(-4, 10)))
 
     ax[0].set_title("Arbitrary list")
     ax[1].set_title("Semantically coherent list")
@@ -642,111 +595,116 @@ for tag, title, arc in zip(tags, titles, arcs):
         #with open(fname, "w") as f:
         #    f.writelines(tex)
 
+
 # %% [markdown]
 # # 3) Set size effect
 
 # %%
-dat_40m_ = filter_and_aggregate_per_set_size(datain=data_40m, model="gpt-2", model_id="a-10", context="intact")
-dat_gpt_ = filter_and_aggregate_per_set_size(datain=data_gpt, model="gpt-2", model_id="w-12", context="intact")
-dat_rnn_ = filter_and_aggregate_per_set_size(datain=data_rnn, model="lstm", model_id="a-10", context="intact")
+def filter_and_aggregate(datain, model, model_id, groups):
+    """
+    Parameters:
+    ----------
+    datain : dataframe
+        dataframe which is filtered and aggregated over
+    model : string
+        string identifying the model in the 'model' column
+    model_id: string
+        string identifying the id of the model in the 'model_id' column of datain
+    groups : list of dicts
+        each element is a dict with column name as key and a list of row values as dict value, 
+        the first dict should be the variable that's manipulated (e.g. list length),
+        the rest are the ones that are held fixed
+    """
+    # unpack the dictionaries for each variable
+    d1, d2, d3, d4 = groups
+   
+    # define variables for querying below
+    var1 = list(d1.keys())[0]  # e.g. .prompt_len
+    var2 = list(d2.keys())[0]  # e.g. .list_len
+    var3 = list(d3.keys())[0]  # e.g. .context
+    var4 = list(d4.keys())[0]  # e.g. .token_positions
+
+    # select the groups based on variable values
+    sel = (datain[var1].isin(d1[var1])) & \
+          (datain[var2].isin(d2[var2])) & \
+          (datain.second_list.isin(["repeat", "permute", "control"])) & \
+          (datain.list.isin(["random", "categorized"])) & \
+          (datain[var3].isin(d3[var3])) & \
+          (datain.model_id==model_id) & \
+          (datain.model==model) & \
+          (datain.marker.isin([1, 3])) & \
+          (datain[var4].isin(d4[var4]))
+    
+    if sum(sel) == 0:
+        logging.info("No rows were selected. Check selection conditions.")
+    
+    d = datain.loc[sel].copy()
+    
+    ## Aggregate
+    # average separately per list_len, stimulus id (sentid), model (lstm or gpt2), marker (1 or 3), list (random, categorized) and second list (repeated, permuted or control)
+    units = [var1, "stimid", "model", "marker", "list", "second_list"]
+    
+    logging.info("Aggregating over these variables:")
+    display(units)
+    
+    # aggregate with .groupby and .agg
+    dagg = d.groupby(units).agg({"surp": ["mean", "std"], "token": list}).reset_index()
+    dagg.columns = ['_'.join(col_v) if col_v[-1] != '' else col_v[0] for col_v in dagg.columns.values]
+    
+    ## Compute metric
+    dataout = relative_change_wrapper(df_agg=dagg, 
+                                      groups = [{"model": [model]}, 
+                                                 d1,  # this is the manipulated variable
+                                                {"second_list": ["repeat", "permute", "control"]},
+                                                {"list": ["categorized", "random"]}
+                                                ]
+                                      )
+    
+    # rename some column/row names for plotting
+    dataout.list = dataout.list.map({"categorized": "semantic", "random": "arbitrary"})
+    dataout.rename(columns={"second_list": "condition"}, inplace=True)
+    dataout.condition = dataout.condition.map({"control": "Novel", "repeat": "Repeated", "permute": "Permuted"})
+    
+    return dataout, dagg
+
+
+# %%
+variables = [{"list_len": [3, 5, 7, 10]},
+             {"prompt_len": [8]},
+             {"context": ["intact"]},
+             {"marker_pos_rel": list(range(1, 10))}]
+
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
+dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables)
 
 # %%
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
 suptitles = ("TRANSFORMER (40m)", "TRANSFORMER (Radford et al, 2019)", "LSTM")
+savetags = ("gpt-2-small", "gpt-2-40m", "lstm-40m")
+ylims=((70, None), (0, None), (70, None))
+basename="set-size"
 
-for df, suptitle in zip((dat_40m_, dat_gpt_ dat_rnn_), suptitles):
+for df, suptitle, ylim, tag in zip((dat_40m_, dat_gpt_, dat_rnn_), suptitles, ylims, savetags):
     
-    plot_size=(4.5,3.5)
+    plot_size=(5, 3)
     sns.set_style("ticks")
-    sns.set_context("paper", font_scale=1.5)
-    p1B, ax, _ = make_point_plot(data_frame=df, 
-                      x="list_len", y="x_perc", hue="condition", col="list", ylim=(None, None),
-                      xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
-                      suptitle="{}".format(arch.upper()), scale=0.8,
-                      legend=False, legend_out=False, custom_legend=False, legend_title="second list",
-                      size_inches=plot_size)
-    p1B.fig.subplots_adjust(top=0.8)
+    sns.set_context("paper", font_scale=1.6)
+    
+    grid, ax, _ = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+                                 xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
+                                 suptitle=suptitle, scale=0.8,
+                                 legend=False, legend_out=False, custom_legend=False, legend_title="second list",
+                                 size_inches=plot_size)
+    
+    grid.fig.subplots_adjust(top=0.8)
     ax[0].set_title("Arbitrary list")
     ax[1].set_title("Semantically coherent list")
-    p.fig.suptitle(suptitle)
-
-# %% [markdown]
-# ### Save plot, export metrics (GPT-2)
-
-# %% tags=[]
-basename = "set-size"
-if savefigs:
     
-    print("Saving {}".format(os.path.join(savedir, "{}_{}.pdf".format(basename, arch))))
-    p1.savefig(os.path.join(savedir, "{}_{}.pdf".format(basename, arch)), transparent=True, bbox_inches="tight")
-    p1.savefig(os.path.join(savedir, "{}_{}.png".format(basename, arch)), dpi=300, bbox_inches="tight")
-    
-    print("Saving {}".format(os.path.join(savedir, "{}_{}_B.pdf".format(basename, arch))))
-    p1B.savefig(os.path.join(savedir, "{}_{}_B.pdf".format(basename, arch)), transparent=True, bbox_inches="tight")
-    p1B.savefig(os.path.join(savedir, "{}_{}_B.png".format(basename, arch)), dpi=300, bbox_inches="tight")
-    
-    # create a column with string formateed and save the table as well
-    stat = stat.round({"ci_min": 1, "ci_max": 1, "median": 1})
-    strfunc = lambda x: str(x["median"]) + "% " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
-    stat["report_str"] = stat.apply(strfunc, axis=1)
-    stat.list_len = stat.list_len.astype(int)
-    stat.sort_values(by="list_len")
-    
-    # save the original .csv
-    fname = os.path.join(table_savedir, "{}_{}_table.csv".format(basename, arch))
-    print("Writing {}".format(fname))
-    stat.to_csv(fname)
-    
-    # save for latex
-    stat.rename(columns={"list_len": "set size"}, inplace=True)
-    tex = stat.pivot(index=["list", "condition"], columns=["set size"], values="report_str")\
-              .to_latex(bold_rows=True,
-                        caption="GPT-2 word list surprisal as a function of set size. "
-                                "We report the percentage of median surprisal on second lists relative to first list. " 
-                                "Ranges are 95\% confidence intervals around the observed median " 
-                                "(bootstrap estimate obtained by sampling with replacement ($N^{sample}=1000$). "
-                                "The length of filler string is fixed at 8 tokens.")
-    
-    # now save as .tex file
-    fname = os.path.join(table_savedir, "{}_{}.tex".format(basename, arch))
-    print("Writing {}".format(fname))
-    with open(fname, "w") as f:
-        f.writelines(tex)
-
-# %% [markdown]
-# ### Plot (lstm)
-
-# %% tags=[]
-arch="lstm"
-sns.set_style("ticks")
-sns.set_context("paper", font_scale=1.2)
-p2, _, stat = make_bar_plot(data_frame=data.loc[data.model==arch], 
-                  x="list_len", y="x_perc", hue="condition", col="list", ylim=(None, None),
-                  xlabel="set size (n. tokens)", ylabel="repeat surprisal\n(%, $\\frac{repeat}{orig}$)", 
-                  suptitle="{}".format(arch), legend_title="second list",
-                  size_inches=(4, 2))
-p2.fig.subplots_adjust(top=0.8)
-
-# %% [markdown]
-# ### Point plot (lstm)
-
-# %%
-plot_size=(4.5, 3.5)
-arch="lstm"
-sns.set_style("ticks")
-sns.set_context("paper", font_scale=1.5)
-p2B, ax, _ = make_point_plot(data_frame=data.loc[data.model==arch], 
-                  x="list_len", y="x_perc", hue="condition", col="list", ylim=(70, None),
-                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
-                  scale=0.8,
-                  suptitle="{}".format(arch), custom_legend=False, legend_title="second list",
-                  size_inches=(4.5, 3.5))
-p2B.fig.subplots_adjust(top=0.8)
-ax[0].set_title("Arbitrary list")
-ax[1].set_title("Semantically coherent list")
-
-# %% [markdown]
-# ### Save plot, export metrics (lstm)
+    if savefigs:
+        print("Saving {}".format(os.path.join(savedir, "{}_{}.".format(basename, tag))))
+        grid.savefig(os.path.join(savedir, "{}_{}.pdf".format(basename, tag)), transparent=True, bbox_inches="tight")
+        grid.savefig(os.path.join(savedir, "{}_{}.png".format(basename, tag)), dpi=300, bbox_inches="tight")
 
 # %% tags=[]
 basename = "set-size"
@@ -761,32 +719,32 @@ if savefigs:
     p2B.savefig(os.path.join(savedir, "{}_{}_B.png".format(basename, arch)), dpi=300, bbox_inches="tight")
     
     # create a column with string formateed and save the table as well
-    stat = stat.round({"ci_min": 1, "ci_max": 1, "median": 1})
-    strfunc = lambda x: str(x["median"]) + "% " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
-    stat["report_str"] = stat.apply(strfunc, axis=1)
-    stat.list_len = stat.list_len.astype(int)
-    stat.sort_values(by="list_len")
+    #stat = stat.round({"ci_min": 1, "ci_max": 1, "median": 1})
+    #strfunc = lambda x: str(x["median"]) + "% " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+    #stat["report_str"] = stat.apply(strfunc, axis=1)
+    #stat.list_len = stat.list_len.astype(int)
+    #stat.sort_values(by="list_len")
     
     # save the original .csv
-    fname = os.path.join(table_savedir, "{}_{}_table.csv".format(basename, arch))
-    print("Writing {}".format(fname))
-    stat.to_csv(fname)
+    #fname = os.path.join(table_savedir, "{}_{}_table.csv".format(basename, arch))
+    #print("Writing {}".format(fname))
+    #stat.to_csv(fname)
     
     # save for latex
-    stat.rename(columns={"list_len": "set size"}, inplace=True)
-    tex = stat.pivot(index=["list", "condition"], columns=["set size"], values="report_str")\
-              .to_latex(bold_rows=True,
-                        caption="LSTM word list surprisal as a function of set size. "
-                                "We report the percentage of median surprisal on second lists relative to first list. " 
-                                "Ranges are 95\% confidence intervals around the observed median " 
-                                "(bootstrap estimate obtainedby sampling with replacement ($N^{sample}=1000$). "
-                                "The length of filler string is fixed at 8 tokens.")
+    #stat.rename(columns={"list_len": "set size"}, inplace=True)
+    #tex = stat.pivot(index=["list", "condition"], columns=["set size"], values="report_str")\
+    #          .to_latex(bold_rows=True,
+    #                    caption="LSTM word list surprisal as a function of set size. "
+    #                            "We report the percentage of median surprisal on second lists relative to first list. " 
+    #                            "Ranges are 95\% confidence intervals around the observed median " 
+    #                            "(bootstrap estimate obtainedby sampling with replacement ($N^{sample}=1000$). "
+    #                            "The length of filler string is fixed at 8 tokens.")
     
     # now save as .tex file
-    fname = os.path.join(table_savedir, "{}_{}_table.tex".format(basename, arch))
-    print("Writing {}".format(fname))
-    with open(fname, "w") as f:
-        f.writelines(tex)
+    #fname = os.path.join(table_savedir, "{}_{}_table.tex".format(basename, arch))
+    #print("Writing {}".format(fname))
+    #with open(fname, "w") as f:
+    #    f.writelines(tex)
 
 # %% [markdown]
 # ## Experiment 4: effect of context length
