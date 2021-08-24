@@ -1025,6 +1025,11 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
     
+    # handle yticks and labels
+    ax[0].set_yticks(list(range(ylim[0], 120, 10)))
+    ax[1].set_yticks(list(range(ylim[0], 120, 10)))
+    ax[0].set_yticklabels(list(range(ylim[0], 120, 10)))
+    
     if savefigs:
         print("Saving {}".format(os.path.join(savedir, "{}_{}_{}-{}.".format(basename, scenario, tag, model_id))))
         grid.savefig(os.path.join(savedir, "{}_{}_{}-{}.pdf".format(basename, scenario, tag, model_id)), transparent=True, bbox_inches="tight")
