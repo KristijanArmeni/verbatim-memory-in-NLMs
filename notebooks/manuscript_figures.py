@@ -1133,11 +1133,11 @@ basename = "set-size"
 for df, suptitle, ylim, model_id, tag in zip(dfs, suptitles, ylims, model_ids, savetags):
     
     plot_size=(5, 3)
-    grid, ax, _ = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                  xlabel="filler size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
-                                  suptitle=suptitle, scale=0.8,
-                                  legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
-                                  size_inches=plot_size)
+    grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+                                     xlabel="filler size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
+                                     suptitle=suptitle, scale=0.8,
+                                     legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
+                                     size_inches=plot_size)
     
     grid.fig.subplots_adjust(top=0.70)
     ax[0].set_title("Arbitrary list\n")
@@ -1147,12 +1147,38 @@ for df, suptitle, ylim, model_id, tag in zip(dfs, suptitles, ylims, model_ids, s
         print("Saving {}".format(os.path.join(savedir, "{}_{}_{}-{}.".format(basename, scenario, tag, model_id))))
         grid.savefig(os.path.join(savedir, "{}_{}_{}-{}.pdf".format(basename, scenario, tag, model_id)), transparent=True, bbox_inches="tight")
         grid.savefig(os.path.join(savedir, "{}_{}_{}-{}.png".format(basename, scenario, tag, model_id)), dpi=300, bbox_inches="tight")
+        
+         # create a column with string formated and save the table as well
+        stat = stat.round({"ci_min": 1, "ci_max": 1, "est": 1})
+        strfunc = lambda x: str(x["est"]) + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        stat["report_str"] = stat.apply(strfunc, axis=1)
+
+        # save the original .csv
+        fname = os.path.join(table_savedir, "{}_{}_{}.csv".format(basename, scenario, tag))
+        print("Writing {}".format(fname))
+        stat.to_csv(fname)
+
+        # save for latex
+        stat.rename(columns={"hue": "Condition", "cond": "List", "xlabel": "Set-Size"}, inplace=True)
+        tex = stat.pivot(index=["List", "Condition"], columns=["Set-Size"], values="report_str")\
+                  .to_latex(bold_rows=True, 
+                            longtable=True, 
+                            caption="{} word list surprisal as a function of set size. We report the percentage of"\
+                            "list-median surprisal on second relative to first lists. Ranges are 95% confidence intervals around"\
+                            "the observed median (bootstrap estimate (N^resample = 1000)."\
+                            "Intervening text size is fixed at 26 tokens".format(suptitle))
+
+        # now save as .tex file
+        fname = os.path.join(table_savedir, "{}_{}_{}.tex".format(basename, scenario, tag))
+        print("Writing {}".format(fname))
+        with open(fname, "w") as f:
+            f.writelines(tex)
 
 # %% [markdown]
 # # 8) Transformer and depth
 
 # %%
-model_ids = ["w-01", "w-03", "w-06", "w-12", "w-12b"]
+model_ids = ["w-01", "w-03", "w-06", "w-12"]
 scenario = "sce3"
 
 dfs = []
@@ -1171,8 +1197,7 @@ tags = ("trf", "trf", "trf", "trf", "trf")
 titles = ("Transformer (1 layer)", 
           "Transformer (3 layer)", 
           "Transformer (6 layer)",
-          "Transformer (12 layer)",
-          "Transformer (12 layer (b))")
+          "Transformer (12 layer)")
 
 for dat, model_id, tag, title in zip(dfs, model_ids, tags, titles):
     
@@ -1212,11 +1237,11 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
     
     plot_size=(5, 3)
     sns.set_context("paper", font_scale=1.6)
-    grid, ax, _ = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                  xlabel="filler size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
-                                  suptitle=suptitle, scale=0.8,
-                                  legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
-                                  size_inches=plot_size)
+    grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+                                     xlabel="filler size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
+                                     suptitle=suptitle, scale=0.8,
+                                     legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
+                                     size_inches=plot_size)
     
     grid.fig.subplots_adjust(top=0.70)
     ax[0].set_title("Arbitrary list\n")
@@ -1228,9 +1253,36 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
     ax[0].set_yticklabels(list(range(ylim[0], 120, 10)))
     
     if savefigs:
+        
         print("Saving {}".format(os.path.join(savedir, "{}_{}_{}-{}.".format(basename, scenario, tag, model_id))))
         grid.savefig(os.path.join(savedir, "{}_{}_{}-{}.pdf".format(basename, scenario, tag, model_id)), transparent=True, bbox_inches="tight")
         grid.savefig(os.path.join(savedir, "{}_{}_{}-{}.png".format(basename, scenario, tag, model_id)), dpi=300, bbox_inches="tight")
+        
+         # create a column with string formated and save the table as well
+        stat = stat.round({"ci_min": 1, "ci_max": 1, "est": 1})
+        strfunc = lambda x: str(x["est"]) + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        stat["report_str"] = stat.apply(strfunc, axis=1)
+
+        # save the original .csv
+        fname = os.path.join(table_savedir, "{}_{}_{}-{}.csv".format(basename, scenario, tag, model_id))
+        print("Writing {}".format(fname))
+        stat.to_csv(fname)
+
+        # save for latex
+        stat.rename(columns={"hue": "Condition", "cond": "List", "xlabel": "Set-Size"}, inplace=True)
+        tex = stat.pivot(index=["List", "Condition"], columns=["Set-Size"], values="report_str")\
+                  .to_latex(bold_rows=True, 
+                            longtable=True, 
+                            caption="{} word list surprisal as a function of set size. We report the percentage of"\
+                            "list-median surprisal on second relative to first lists. Ranges are 95% confidence intervals around"\
+                            "the observed median (bootstrap estimate (N^resample = 1000)."\
+                            "Interve".format(suptitle))
+
+        # now save as .tex file
+        fname = os.path.join(table_savedir, "{}_{}_{}-{}.text".format(basename, scenario, tag, model_id))
+        print("Writing {}".format(fname))
+        with open(fname, "w") as f:
+            f.writelines(tex)
 
 # %% [markdown]
 # # Experiment 6: n-gram experiment
