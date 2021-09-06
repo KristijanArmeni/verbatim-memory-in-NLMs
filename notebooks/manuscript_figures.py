@@ -1279,7 +1279,7 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
                             "Interve".format(suptitle))
 
         # now save as .tex file
-        fname = os.path.join(table_savedir, "{}_{}_{}-{}.text".format(basename, scenario, tag, model_id))
+        fname = os.path.join(table_savedir, "{}_{}_{}-{}.tex".format(basename, scenario, tag, model_id))
         print("Writing {}".format(fname))
         with open(fname, "w") as f:
             f.writelines(tex)
