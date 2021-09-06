@@ -49,7 +49,7 @@ plt.style.use("gadfly")
 home_dir = os.path.join(os.environ['homepath'], "project", "lm-mem")
 data_dir = os.path.join(home_dir, "data", "output_cshift")
 savedir = os.path.join(home_dir, "fig", "raw")
-table_savedir = os.path.join(home_dir, "tables")
+table_savedir = os.path.join(home_dir, "tables", "revised")
 savefigs = False
 
 
@@ -194,6 +194,42 @@ def make_bar_plot(data_frame, x, y, hue, col,
     return g, ax, ci_df
 
 
+# %%
+def get_data_lineplot_with_bars(axis):
+    
+    """
+    extract data from a line plot (errbar) with error bars
+    
+    Parameters:
+    axis : AxisSubplot()
+    
+    Returns:
+     : DataFrame()
+    """
+    
+    labels = axis.get_legend_handles_labels()[-1]
+    n_groups = len(labels)
+    group_size = int(len(axis.lines)/n_groups)
+    
+    data_dict = {key: {"est": None, "err": None} for key in labels}
+    
+    tmplist = []
+    for n in range(n_groups):
+        
+        tmp = pd.DataFrame(columns=["est", "ci_max", "ci_min"])
+        
+        beg_element = n * group_size
+        end_element = beg_element + group_size
+        
+        tmp["est"] = axis.lines[beg_element].get_data()[-1]
+        tmp["ci_min"] = [axis.lines[i].get_data()[-1][0] for i in range(beg_element+1, end_element)]
+        tmp["ci_max"] = [axis.lines[i].get_data()[-1][1] for i in range(beg_element+1, end_element)]
+        tmp["group"] = labels[n]
+        tmplist.append(tmp)
+    
+    return pd.concat(tmplist)
+
+
 # %% [markdown]
 # ## make_point_plot()
 
@@ -240,21 +276,14 @@ def make_point_plot(data_frame, x, y, hue, col,
     one_group = (data_frame[x]==x_levels[0]) & (data_frame[hue]==hue_levels[0]) & (data_frame[col] == col_levels[0])
     n = len(data_frame.loc[one_group])  
     print("N per group == {}".format(n))
-    # ax[0].text(x=ax[0].get_xlim()[0], y=ax[0].get_ylim()[-1]*0.9, s="N = {}".format(n))
     
-    # find numerical values
-    ci = {}
-    for k, a in enumerate(ax):
-        d = {lab: [] for lab in hue_order}
-        ci[col_order[k]] = {"{}-{}".format(lab, x_levels[j]): plot_obj[0].get_ydata().tolist() + [plot_obj[1].get_height()]
-                                                           for i, lab in enumerate(hue_order)
-                                                           for j, plot_obj in enumerate(zip(a.lines[0+(i*n_x_groups):n_x_groups+(i*n_x_groups)],
-                                                                                            a.patches[0+(i*n_x_groups):n_x_groups+(i*n_x_groups)]))}
-    
-    # convert dict to a "record" list with observation per row                                                      
-    rec = [[key1, key.split("-")[0], key.split("-")[1], ci[key1][key][0], ci[key1][key][1], ci[key1][key][2]] for key1 in ci.keys() for key in ci[key1].keys()]
-    
-    ci_df = pd.DataFrame.from_records(rec, columns=[col, hue, x, "ci_min", "ci_max", "median"])
+    tmp = []
+    for i, a in enumerate(ax):
+        tmp_df = get_data_lineplot_with_bars(axis=a)
+        tmp_df["cond"] = col_order[i]
+        tmp.append(tmp_df)
+        
+    ci_df = pd.concat(tmp)
     
     # legend
     # Improve the legend
@@ -289,7 +318,7 @@ def make_timecourse_plot(datain, x, style, col, col_order, style_order, hue_orde
     n = len(datain.loc[one_group])  
     
     p = sns.relplot(kind="line", data=datain, x=x, y="surp", style=style, hue=style, col=col, 
-                    estimator=np.median, ci=95.0, err_style=err_style,
+                    estimator=np.median, ci=95.0, err_style=err_style, seed=12345,
                     markers=True, style_order=style_order, hue_order=hue_order, col_order=col_order,
                     legend=True, linewidth=0.7)
     
@@ -363,7 +392,11 @@ def relative_change_wrapper(df_agg, groups):
                     df = pd.DataFrame(columns=cols)
                         
                     # select the correct rows
-                    select = (df_agg.loc[:, col1] == val1) & (df_agg.loc[:, col2] == val2) & (df_agg.loc[:, col3] == val3) & (df_agg.loc[:, col4] == val4)
+                    select = (df_agg.loc[:, col1] == val1) & \
+                             (df_agg.loc[:, col2] == val2) & \
+                             (df_agg.loc[:, col3] == val3) & \
+                             (df_agg.loc[:, col4] == val4)
+                    
                     tmp = df_agg.loc[select].copy()
 
                     # get vectors with aggregated surprisal values from first and second list
@@ -375,14 +408,8 @@ def relative_change_wrapper(df_agg, groups):
                     # compute change and populate output dfs
                     x_del, x_perc = get_relative_change(x1=x1, x2=x2, labels1=labels1, labels2=labels2)
                     
-                    df["x1"] = x1
-                    df["x2"] = x2
-                    df["x_del"] = x_del
-                    df["x_perc"] = x_perc
-                    df[col1] = val1
-                    df[col2] = val2
-                    df[col3] = val3
-                    df[col4] = val4
+                    df["x1"], df["x2"], df["x_del"], df["x_perc"] = x1, x2, x_del, x_perc
+                    df[col1], df[col2], df[col3], df[col4] = val1, val2, val3, val4
 
                     df_list.append(df)
     
@@ -472,8 +499,28 @@ for dat, model_id, tag, title in zip((data_gpt, data_40m, data_rnn, data_rnn2), 
         f.savefig(os.path.join(savedir, "example_{}_{}-{}.pdf".format(scenario, tag, model_id)), transparent=True, dpi=300, bbox_inches="tight")
         f.savefig(os.path.join(savedir, "example_{}_{}-{}.png".format(scenario, tag, model_id)), dpi=300, bbox_inches="tight")
 
+
 # %% [markdown]
 # # 2) Timecourse plots 
+
+# %%
+def get_data_from_axis(axis):
+    
+    data_dict = {"lines": []}
+    
+    # get line data
+    lines = [line2d for line2d in axis.lines if line2d.get_data()[-1].size != 0]
+    labels = axis.get_legend_handles_labels()[1]
+    assert len(lines) == len(labels)
+    
+    for i, line2d in enumerate(lines):
+        
+        data_dict["lines"].append({"x": line2d.get_data()[0],
+                                   "y": line2d.get_data()[1],
+                                   "label": labels[i]})
+    
+    return data_dict
+
 
 # %%
 data = pd.concat([data_gpt, data_40m, data_rnn, data_rnn2], ignore_index=True)
@@ -510,23 +557,30 @@ d.condition = d.condition.map(new_second_list_names)
 # %%
 # common fig properties
 w, h, w_disp, h_disp = 12, 2, 17, 3
-# this fontsize should work
-plt.rc("font", size=16)
 
 model_ids = ("a-10", "w-12", "a-10", "a-70")
 tags = ("trf", "trf", "lstm", "lstm")
-titles = ("Transformer (Radford et al, 2019)", "Transformer", "LSTM", "LSTM (80M tokens, 1600 hidden)")
+titles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)", "LSTM-400 (Wikitext-103)", "LSTM-1600 (Wikitext-103, 80M tokens)")
 arcs = ("gpt-2", "gpt-2", "lstm", "lstm")
 
 for model_id, title, arc, tag in zip(model_ids, titles, arcs, tags):
     
     sel = ((d["model_id"] == model_id) & (d.model == arc))
     
-    p, ax, stat = make_timecourse_plot(d.loc[sel], x="marker_pos_rel", style="condition", col="list structure", 
+    sns.set_context("paper", font_scale=1.6)
+    
+    p, ax, _ = make_timecourse_plot(d.loc[sel], x="marker_pos_rel", style="condition", col="list structure", 
                                        col_order=["arbitrary", "semantic"], err_style="band", 
                                        hue_order=["Repeated", "Permuted", "Novel"],
                                        style_order=["Repeated", "Permuted", "Novel"],
                                        xticks=list(range(-4, 10)))
+    
+    _, _, stat = make_timecourse_plot(d.loc[sel], x="marker_pos_rel", style="condition", col="list structure", 
+                                      col_order=["arbitrary", "semantic"], err_style="bars", 
+                                      hue_order=["Repeated", "Permuted", "Novel"],
+                                      style_order=["Repeated", "Permuted", "Novel"],
+                                      xticks=list(range(-4, 10)))
+    plt.close(plt.gcf())
 
     ax[0].set_title("Arbitrary list", fontsize=16)
     ax[1].set_title("Semantically coherent list", fontsize=16)
@@ -572,7 +626,7 @@ for model_id, title, arc, tag in zip(model_ids, titles, arcs, tags):
 # %% [markdown]
 # # 3) Set size effect
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # ## filter_and_aggregate()
 
 # %%
@@ -656,31 +710,55 @@ dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10
 
 # %%
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
-suptitles = ("Transformer (40m)", "Transformer (Radford et al, 2019)", "LSTM")
-savetags = ("gpt2-40m", "gpt2-small", "lstm-40m")
+suptitles = ("Transformer", "Transformer (Radford et al, 2019)", "LSTM")
+savetags = ("trf-w12", "trf-a10", "lstm-a10")
 ylims=((70, None), (0, None), (70, None))
 basename="set-size"
+scenario = "sce1"
 
 for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     
     plot_size=(5, 3)
-    #sns.set_style("ticks")
     sns.set_context("paper", font_scale=1.6)
     
-    grid, ax, _ = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                 xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
-                                 suptitle=suptitle, scale=0.8,
-                                 legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
-                                 size_inches=plot_size)
+    grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+                                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
+                                  suptitle=suptitle, scale=0.8,
+                                  legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
+                                  size_inches=plot_size)
     
     grid.fig.subplots_adjust(top=0.70)
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
     
     if savefigs:
-        print("Saving {}".format(os.path.join(savedir, "{}_{}.".format(basename, tag))))
-        grid.savefig(os.path.join(savedir, "{}_{}.pdf".format(basename, tag)), transparent=True, bbox_inches="tight")
-        grid.savefig(os.path.join(savedir, "{}_{}.png".format(basename, tag)), dpi=300, bbox_inches="tight")
+        print("Saving {}".format(os.path.join(savedir, "{}_{}_{}.".format(basename, scenario, tag))))
+        grid.savefig(os.path.join(savedir, "{}_{}_{}.pdf".format(basename, scenario, tag)), transparent=True, bbox_inches="tight")
+        grid.savefig(os.path.join(savedir, "{}_{}_{}.png".format(basename, scenario, tag)), dpi=300, bbox_inches="tight")
+        
+        # create a column with string formated and save the table as well
+        stat = stat.round({"ci_min": 1, "ci_max": 1, "est": 1})
+        strfunc = lambda x: str(x["est"]) + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        stat["report_str"] = stat.apply(strfunc, axis=1)
+
+        # save the original .csv
+        fname = os.path.join(table_savedir, "{}_{}_{}.csv".format(basename, scenario, tag))
+        print("Writing {}".format(fname))
+        stat.to_csv(fname)
+
+        # save for latex
+        #stat.rename(columns={"list structure": "list", "marker_pos_rel": "token position"}, inplace=True)
+        #tex = stat.loc[stat["token position"].isin(list(range(0, 10))), :]\
+        #      .pivot(index=["token position"], columns=["list", "condition"], values="report_str")\
+        #      .to_latex(bold_rows=True,
+        #                longtable=True,
+        #                caption="Surprisal values (GPT-2) per token position, list type and condition.")
+
+        # now save as .tex file
+        #fname = os.path.join(table_savedir, "{}_{}_table.tex".format(basename, arch))
+        #print("Writing {}".format(fname))
+        #with open(fname, "w") as f:
+        #    f.writelines(tex)
 
 # %% [markdown]
 # # 4): Context length effect
@@ -710,15 +788,15 @@ dat_rnn_.prompt_len = dat_rnn_.prompt_len.map(prompt_len_map)
 
 # %%
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
-suptitles = ("Transformer (Wikitext-103)", "Transformer (Radford et al, 2019)", "LSTM")
-savetags = ("gpt2-40m", "gpt2-small", "lstm-40m")
+suptitles = ("Transformer", "Transformer (Radford et al, 2019)", "LSTM")
+savetags = ("trf-w12", "trf-a10", "lstm-a10")
 ylims=((80, None), (None, None), (80, None))
 basename="inter-text-size"
+scenario = "sce1"
 
 for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     
     plot_size=(5, 3)
-    #sns.set_style("ticks")
     #sns.set_context("paper", font_scale=1.6)
     
     grid, ax, _ = make_point_plot(data_frame=df, x="prompt_len", y="x_perc", hue="condition", col="list", ylim=ylim,
@@ -732,24 +810,32 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     ax[1].set_title("Semantically coherent\nlist")
     
     if savefigs:
-        print("Saving {}".format(os.path.join(savedir, "{}_{}.".format(basename, tag))))
-        grid.savefig(os.path.join(savedir, "{}_{}.pdf".format(basename, tag)), transparent=True, bbox_inches="tight")
-        grid.savefig(os.path.join(savedir, "{}_{}.png".format(basename, tag)), dpi=300, bbox_inches="tight")
+        print("Saving {}".format(os.path.join(savedir, "{}_{}_{}.".format(basename, scenario, tag))))
+        grid.savefig(os.path.join(savedir, "{}_{}_{}.pdf".format(basename, scenario, tag)), transparent=True, bbox_inches="tight")
+        grid.savefig(os.path.join(savedir, "{}_{}_{}.png".format(basename, scenario, tag)), dpi=300, bbox_inches="tight")
 
 # %% [markdown]
 # # 5) Effect of context structure
 
 # %%
-gptlst = []
-rnnlst = []
+gptlst, gptlst2, rnnlst = [], [], []
 for sce in ["sce1", "sce2", "sce1rnd"]:
+    
+    logging.info("Loading {}".format(os.path.join(data_dir, "output_rnn_a-10_{}.csv".format(sce))))
     rnn = pd.read_csv(os.path.join(data_dir, "output_rnn_a-10_{}.csv".format(sce)), sep="\t", index_col=None)
     rnn.rename(columns={"word":"token"}, inplace=True)
     rnnlst.append(rnn)
+    
+    logging.info("Loading {}".format(os.path.join(data_dir, "output_gpt2_a-10_{}.csv".format(sce))))
     gptlst.append(pd.read_csv(os.path.join(data_dir, "output_gpt2_a-10_{}.csv".format(sce)), sep="\t", index_col=0))
+    
+    logging.info("Loading {}".format(os.path.join(data_dir, "output_gpt2_w-12_{}.csv".format(sce))))
+    gptlst2.append(pd.read_csv(os.path.join(data_dir, "output_gpt2_w-12_{}.csv".format(sce)), sep="\t", index_col=0))
 
 data_gpt = pd.concat(gptlst)
+data_40m = pd.concat(gptlst2)
 data_rnn = pd.concat(rnnlst)
+data_40m["model"] = "gpt-2"
 data_gpt["model"] = "gpt-2"
 data_rnn["model"] = "lstm"
 
@@ -760,21 +846,20 @@ variables = [{"context": ["intact", 'scrambled', 'incongruent']},
              {"marker_pos_rel": list(range(1, 10))}]
 
 dat_40m_, dat_gpt_, dat_rnn_ = None, None, None
-#dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
 dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
 dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables)
 
 # %%
-dfs = (dat_gpt_, dat_rnn_)
-suptitles = ("Transformer (Radford et al, 2019)", "LSTM")
-savetags = ("gpt-2", "lstm")
-ylims=((None, None), (None, None))
-basename="filler-type"
+dfs = (dat_gpt_, dat_40m_, dat_rnn_)
+suptitles = ("Transformer (Radford et al, 2019)", "Transformer", "LSTM")
+savetags = ("trf-a10", "trf-w12", "lstm-a10")
+ylims = ((None, None), (None, None), (None, None))
+basename = "filler-type"
 
 for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     
     plot_size=(6, 3)
-    #sns.set_style("ticks")
     sns.set_context("paper", font_scale=1.6)
     
     grid, ax, _ = make_bar_plot(data_frame=df, x="context", y="x_perc", hue="condition", col="list", ylim=ylim,
@@ -1002,7 +1087,7 @@ for i, model_id in enumerate(model_ids):
     
     tmp, _ = filter_and_aggregate(datain=dfs[i], model="gpt-2", model_id=model_id, groups=variables)
     dfs_.append(tmp)
-    
+
 
 # %%
 scenario = "sce3"
