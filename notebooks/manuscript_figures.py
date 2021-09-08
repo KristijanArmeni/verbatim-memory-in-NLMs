@@ -25,11 +25,12 @@ sys.path.append(os.path.abspath("C:/users/karmeni1/project/lm-mem/src/output"))
 sys.path.append(os.path.abspath("C:/users/karmeni1/project/lm-mem/src"))
 import pandas as pd
 import numpy as np
-import plotly.express as px
+
 import seaborn as sns
 from matplotlib import pyplot as plt
 import matplotlib
 from matplotlib.patches import Rectangle
+
 from stimuli import prefixes, prompts
 import json
 import logging
@@ -37,10 +38,17 @@ logging.basicConfig(format="[INFO] %(message)s", level=logging.INFO)
 
 # %%
 # set some matplotlib options to handle text better
+plt.style.use("gadfly")
+sns.set_context('paper', font_scale=1.8)
+
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Palatino"],
+})
+
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-plt.rc("font", size=11)
-plt.style.use("gadfly")
 
 # %% [markdown]
 # # Define directories
@@ -62,7 +70,9 @@ savefigs = False
 # %%
 #wrapper function
 def plot_example(x, y, markers, xlabels, ylabel, fh, fw, ylim, title):
-
+    
+    usetex = plt.rcParams["text.usetex"]
+    
     f, a = plt.subplots(figsize=(fw, fh))
 
     a.plot(x, y, marker='o', linestyle="--")
@@ -78,6 +88,10 @@ def plot_example(x, y, markers, xlabels, ylabel, fh, fw, ylim, title):
                                edgecolor=None, facecolor="tab:blue", alpha=0.15))
         
     a.set_xticks(x);
+    
+    # escape underscore if latex is used for rendering
+    if usetex:
+        xlabels = [lab.replace("_", "\_").replace("<", "").replace(">", "") for lab in xlabels]
     a.set_xticklabels(xlabels, rotation=40, fontsize=12, ha="right");
 
     bluewords = np.isin(markers, [1, 3])
@@ -312,6 +326,8 @@ def make_point_plot(data_frame, x, y, hue, col,
 # %%
 def make_timecourse_plot(datain, x, style, col, col_order, style_order, hue_order, err_style, xticks):
     
+    usetex = plt.rcParams["text.usetex"]
+    
     # annotate
     x_levels = datain.loc[:, x].unique()          # x group
     col_levels = datain.loc[:, col].unique()      # column grouping
@@ -339,9 +355,6 @@ def make_timecourse_plot(datain, x, style, col, col_order, style_order, hue_orde
     stat = pd.DataFrame.from_records(rec, columns=colnames)
     
     p.set_titles(col_template="{col_name} list")
-    p.set_axis_labels("token position in list" , "surprisal\n(bit)".format(n))
-    
-    p.set(xticks=xticks)
     p.despine(left=True);
     
     return p, ax, stat
@@ -456,7 +469,7 @@ def make_example_plot(data, seed, model_id, title, ylim=None, context="intact"):
 
 
 # %% [markdown]
-# # 1) Example time courses (sce1)
+# # 1) Example time courses
 
 # %%
 data_gpt = pd.read_csv(os.path.join(data_dir, "output_gpt2_a-10_sce1.csv"), sep="\t", index_col=0)
@@ -489,12 +502,13 @@ for dat in (data_gpt, data_40m):
 # %%
 ids = ("a-10", "w-12", "a-10", "a-70")
 tags = ("trf", "trf", "lstm", "lstm")
-titles = ("Transformer (Radford et al, 2019)", "Transformer", "LSTM", "LSTM (80M tokens, 1600 hidden)")
+titles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)", "LSTM (Wikitext-103)", "LSTM (80M tokens, 1600 hidden)")
 scenario = "sce1"
 
 for dat, model_id, tag, title in zip((data_gpt, data_40m, data_rnn, data_rnn2), ids, tags, titles):
-
-    f, a = make_example_plot(data=dat, seed=123, model_id=model_id, context="intact", ylim=(0, 30), title=title)
+    
+    sns.set_context('paper', font_scale=1.6):
+        f, a = make_example_plot(data=dat, seed=123, model_id=model_id, context="intact", ylim=(0, 30), title=title)
     
     if savefigs:
         
@@ -503,28 +517,8 @@ for dat, model_id, tag, title in zip((data_gpt, data_40m, data_rnn, data_rnn2), 
         f.savefig(os.path.join(savedir, "example_{}_{}-{}.pdf".format(scenario, tag, model_id)), transparent=True, dpi=300, bbox_inches="tight")
         f.savefig(os.path.join(savedir, "example_{}_{}-{}.png".format(scenario, tag, model_id)), dpi=300, bbox_inches="tight")
 
-
 # %% [markdown]
 # # 2) Timecourse plots 
-
-# %%
-def get_data_from_axis(axis):
-    
-    data_dict = {"lines": []}
-    
-    # get line data
-    lines = [line2d for line2d in axis.lines if line2d.get_data()[-1].size != 0]
-    labels = axis.get_legend_handles_labels()[1]
-    assert len(lines) == len(labels)
-    
-    for i, line2d in enumerate(lines):
-        
-        data_dict["lines"].append({"x": line2d.get_data()[0],
-                                   "y": line2d.get_data()[1],
-                                   "label": labels[i]})
-    
-    return data_dict
-
 
 # %%
 data = pd.concat([data_gpt, data_40m, data_rnn, data_rnn2], ignore_index=True)
@@ -567,19 +561,19 @@ tags = ("trf", "trf", "lstm", "lstm")
 titles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)", "LSTM-400 (Wikitext-103)", "LSTM-1600 (Wikitext-103, 80M tokens)")
 arcs = ("gpt-2", "gpt-2", "lstm", "lstm")
 
-for model_id, title, arc, tag in zip(model_ids, titles, arcs, tags):
+for model_id, suptitle, arc, tag in zip(model_ids, titles, arcs, tags):
     
     sel = ((d["model_id"] == model_id) & (d.model == arc))
     
-    sns.set_context("paper", font_scale=1.6)
+    d.rename(columns={"marker_pos_rel": "marker-pos-rel", "condition": "Second list"}, inplace=True)
     
-    p, ax, _ = make_timecourse_plot(d.loc[sel], x="marker_pos_rel", style="condition", col="list structure", 
+    p, ax, _ = make_timecourse_plot(d.loc[sel], x="marker-pos-rel", style="Second list", col="list structure", 
                                        col_order=["arbitrary", "semantic"], err_style="band", 
                                        hue_order=["Repeated", "Permuted", "Novel"],
                                        style_order=["Repeated", "Permuted", "Novel"],
                                        xticks=list(range(-4, 10)))
     
-    _, _, stat = make_timecourse_plot(d.loc[sel], x="marker_pos_rel", style="condition", col="list structure", 
+    _, _, stat = make_timecourse_plot(d.loc[sel], x="marker-pos-rel", style="Second list", col="list structure", 
                                       col_order=["arbitrary", "semantic"], err_style="bars", 
                                       hue_order=["Repeated", "Permuted", "Novel"],
                                       style_order=["Repeated", "Permuted", "Novel"],
@@ -588,43 +582,47 @@ for model_id, title, arc, tag in zip(model_ids, titles, arcs, tags):
 
     ax[0].set_title("Arbitrary list", fontsize=16)
     ax[1].set_title("Semantically coherent list", fontsize=16)
-    ax[0].set_xlabel("token position relative to list onset", fontsize=14)
-    ax[1].set_xlabel("token position relative to list onset", fontsize=14)
-    p.fig.suptitle(title, fontsize=20)
+    ax[0].set_ylabel("surprisal\n(bit)")
+    for a in ax:
+        a.set_xlabel("token position relative to list onset")
+        a.set_xticks(list(range(-4, 10, 2)))
+        a.set_xticklabels(list(range(-4, 10, 2)))
+            
+    p.fig.suptitle(suptitle, fontsize=18)
     p.fig.set_size_inches(w=w, h=h)
     p.fig.subplots_adjust(top=0.65)
     
     if savefigs:
         
-        print("Saving {}".format(os.path.join(savedir, "timecourse_plot_{}_{}".format(tag, model_id))))
-        p.savefig(os.path.join(savedir, "timecourse_plot_{}_{}.pdf".format(tag, model_id)), transparent=True, bbox_inches="tight")
-        p.savefig(os.path.join(savedir, "timecourse_plot_{}_{}.png".format(tag, model_id)), dpi=300, bbox_inches="tight")
+        print("Saving {}".format(os.path.join(savedir, "timecourse_{}_{}".format(tag, model_id))))
+        p.savefig(os.path.join(savedir, "timecourse_{}_{}.pdf".format(tag, model_id)), transparent=True, bbox_inches="tight")
+        p.savefig(os.path.join(savedir, "timecourse_{}_{}.png".format(tag, model_id)), dpi=300, bbox_inches="tight")
         
         # save numerical tables
         
         # create a column with string formated and save the table as well
-        #stat = stat.round({"ci_min": 1, "ci_max": 1, "median": 1})
-        #strfunc = lambda x: str(x["median"]) + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
-        #stat["report_str"] = stat.apply(strfunc, axis=1)
+        stat = stat.round({"ci_min": 1, "ci_max": 1, "median": 1})
+        strfunc = lambda x: str(x["median"]) + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        stat["report_str"] = stat.apply(strfunc, axis=1)
 
             # save the original .csv
-        #fname = os.path.join(table_savedir, "{}_{}_table.csv".format(basename, arch))
-        #print("Writing {}".format(fname))
-        #stat.to_csv(fname)
+        fname = os.path.join(table_savedir, "timecourse_{}_{}_table.csv".format(tag, model_id))
+        print("Writing {}".format(fname))
+        stat.to_csv(fname)
 
         # save for latex
-        #stat.rename(columns={"list structure": "list", "marker_pos_rel": "token position"}, inplace=True)
-        #tex = stat.loc[stat["token position"].isin(list(range(0, 10))), :]\
-        #      .pivot(index=["token position"], columns=["list", "condition"], values="report_str")\
-        #      .to_latex(bold_rows=True,
-        #                longtable=True,
-        #                caption="Surprisal values (GPT-2) per token position, list type and condition.")
+        stat.rename(columns={"list structure": "list", "marker-pos-rel": "token position"}, inplace=True)
+        tex = stat.loc[stat["token position"].isin(list(range(0, 10))), :]\
+                  .pivot(index=["token position"], columns=["list", "Second list"], values="report_str")\
+                  .to_latex(bold_rows=True,
+                            longtable=True,
+                            caption="{} surprisal values per token position, list type and second list condition.".format(suptitle))
 
         # now save as .tex file
-        #fname = os.path.join(table_savedir, "{}_{}_table.tex".format(basename, arch))
-        #print("Writing {}".format(fname))
-        #with open(fname, "w") as f:
-        #    f.writelines(tex)
+        fname = os.path.join(table_savedir, "timecourse_{}_{}_table.tex".format(tag, model_id))
+        print("Writing {}".format(fname))
+        with open(fname, "w") as f:
+            f.writelines(tex)
 
 
 # %% [markdown]
@@ -716,22 +714,24 @@ dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
 suptitles = ("Transformer (Wikitext-103)", "Transformer (Radford et al, 2019)", "LSTM (Wikitext-103)")
 savetags = ("trf-w12", "trf-a10", "lstm-a10")
-ylims=((70, None), (0, None), (70, None))
+ylims=((80, 120), (0, None), (80, 120))
 basename="set-size"
 scenario = "sce1"
 
-for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
+for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     
-    plot_size=(5, 3)
-    sns.set_context("paper", font_scale=1.6)
+    plot_size=(4, 3)
+    
+    df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
     
     grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
+                                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
                                   suptitle=suptitle, scale=0.8,
                                   legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                   size_inches=plot_size)
     
     grid.fig.subplots_adjust(top=0.70)
+    
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
     
@@ -756,9 +756,9 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         tex = stat.pivot(index=["List", "Condition"], columns=["Set-Size"], values="report_str")\
                   .to_latex(bold_rows=True, 
                             longtable=True, 
-                            caption="{} word list surprisal as a function of set size. We report the percentage of"\
-                            "list-median surprisal on second relative to first lists. Ranges are 95% confidence intervals around"\
-                            "the observed median (bootstrap estimate (N^resample = 1000)."\
+                            caption="{} word list surprisal as a function of set size. We report the percentage of "\
+                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
+                            "the observed median (bootstrap estimate ($N^resample = 1000$). "\
                             "The length of intervening text is fixed at 8 tokens.)".format(suptitle))
 
         # now save as .tex file
@@ -797,17 +797,16 @@ dat_rnn_.prompt_len = dat_rnn_.prompt_len.map(prompt_len_map)
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
 suptitles = ("Transformer (Wikitext-103)", "Transformer (Radford et al, 2019)", "LSTM (Wikitext-103)")
 savetags = ("trf-w12", "trf-a10", "lstm-a10")
-ylims=((80, None), (None, None), (80, None))
+ylims=((80, 120), (None, None), (80, 120))
 basename="inter-text-size"
 scenario = "sce1"
 
 for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     
-    plot_size=(5, 3)
-    #sns.set_context("paper", font_scale=1.6)
+    plot_size=(4, 3)
     
     grid, ax, stat = make_point_plot(data_frame=df, x="prompt_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                 xlabel="filler size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
+                                 xlabel="filler size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
                                  suptitle=suptitle, scale=0.8,
                                  legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                  size_inches=plot_size)
@@ -837,9 +836,9 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         tex = stat.pivot(index=["List", "Condition"], columns=["Intervening text len."], values="report_str")\
                   .to_latex(bold_rows=True, 
                             longtable=True, 
-                            caption="{} word list surprisal as a function of intervening text size. We report the percentage of"\
-                            "list-median surprisal on second relative to first lists. Ranges are 95% confidence intervals around"\
-                            "the observed median (bootstrap estimate (N^resample = 1000)."\
+                            caption="{} word list surprisal as a function of intervening text size. We report the percentage of "\
+                            "list-median surprisal on second relative to first lists. Ranges are 95% confidence intervals around "\
+                            "the observed median (bootstrap estimate ($N^resample = 1000$). "\
                             "The length of intervening text is fixed at 8 tokens.)".format(suptitle))
 
         # now save as .tex file
@@ -885,31 +884,6 @@ dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-1
 dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables)
 
 # %%
-gptlst, gptlst2, rnnlst = [], [], []
-for sce in ["sce1", "sce2", "sce1rnd"]:
-    
-    logging.info("Loading {}".format(os.path.join(data_dir, "output_rnn_a-10_{}.csv".format(sce))))
-    rnn = pd.read_csv(os.path.join(data_dir, "output_rnn_a-10_{}.csv".format(sce)), sep="\t", index_col=None)
-    rnn.rename(columns={"word":"token"}, inplace=True)
-    rnnlst.append(rnn)
-    
-    logging.info("Loading {}".format(os.path.join(data_dir, "output_gpt2_a-10_{}.csv".format(sce))))
-    gptlst.append(pd.read_csv(os.path.join(data_dir, "output_gpt2_a-10_{}.csv".format(sce)), sep="\t", index_col=0))
-    
-    logging.info("Loading {}".format(os.path.join(data_dir, "output_gpt2_w-12_{}.csv".format(sce))))
-    gptlst2.append(pd.read_csv(os.path.join(data_dir, "output_gpt2_w-12_{}.csv".format(sce)), sep="\t", index_col=0))
-
-data_gpt = pd.concat(gptlst)
-data_40m = pd.concat(gptlst2)
-data_rnn = pd.concat(rnnlst)
-data_40m["model"] = "gpt-2"
-data_gpt["model"] = "gpt-2"
-data_rnn["model"] = "lstm"
-
-# %% [markdown]
-# # 6) Effect of short context
-
-# %%
 dfs = (dat_gpt_, dat_40m_, dat_rnn_)
 suptitles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)", "LSTM (Wikitext-103)")
 savetags = ("trf-a10", "trf-w12", "lstm-a10")
@@ -919,10 +893,9 @@ basename = "filler-type"
 for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     
     plot_size=(6, 3)
-    sns.set_context("paper", font_scale=1.6)
     
     grid, ax, stat = make_bar_plot(data_frame=df, x="context", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                 xlabel="filler size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
+                                 xlabel="intervening text", ylabel="repeat surprisal\n(\%)",
                                  suptitle=suptitle,
                                  legend=False, legend_out=True, legend_title="Second list",
                                  size_inches=plot_size)
@@ -966,7 +939,10 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         print("Writing {}".format(fname))
         with open(fname, "w") as f:
             f.writelines(tex)
-        
+
+
+# %% [markdown] tags=[]
+# # 6) Effect of short context
 
 # %%
 rnn_id = "a-10"
