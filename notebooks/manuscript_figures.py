@@ -599,12 +599,12 @@ for model_id, suptitle, arc, tag in zip(model_ids, titles, arcs, tags):
         stat.to_csv(fname)
 
         # save for latex
-        stat.rename(columns={"list structure": "list", "marker-pos-rel": "token position"}, inplace=True)
-        tex = stat.loc[stat["token position"].isin(list(range(0, 10))), :]\
-                  .pivot(index=["token position"], columns=["list", "Second list"], values="report_str")\
+        stat.rename(columns={"list structure": "List", "marker-pos-rel": "Token position"}, inplace=True)
+        tex = stat.loc[stat["Token position"].isin(list(range(0, 4))), :]\
+                  .pivot(index=["List", "Second list"], columns=["Token position"], values="report_str")\
                   .to_latex(bold_rows=True,
                             longtable=True,
-                            caption="{} surprisal values per token position, list type and second list condition.".format(suptitle))
+                            caption="{} surprisal values for four initial token positions, list type and second list condition.".format(suptitle))
 
         # now save as .tex file
         fname = os.path.join(table_savedir, "timecourse_{}_{}_table.tex".format(tag, model_id))
@@ -731,7 +731,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         
         # create a column with string formated and save the table as well
         stat = stat.round({"ci_min": 1, "ci_max": 1, "est": 1})
-        strfunc = lambda x: str(x["est"]) + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        strfunc = lambda x: str(x["est"]) + "% " + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
         stat["report_str"] = stat.apply(strfunc, axis=1)
 
         # save the original .csv
@@ -741,13 +741,14 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
 
         # save for latex
         stat.rename(columns={"hue": "Condition", "cond": "List", "xlabel": "Set-Size"}, inplace=True)
-        tex = stat.pivot(index=["List", "Condition"], columns=["Set-Size"], values="report_str")\
-                  .to_latex(bold_rows=True, 
-                            longtable=True, 
-                            caption="{} word list surprisal as a function of set size. We report the percentage of "\
-                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
-                            "the observed median (bootstrap estimate ($N^resample = 1000$). "\
-                            "The length of intervening text is fixed at 8 tokens.)".format(suptitle))
+        stat = stat.pivot(index=["List", "Condition"], columns=["Set-Size"], values="report_str")
+        stat.columns = stat.columns.astype(int)
+        stat.sort_index(axis=1, ascending=True, inplace=True)
+        tex = stat.to_latex(bold_rows=True,
+                            caption="{} word list surprisal as a function of set size. We report the percentage of ".format(suptitle) + \
+                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around " \
+                            "the observed median (bootstrap estimate, $N^{resample} = 1000$). " \
+                            "The length of intervening text is fixed at 26 tokens.")
 
         # now save as .tex file
         fname = os.path.join(table_savedir, "{}_{}_{}.tex".format(basename, scenario, tag))
@@ -811,7 +812,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         
         # create a column with string formated and save the table as well
         stat = stat.round({"ci_min": 1, "ci_max": 1, "est": 1})
-        strfunc = lambda x: str(x["est"]) + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        strfunc = lambda x: str(x["est"]) + "% " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
         stat["report_str"] = stat.apply(strfunc, axis=1)
 
         # save the original .csv
@@ -821,13 +822,16 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
 
         # save for latex
         stat.rename(columns={"hue": "Condition", "cond": "List", "xlabel": "Intervening text len."}, inplace=True)
-        tex = stat.pivot(index=["List", "Condition"], columns=["Intervening text len."], values="report_str")\
-                  .to_latex(bold_rows=True, 
+        stat = stat.pivot(index=["List", "Condition"], columns=["Intervening text len."], values="report_str")
+        stat.columns = stat.columns.astype(int)
+        stat.sort_index(axis=1, ascending=True, inplace=True)
+        
+        tex = stat.to_latex(bold_rows=True, 
                             longtable=True, 
-                            caption="{} word list surprisal as a function of intervening text size. We report the percentage of "\
-                            "list-median surprisal on second relative to first lists. Ranges are 95% confidence intervals around "\
-                            "the observed median (bootstrap estimate ($N^resample = 1000$). "\
-                            "The length of intervening text is fixed at 8 tokens.)".format(suptitle))
+                            caption="{} word list surprisal as a function of intervening text size. We report the percentage of ".format(suptitle) + \
+                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
+                            "the observed median (bootstrap estimate, $N^{resample} = 1000$). "\
+                            "The list length is fixed at 10 tokens.")
 
         # now save as .tex file
         fname = os.path.join(table_savedir, "{}_{}_{}.tex".format(basename, scenario, tag))
@@ -914,13 +918,14 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         # save for latex
         stat.list = stat.list.str.capitalize()
         stat.rename(columns={"condition": "Condition", "list": "List", "context": "Context"}, inplace=True)
-        tex = stat.pivot(index=["List", "Condition"], columns=["Context"], values="report_str")\
-                  .to_latex(bold_rows=True, 
-                            longtable=True, 
-                            caption="{} word list surprisal as a function of intervening context. We report the percentage of" \
-                            "list-median surprisal on second relative to first lists. Ranges are 95% confidence intervals around"\
-                            "the observed median (bootstrap estimate (N^resample = 1000)."\
-                            "The set-size and the length of intervening text are fixed at 10, and 435 tokens, respecitvely.)".format(suptitle))
+        stat = stat.pivot(index=["List", "Condition"], columns=["Context"], values="report_str")\
+        stat.columns = stat.columns.astype(int)
+        stat.sort_index(axis=1, ascending=True, inplace=True)
+        tex = stat.to_latex(bold_rows=True,
+                            caption="{} word list surprisal as a function of intervening context. We report the percentage of ".format(suptitle)\
+                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
+                            "the observed median (bootstrap estimate, N^{resample} = 1000). "\
+                            "The set-size and the length of intervening text are fixed at 10, and 435 tokens, respectively.")
 
         # now save as .tex file
         fname = os.path.join(table_savedir, "{}_{}_{}.tex".format(basename, scenario, tag))
@@ -1007,7 +1012,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         
          # create a column with string formated and save the table as well
         stat = stat.round({"ci_min": 1, "ci_max": 1, "est": 1})
-        strfunc = lambda x: str(x["est"]) + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        strfunc = lambda x: str(x["est"]) + "% " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
         stat["report_str"] = stat.apply(strfunc, axis=1)
 
         # save the original .csv
@@ -1017,12 +1022,13 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
 
         # save for latex
         stat.rename(columns={"hue": "Condition", "cond": "List", "xlabel": "Set-Size"}, inplace=True)
-        tex = stat.pivot(index=["List", "Condition"], columns=["Set-Size"], values="report_str")\
-                  .to_latex(bold_rows=True, 
-                            longtable=True, 
-                            caption="{} word list surprisal as a function of set size with intervening text of 3 tokens. We report the percentage of"\
-                            "list-median surprisal on second relative to first lists. Ranges are 95% confidence intervals around"\
-                            "the observed median (bootstrap estimate (N^resample = 1000).".format(suptitle))
+        stat = stat.pivot(index=["List", "Condition"], columns=["Set-Size"], values="report_str")
+        stat.columns = stat.columns.astype(int)
+        stat.sort_index(axis=1, ascending=True, inplace=True)
+        tex = stat.to_latex(bold_rows=True,
+                            caption="{} word list surprisal as a function of set size with intervening text of 3 tokens. We report the percentage of "\
+                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
+                            "the observed median (bootstrap estimate (N^{resample} = 1000).".format(suptitle))
 
         # now save as .tex file
         fname = os.path.join(table_savedir, "{}_{}_{}.tex".format(basename, scenario, tag))
