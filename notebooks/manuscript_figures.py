@@ -55,7 +55,7 @@ matplotlib.rcParams['ps.fonttype'] = 42
 
 # %%
 home_dir = os.path.join(os.environ['homepath'], "project", "lm-mem")
-data_dir = os.path.join(home_dir, "data", "output_cshift")
+data_dir = os.path.join(home_dir, "data", "outputs")
 savedir = os.path.join(home_dir, "fig", "raw")
 table_savedir = os.path.join(home_dir, "tables", "revised")
 savefigs = False
@@ -123,17 +123,6 @@ def make_bar_plot(data_frame, x, y, hue, col,
                     edgecolor=["white"], ecolor=["tab:gray"], bottom=0, linewidth=1)
     
     ax = g.axes[0]
-
-    # right panel
-    #select = (data_frame[col]==col_order[0])
-    #sns.stripplot(ax=ax[0], data=data_frame[select], x=x, y=y, hue=hue, hue_order=hue_order,
-    #               palette="pastel", dodge=0.5, alpha=0.05, zorder=1)
-
-    # right panel
-    #for j, a in enumerate(ax):
-    #    select = (data_frame[col]==col_order[j])
-    #    sns.stripplot(ax=ax[j], data=data_frame[select], x=x, y=y, hue=hue, hue_order=hue_order,
-    #                  palette="pastel", dodge=0.5, alpha=point_cloud_alpha, zorder=1)
 
     # set labels
     ax[0].set_ylabel(ylabel)
@@ -506,9 +495,8 @@ titles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)", "LS
 scenario = "sce1"
 
 for dat, model_id, tag, title in zip((data_gpt, data_40m, data_rnn, data_rnn2), ids, tags, titles):
-    
-    sns.set_context('paper', font_scale=1.6):
-        f, a = make_example_plot(data=dat, seed=123, model_id=model_id, context="intact", ylim=(0, 30), title=title)
+
+    f, a = make_example_plot(data=dat, seed=123, model_id=model_id, context="intact", ylim=(0, 30), title=title)
     
     if savefigs:
         
@@ -714,7 +702,7 @@ dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
 suptitles = ("Transformer (Wikitext-103)", "Transformer (Radford et al, 2019)", "LSTM (Wikitext-103)")
 savetags = ("trf-w12", "trf-a10", "lstm-a10")
-ylims=((80, 120), (0, None), (80, 120))
+ylims=((60, 120), (0, None), (80, 120))
 basename="set-size"
 scenario = "sce1"
 
@@ -797,7 +785,7 @@ dat_rnn_.prompt_len = dat_rnn_.prompt_len.map(prompt_len_map)
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
 suptitles = ("Transformer (Wikitext-103)", "Transformer (Radford et al, 2019)", "LSTM (Wikitext-103)")
 savetags = ("trf-w12", "trf-a10", "lstm-a10")
-ylims=((80, 120), (None, None), (80, 120))
+ylims=((70, 120), (None, None), (80, 120))
 basename="inter-text-size"
 scenario = "sce1"
 
@@ -1003,7 +991,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     sns.set_context("paper", font_scale=1.6)
     
     grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
+                                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
                                   suptitle=suptitle, scale=0.8,
                                   legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                   size_inches=plot_size)
