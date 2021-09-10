@@ -548,8 +548,9 @@ model_ids = ("a-10", "w-12", "a-10", "a-70")
 tags = ("trf", "trf", "lstm", "lstm")
 titles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)", "LSTM-400 (Wikitext-103)", "LSTM-1600 (Wikitext-103, 80M tokens)")
 arcs = ("gpt-2", "gpt-2", "lstm", "lstm")
+ylims=((0, None), (0, None), (0, None), (0, None))
 
-for model_id, suptitle, arc, tag in zip(model_ids, titles, arcs, tags):
+for model_id, suptitle, arc, tag, ylim in zip(model_ids, titles, arcs, tags, ylims):
     
     sel = ((d["model_id"] == model_id) & (d.model == arc))
     
@@ -567,7 +568,13 @@ for model_id, suptitle, arc, tag in zip(model_ids, titles, arcs, tags):
                                       style_order=["Repeated", "Permuted", "Novel"],
                                       xticks=list(range(-4, 10)))
     plt.close(plt.gcf())
-
+    
+    # set ylims
+    ymin, ymax = ylim
+    if ymin is None: ymin = ax[0].get_ylim()[0]
+    if ymax is None: ymax = ax[0].get_ylim()[1]
+    ax[0].set(ylim=(ymin, ymax))
+    
     ax[0].set_title("Arbitrary list", fontsize=16)
     ax[1].set_title("Semantically coherent list", fontsize=16)
     ax[0].set_ylabel("surprisal\n(bit)")
@@ -795,7 +802,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     plot_size=(4, 3)
     
     grid, ax, stat = make_point_plot(data_frame=df, x="prompt_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                 xlabel="filler size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                 xlabel="intervening text\nlen. (n. tokens)", ylabel="repeat surprisal\n(\%)",
                                  suptitle=suptitle, scale=0.8,
                                  legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                  size_inches=plot_size)
@@ -918,11 +925,9 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         # save for latex
         stat.list = stat.list.str.capitalize()
         stat.rename(columns={"condition": "Condition", "list": "List", "context": "Context"}, inplace=True)
-        stat = stat.pivot(index=["List", "Condition"], columns=["Context"], values="report_str")\
-        stat.columns = stat.columns.astype(int)
-        stat.sort_index(axis=1, ascending=True, inplace=True)
+        stat = stat.pivot(index=["List", "Condition"], columns=["Context"], values="report_str")
         tex = stat.to_latex(bold_rows=True,
-                            caption="{} word list surprisal as a function of intervening context. We report the percentage of ".format(suptitle)\
+                            caption="{} word list surprisal as a function of intervening context. We report the percentage of ".format(suptitle) + \
                             "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
                             "the observed median (bootstrap estimate, N^{resample} = 1000). "\
                             "The set-size and the length of intervening text are fixed at 10, and 435 tokens, respectively.")
