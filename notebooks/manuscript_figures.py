@@ -610,7 +610,6 @@ for model_id, suptitle, arc, tag, ylim in zip(model_ids, titles, arcs, tags, yli
         tex = stat.loc[stat["Token position"].isin(list(range(0, 4))), :]\
                   .pivot(index=["List", "Second list"], columns=["Token position"], values="report_str")\
                   .to_latex(bold_rows=True,
-                            longtable=True,
                             caption="{} surprisal values for four initial token positions, list type and second list condition.".format(suptitle))
 
         # now save as .tex file
@@ -993,7 +992,7 @@ dfs = (dat_gpt40m_, dat_rnn_)
 suptitles = ("Transformer (Wikitext-103)", "LSTM (Wikitext-103")
 savetags = ("trf-w12", "lstm-a10")
 ylims = ((70, None), (70, None))
-basename = "short-filler"
+basename = "set-size"
 
 for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     
@@ -1011,9 +1010,10 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     ax[1].set_title("Semantically coherent")
     
     if savefigs:
-        print("Saving {}".format(os.path.join(savedir, "{}_{}.".format(basename, tag))))
-        grid.savefig(os.path.join(savedir, "{}_{}.pdf".format(basename, tag)), transparent=True, bbox_inches="tight")
-        grid.savefig(os.path.join(savedir, "{}_{}.png".format(basename, tag)), dpi=300, bbox_inches="tight")
+        
+        print("Saving {}".format(os.path.join(savedir, "{}_{}_{}.".format(basename, scenario, tag))))
+        grid.savefig(os.path.join(savedir, "{}_{}_{}.pdf".format(basename, scenario, tag)), transparent=True, bbox_inches="tight")
+        grid.savefig(os.path.join(savedir, "{}_{}_{}.png".format(basename, scenario, tag)), dpi=300, bbox_inches="tight")
         
          # create a column with string formated and save the table as well
         stat = stat.round({"ci_min": 1, "ci_max": 1, "est": 1})
@@ -1031,9 +1031,9 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         stat.columns = stat.columns.astype(int)
         stat.sort_index(axis=1, ascending=True, inplace=True)
         tex = stat.to_latex(bold_rows=True,
-                            caption="{} word list surprisal as a function of set size with intervening text of 3 tokens. We report the percentage of "\
-                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
-                            "the observed median (bootstrap estimate (N^{resample} = 1000).".format(suptitle))
+                            caption="{} word list surprisal as a function of set size with intervening text of 3 tokens. ".format(suptitle) + \
+                            "We report the percentage of list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
+                            "the observed median (bootstrap estimate, $N^{resample}$ = 1000).")
 
         # now save as .tex file
         fname = os.path.join(table_savedir, "{}_{}_{}.tex".format(basename, scenario, tag))
@@ -1205,6 +1205,10 @@ for i, model_id in enumerate(model_ids):
 scenario = "sce3"
 savetags = ("trf", "trf", "trf", "trf", "trf")
 ylims = ((70, None), (70, None), (70, None), (70, None), (70, None))
+titles = ("Transformer (1 layer)", 
+          "Transformer (3 layer)", 
+          "Transformer (6 layer)",
+          "Transformer (12 layer)")
 
 basename = "set-size"
 
@@ -1213,7 +1217,7 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
     plot_size=(5, 3)
     sns.set_context("paper", font_scale=1.6)
     grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                     xlabel="filler size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
+                                     xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
                                      suptitle=suptitle, scale=0.8,
                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                      size_inches=plot_size)
@@ -1235,7 +1239,7 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
         
          # create a column with string formated and save the table as well
         stat = stat.round({"ci_min": 1, "ci_max": 1, "est": 1})
-        strfunc = lambda x: str(x["est"]) + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        strfunc = lambda x: str(x["est"]) + "% " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
         stat["report_str"] = stat.apply(strfunc, axis=1)
 
         # save the original .csv
@@ -1245,13 +1249,14 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
 
         # save for latex
         stat.rename(columns={"hue": "Condition", "cond": "List", "xlabel": "Set-Size"}, inplace=True)
-        tex = stat.pivot(index=["List", "Condition"], columns=["Set-Size"], values="report_str")\
-                  .to_latex(bold_rows=True, 
-                            longtable=True, 
-                            caption="{} word list surprisal as a function of set size. We report the percentage of"\
-                            "list-median surprisal on second relative to first lists. Ranges are 95% confidence intervals around"\
-                            "the observed median (bootstrap estimate (N^resample = 1000)."\
-                            "Interve".format(suptitle))
+        stat = stat.pivot(index=["List", "Condition"], columns=["Set-Size"], values="report_str")
+        stat.columns = stat.columns.astype(int)
+        stat.sort_index(axis=1, ascending=True, inplace=True)
+        
+        tex = stat.to_latex(bold_rows=True, 
+                            caption="{} word list surprisal as a function of set size. We report the percentage of ".format(suptitle) + \
+                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
+                            "the observed median (bootstrap estimate ($N^{resample} = 1000$).")
 
         # now save as .tex file
         fname = os.path.join(table_savedir, "{}_{}_{}-{}.tex".format(basename, scenario, tag, model_id))
