@@ -38,7 +38,11 @@ logging.basicConfig(format="[INFO] %(message)s", level=logging.INFO)
 
 # %%
 # set some matplotlib options to handle text better
+# default color cycle: ['00BEFF', 'D4CA3A', 'FF6DAE', '67E1B5', 'EBACFA', '9E9E9E', 'F1988E', '5DB15A', 'E28544', '52B8AA']
+# taken from: https://gist.github.com/JonnyCBB/c464d302fefce4722fe6cf5f461114ea
 plt.style.use("gadfly")
+
+# scale font sizes
 sns.set_context('paper', font_scale=1.8)
 
 plt.rcParams.update({
@@ -294,12 +298,12 @@ def make_point_plot(data_frame, x, y, hue, col,
     
     # legend
     # Improve the legend
-    #ax[1].get_legend().remove()
     if custom_legend:
         handles, labels = ax[1].get_legend_handles_labels()
-        ax[1].legend(handles[0:3], labels[0:3],
-                     handletextpad=1, columnspacing=1, bbox_to_anchor=(1, 1),
-                     loc="upper left", ncol=1, frameon=False, title=legend_title)
+        ax[1].legend(handles[0:3], labels[0:3], labelcolor=['#00BEFF', '#D4CA3A', '#FF6DAE'], fontsize=16,
+                     markerscale=1.4, handletextpad=1, columnspacing=1, bbox_to_anchor=(1, 1),
+                     loc="upper left", ncol=1, frameon=False, facecolor='white', framealpha=0.2, 
+                     title=legend_title, title_fontsize=17)
 
     g.fig.suptitle("{}".format(suptitle))
     g.set_titles(col_template="{col_name} lists")
@@ -708,7 +712,7 @@ dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
 suptitles = ("Transformer (Wikitext-103)", "Transformer (Radford et al, 2019)", "LSTM (Wikitext-103)")
 savetags = ("trf-w12", "trf-a10", "lstm-a10")
-ylims=((60, 120), (0, None), (80, 120))
+ylims=((60, 115), (None, None), (80, 115))
 basename="set-size"
 scenario = "sce1"
 
@@ -728,6 +732,8 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
+    for i in range(len(ax)):
+        ax[i].set_xlabel("set size\n(n. tokens)", color='#23a952')
     
     if savefigs:
         
@@ -792,7 +798,7 @@ dat_rnn_.prompt_len = dat_rnn_.prompt_len.map(prompt_len_map)
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
 suptitles = ("Transformer (Wikitext-103)", "Transformer (Radford et al, 2019)", "LSTM (Wikitext-103)")
 savetags = ("trf-w12", "trf-a10", "lstm-a10")
-ylims=((70, 120), (None, None), (80, 120))
+ylims=((60, 115), (None, None), (80, 115))
 basename="inter-text-size"
 scenario = "sce1"
 
@@ -809,6 +815,8 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     grid.fig.subplots_adjust(top=0.70)
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
+    for i in range(len(ax)):
+        ax[i].set_xlabel("intervening text\nlen. (n. tokens)", color="#FF8000")
     
     if savefigs:
         
@@ -832,8 +840,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         stat.columns = stat.columns.astype(int)
         stat.sort_index(axis=1, ascending=True, inplace=True)
         
-        tex = stat.to_latex(bold_rows=True, 
-                            longtable=True, 
+        tex = stat.to_latex(bold_rows=True,
                             caption="{} word list surprisal as a function of intervening text size. We report the percentage of ".format(suptitle) + \
                             "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
                             "the observed median (bootstrap estimate, $N^{resample} = 1000$). "\
@@ -989,15 +996,14 @@ dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10
 
 # %%
 dfs = (dat_gpt40m_, dat_rnn_)
-suptitles = ("Transformer (Wikitext-103)", "LSTM (Wikitext-103")
+suptitles = ("Transformer (Wikitext-103)", "LSTM: Intervening text at 3 tokens")
 savetags = ("trf-w12", "lstm-a10")
-ylims = ((70, None), (70, None))
+ylims = ((70, None), (80, 110))
 basename = "set-size"
-
+scenario = "sce3"
 for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     
-    plot_size=(5, 3)
-    sns.set_context("paper", font_scale=1.6)
+    plot_size=(4, 3)
     
     grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
                                   xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
@@ -1005,9 +1011,10 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
                                   legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                   size_inches=plot_size)
     
-    grid.fig.subplots_adjust(top=0.75)
-    ax[0].set_title("Arbitrary")
-    ax[1].set_title("Semantically coherent")
+    grid.fig.subplots_adjust(top=0.7)
+    ax[0].set_title("Arbitrary list\n")
+    ax[1].set_title("Semantically coherent\nlist")
+    plt.suptitle(suptitle, x=0.3)
     
     if savefigs:
         
@@ -1097,11 +1104,11 @@ gptrnd_r30, _ = filter_and_aggregate(datain=gptlst[3], model="gpt-2", model_id="
 scenario = "sce1"
 dfs = (gptrnd_r10, gptrnd_r20, gptrnd_r25, gptrnd_r30)
 suptitles = ("Transformer (random init.)", 
-             "Transformer (shuffled attn. weights across heads)", 
+             "Transformer (shuffled attn. weights)", 
              "Transformer (shuffled attn. weights per head)",
              "Transformer (shuffled position embed.)")
 savetags = ("trf", "trf", "trf", "trf")
-ylims = ((70, None), (70, None), (70, None), (30, 100))
+ylims = ((70, 120), (70, 120), (70, 120), (30, 100))
 
 basename = "set-size"
 
@@ -1109,7 +1116,7 @@ for df, suptitle, ylim, model_id, tag in zip(dfs, suptitles, ylims, model_ids, s
     
     plot_size=(5, 3)
     grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                     xlabel="filler size\n(n. tokens)", ylabel="repeat surprisal\n(%)",
+                                     xlabel="set size (n. tokens)", ylabel="repeat surprisal\n(\%)",
                                      suptitle=suptitle, scale=0.8,
                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                      size_inches=plot_size)
@@ -1125,26 +1132,25 @@ for df, suptitle, ylim, model_id, tag in zip(dfs, suptitles, ylims, model_ids, s
         
          # create a column with string formated and save the table as well
         stat = stat.round({"ci_min": 1, "ci_max": 1, "est": 1})
-        strfunc = lambda x: str(x["est"]) + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        strfunc = lambda x: str(x["est"]) + "% " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
         stat["report_str"] = stat.apply(strfunc, axis=1)
 
         # save the original .csv
-        fname = os.path.join(table_savedir, "{}_{}_{}.csv".format(basename, scenario, tag))
+        fname = os.path.join(table_savedir, "{}_{}_{}-{}.csv".format(basename, scenario, tag, model_id))
         print("Writing {}".format(fname))
         stat.to_csv(fname)
 
         # save for latex
         stat.rename(columns={"hue": "Condition", "cond": "List", "xlabel": "Set-Size"}, inplace=True)
         tex = stat.pivot(index=["List", "Condition"], columns=["Set-Size"], values="report_str")\
-                  .to_latex(bold_rows=True, 
-                            longtable=True, 
-                            caption="{} word list surprisal as a function of set size. We report the percentage of"\
-                            "list-median surprisal on second relative to first lists. Ranges are 95% confidence intervals around"\
-                            "the observed median (bootstrap estimate (N^resample = 1000)."\
-                            "Intervening text size is fixed at 26 tokens".format(suptitle))
+                  .to_latex(bold_rows=True,
+                            caption="{} word list surprisal as a function of set size. We report the percentage of ".format(suptitle) + \
+                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
+                            "the observed median (bootstrap estimate ($N^{resample} = 1000$)."\
+                            "Intervening text size is fixed at 26 tokens")
 
         # now save as .tex file
-        fname = os.path.join(table_savedir, "{}_{}_{}.tex".format(basename, scenario, tag))
+        fname = os.path.join(table_savedir, "{}_{}_{}-{}.tex".format(basename, scenario, tag, model_id))
         print("Writing {}".format(fname))
         with open(fname, "w") as f:
             f.writelines(tex)
