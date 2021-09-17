@@ -645,7 +645,7 @@ for model_id, suptitle, arc, tag, ylim in zip(model_ids, titles, arcs, tags, yli
         tex = stat.loc[stat["Token position"].isin(list(range(0, 4))), :]\
                   .pivot(index=["List", "Second list"], columns=["Token position"], values="report_str")\
                   .to_latex(bold_rows=True,
-                            label="tab:timecourse_{}_{}.".format(tag, model_id),
+                            label="tab:timecourse_{}_{}_{}".format(scenario, tag, model_id),
                             caption="{} surprisal values for four initial token positions, list type and second list condition.".format(suptitle))
 
         # now save as .tex file
@@ -730,6 +730,9 @@ def filter_and_aggregate(datain, model, model_id, groups):
     return dataout, dagg
 
 
+# %% [markdown]
+# ## Prepare data
+
 # %%
 variables = [{"list_len": [3, 5, 7, 10]},
              {"prompt_len": [8]},
@@ -739,6 +742,9 @@ variables = [{"list_len": [3, 5, 7, 10]},
 dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
 dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
 dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables)
+
+# %% [markdown]
+# ## Plot
 
 # %%
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
@@ -789,6 +795,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         stat.columns = stat.columns.astype(int)
         stat.sort_index(axis=1, ascending=True, inplace=True)
         tex = stat.to_latex(bold_rows=True,
+                            label="tab:{}_{}_{}".format(basename, scenario, tag),
                             caption="{} word list surprisal as a function of set size. We report the percentage of ".format(suptitle) + \
                             "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around " \
                             "the observed median (bootstrap estimate, $N^{resample} = 1000$). " \
@@ -802,6 +809,9 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
 
 # %% [markdown]
 # # Context length effect
+
+# %% [markdown]
+# ## Prepare data
 
 # %%
 variables = [{"prompt_len": [8, 100, 200, 400]},
@@ -825,6 +835,9 @@ prompt_len_map = {8: 26, 30: 47, 100: 99, 200: 194, 400: 435}
 dat_40m_.prompt_len = dat_40m_.prompt_len.map(prompt_len_map)
 dat_gpt_.prompt_len = dat_gpt_.prompt_len.map(prompt_len_map)
 dat_rnn_.prompt_len = dat_rnn_.prompt_len.map(prompt_len_map)
+
+# %% [markdown]
+# ## Plot
 
 # %%
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
@@ -873,6 +886,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         stat.sort_index(axis=1, ascending=True, inplace=True)
         
         tex = stat.to_latex(bold_rows=True,
+                            label="tab:{}_{}_{}".format(basename, scenario, tag),
                             caption="{} word list surprisal as a function of intervening text size. We report the percentage of ".format(suptitle) + \
                             "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
                             "the observed median (bootstrap estimate, $N^{resample} = 1000$). "\
@@ -886,6 +900,9 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
 
 # %% [markdown] tags=[]
 # # Effect of context structure
+
+# %% [markdown]
+# ## Prepare data
 
 # %%
 gptlst, gptlst2, rnnlst = [], [], []
@@ -919,6 +936,9 @@ dat_40m_, dat_gpt_, dat_rnn_ = None, None, None
 dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
 dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
 dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables)
+
+# %% [markdown]
+# ## Plot
 
 # %%
 dfs = (dat_gpt_, dat_40m_, dat_rnn_)
@@ -956,7 +976,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         stat["report_str"] = stat.apply(strfunc, axis=1)
 
         # save the original .csv
-        fname = os.path.join(table_savedir, "{}_{}_{}.csv".format(basename, scenario, tag))
+        fname = os.path.join(table_savedir, "{}_{}.csv".format(basename, tag))
         print("Writing {}".format(fname))
         stat.to_csv(fname)
 
@@ -965,13 +985,14 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         stat.rename(columns={"condition": "Condition", "list": "List", "context": "Context"}, inplace=True)
         stat = stat.pivot(index=["List", "Condition"], columns=["Context"], values="report_str")
         tex = stat.to_latex(bold_rows=True,
+                            label="tab:{}_{}".format(basename, tag),
                             caption="{} word list surprisal as a function of intervening context. We report the percentage of ".format(suptitle) + \
                             "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
                             "the observed median (bootstrap estimate, N^{resample} = 1000). "\
                             "The set-size and the length of intervening text are fixed at 10, and 435 tokens, respectively.")
 
         # now save as .tex file
-        fname = os.path.join(table_savedir, "{}_{}_{}.tex".format(basename, scenario, tag))
+        fname = os.path.join(table_savedir, "{}_{}.tex".format(basename, tag))
         print("Writing {}".format(fname))
         with open(fname, "w") as f:
             f.writelines(tex)
@@ -1013,6 +1034,9 @@ for dat, tag, model_id, title in zip((data_rnn, data_gpt40m), tags, model_ids, t
         f.savefig(os.path.join(savedir, "example_{}_{}-{}.pdf".format(scenario, model_id, tag)), transparent=True, dpi=300, bbox_inches="tight")
         f.savefig(os.path.join(savedir, "example_{}_{}-{}.png".format(scenario, model_id, tag)), dpi=300, bbox_inches="tight")
 
+
+# %% [markdown]
+# ## Select data
 
 # %%
 variables = [{"list_len": [3, 5, 7, 10]},
@@ -1070,6 +1094,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         stat.columns = stat.columns.astype(int)
         stat.sort_index(axis=1, ascending=True, inplace=True)
         tex = stat.to_latex(bold_rows=True,
+                            label="tab:{}_{}_{}".format(basename, scenario, tag),
                             caption="{} word list surprisal as a function of set size with intervening text of 3 tokens. ".format(suptitle) + \
                             "We report the percentage of list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
                             "the observed median (bootstrap estimate, $N^{resample}$ = 1000).")
@@ -1116,7 +1141,7 @@ for dat, model_id, tag, title in zip((data_gpt, data_40m), ids, tags, titles):
         f.savefig(os.path.join(savedir, "example_{}_{}-{}.png".format(scenario, tag, model_id)), dpi=300, bbox_inches="tight")
 
 # %% [markdown]
-# ## Averaged timecourse
+# ## Averaged timecourse plot
 
 # %%
 data_gpt_time = select_data_for_timecourse(data=data_gpt, list_len=10, context_len=8, context="no-comma", model_tags=["a-10"], 
@@ -1187,7 +1212,7 @@ if savefigs:
         tex = stat.loc[stat["Token position"].isin(list(range(0, 4))), :]\
                   .pivot(index=["List", "Second list"], columns=["Token position"], values="report_str")\
                   .to_latex(bold_rows=True,
-                            label="tab:timecourse_{}_{}_{}.".format(scenario, tag, model_id),
+                            label="tab:timecourse_{}_{}_{}".format(scenario, tag, model_id),
                             caption="{} surprisal values for four initial token positions, list type and second list condition when ':' " + \
                                      "token is replaced by ',' in preface in prompt strings".format(suptitle))
 
@@ -1258,6 +1283,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         stat.columns = stat.columns.astype(int)
         stat.sort_index(axis=1, ascending=True, inplace=True)
         tex = stat.to_latex(bold_rows=True,
+                            label="tab:{}_{}_{}".format(basename, scenario, tag),
                             caption="{} word list surprisal as a function of set size when ':' token is replaced by ',' in preface in prompt strings ".format(suptitle) + \
                             "We report the percentage of list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around " \
                             "the observed median (bootstrap estimate, $N^{resample} = 1000$). " \
@@ -1284,7 +1310,7 @@ data_gpt["model"] = "gpt-2"
 data_40m["model"] = "gpt-2"
 
 # %% [markdown]
-# ### Example time course
+# ## Example time course
 
 # %%
 scenario_txt = "'Mary' $\\rightarrow$ 'John'"
@@ -1304,7 +1330,7 @@ for dat, model_id, tag, title in zip((data_gpt, data_40m), ids, tags, titles):
         f.savefig(os.path.join(savedir, "example_{}_{}-{}.png".format(scenario, tag, model_id)), dpi=300, bbox_inches="tight")
 
 # %% [markdown]
-# ### Averaged timecourse
+# ## Averaged timecourse
 
 # %%
 data_gpt_time = select_data_for_timecourse(data=data_gpt, list_len=10, context_len=8, context="mary-john", model_tags=["a-10"], 
@@ -1354,8 +1380,40 @@ p.fig.suptitle("{} Transformer (Radford et al, 2019)".format(scenario_txt), font
 p.fig.set_size_inches(w=w, h=h)
 p.fig.subplots_adjust(top=0.65)
 
+
+if savefigs:
+        
+        print("Saving {}".format(os.path.join(savedir, "timecourse_{}__{}_{}".format(scenario, tag, model_id))))
+        p.savefig(os.path.join(savedir, "timecourse_{}_{}_{}.pdf".format(scenario, tag, model_id)), transparent=True, bbox_inches="tight")
+        p.savefig(os.path.join(savedir, "timecourse_{}_{}_{}.png".format(scenario, tag, model_id)), dpi=300, bbox_inches="tight")
+        
+        # create a column with string formated and save the table as well
+        stat = stat.round({"ci_min": 1, "ci_max": 1, "median": 1})
+        strfunc = lambda x: str(x["median"]) + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        stat["report_str"] = stat.apply(strfunc, axis=1)
+
+            # save the original .csv
+        fname = os.path.join(table_savedir, "timecourse_{}_{}_table.csv".format(tag, model_id))
+        print("Writing {}".format(fname))
+        stat.to_csv(fname)
+
+        # save for latex
+        stat.rename(columns={"list structure": "List", "marker-pos-rel": "Token position"}, inplace=True)
+        tex = stat.loc[stat["Token position"].isin(list(range(0, 4))), :]\
+                  .pivot(index=["List", "Second list"], columns=["Token position"], values="report_str")\
+                  .to_latex(bold_rows=True,
+                            label="tab:timecourse_{}_{}_{}".format(scenario, tag, model_id),
+                            caption="{} surprisal values for four initial token positions, list type and second list condition when ':' " + \
+                                     "token is replaced by ',' in preface in prompt strings".format(suptitle))
+
+        # now save as .tex file
+        fname = os.path.join(table_savedir, "timecourse_{}_{}_{}_table.tex".format(scenario, tag, model_id))
+        print("Writing {}".format(fname))
+        with open(fname, "w") as f:
+            f.writelines(tex)
+
 # %% [markdown]
-# ### Aggregated data
+# ## Aggregated data
 
 # %%
 variables = [{"list_len": [3, 5, 7, 10]},
@@ -1412,6 +1470,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         stat.columns = stat.columns.astype(int)
         stat.sort_index(axis=1, ascending=True, inplace=True)
         tex = stat.to_latex(bold_rows=True,
+                            label="tab:{}_{}_{}".format(basename, scenario, tag),
                             caption="{} word list surprisal as a function of set size when 'Mary' is replaced with 'John'. We report the percentage of ".format(suptitle) + \
                             "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around " \
                             "the observed median (bootstrap estimate, $N^{resample} = 1000$). " \
@@ -1438,7 +1497,7 @@ data_gpt["model"] = "gpt-2"
 data_40m["model"] = "gpt-2"
 
 # %% [markdown]
-# ### Example time course
+# ## Example time course
 
 # %%
 scenario_txt = "Shuffled preface string"
@@ -1459,7 +1518,7 @@ for dat, model_id, tag, title in zip((data_gpt, data_40m), ids, tags, titles):
         f.savefig(os.path.join(savedir, "example_{}_{}-{}.png".format(scenario, tag, model_id)), dpi=300, bbox_inches="tight")
 
 # %% [markdown]
-# ### Averaged timecourse
+# ## Averaged timecourse
 
 # %%
 data_gpt_time = select_data_for_timecourse(data=data_gpt, list_len=10, context_len=8, context="shuf-preface", model_tags=["a-10"], 
@@ -1541,7 +1600,7 @@ if savefigs:
         f.writelines(tex)
 
 # %% [markdown]
-# ### Aggregated data
+# ## Aggregated data
 
 # %%
 variables = [{"list_len": [3, 5, 7, 10]},
@@ -1707,6 +1766,7 @@ for df, suptitle, ylim, model_id, tag in zip(dfs, suptitles, ylims, model_ids, s
         stat.rename(columns={"hue": "Condition", "cond": "List", "xlabel": "Set-Size"}, inplace=True)
         tex = stat.pivot(index=["List", "Condition"], columns=["Set-Size"], values="report_str")\
                   .to_latex(bold_rows=True,
+                            label="{}_{}_{}-{}".format(basename, scenario, tag, model_id),
                             caption="{} word list surprisal as a function of set size. We report the percentage of ".format(suptitle) + \
                             "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
                             "the observed median (bootstrap estimate ($N^{resample} = 1000$)."\
@@ -1822,7 +1882,8 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
         stat.columns = stat.columns.astype(int)
         stat.sort_index(axis=1, ascending=True, inplace=True)
         
-        tex = stat.to_latex(bold_rows=True, 
+        tex = stat.to_latex(bold_rows=True,
+                            label="{}_{}_{}-{}.tex".format(basename, scenario, tag, model_id),
                             caption="{} word list surprisal as a function of set size. We report the percentage of ".format(suptitle) + \
                             "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
                             "the observed median (bootstrap estimate ($N^{resample} = 1000$).")
