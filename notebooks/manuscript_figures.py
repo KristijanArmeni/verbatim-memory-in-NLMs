@@ -536,6 +536,9 @@ for dat, model_id, tag, title in zip((data_gpt, data_40m, data_rnn, data_rnn2), 
 # %% [markdown]
 # # Timecourse plots 
 
+# %% [markdown]
+# ## Prepare data
+
 # %%
 data = pd.concat([data_gpt, data_40m, data_rnn, data_rnn2], ignore_index=True)
 
@@ -568,6 +571,9 @@ d.rename(columns={"list": "list structure", "second_list": "condition"}, inplace
 new_second_list_names = {"novel": "Novel", "repeated": "Repeated", "permuted": "Permuted"}
 d.condition = d.condition.map(new_second_list_names)
 
+# %% [markdown]
+# ## Plots
+
 # %%
 # common fig properties
 w, h, w_disp, h_disp = 12, 2, 17, 3
@@ -577,6 +583,7 @@ tags = ("trf", "trf", "lstm", "lstm")
 titles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)", "LSTM-400 (Wikitext-103)", "LSTM-1600 (Wikitext-103, 80M tokens)")
 arcs = ("gpt-2", "gpt-2", "lstm", "lstm")
 ylims=((0, None), (0, None), (0, None), (0, None))
+scenario = "sce1"
 
 for model_id, suptitle, arc, tag, ylim in zip(model_ids, titles, arcs, tags, ylims):
     
@@ -617,9 +624,9 @@ for model_id, suptitle, arc, tag, ylim in zip(model_ids, titles, arcs, tags, yli
     
     if savefigs:
         
-        print("Saving {}".format(os.path.join(savedir, "timecourse_{}_{}".format(tag, model_id))))
-        p.savefig(os.path.join(savedir, "timecourse_{}_{}.pdf".format(tag, model_id)), transparent=True, bbox_inches="tight")
-        p.savefig(os.path.join(savedir, "timecourse_{}_{}.png".format(tag, model_id)), dpi=300, bbox_inches="tight")
+        print("Saving {}".format(os.path.join(savedir, "timecourse_{}_{}_{}".format(scenario, tag, model_id))))
+        p.savefig(os.path.join(savedir, "timecourse_{}_{}_{}.pdf".format(scenario, tag, model_id)), transparent=True, bbox_inches="tight")
+        p.savefig(os.path.join(savedir, "timecourse_{}_{}_{}.png".format(scenario, tag, model_id)), dpi=300, bbox_inches="tight")
         
         # save numerical tables
         
@@ -629,7 +636,7 @@ for model_id, suptitle, arc, tag, ylim in zip(model_ids, titles, arcs, tags, yli
         stat["report_str"] = stat.apply(strfunc, axis=1)
 
             # save the original .csv
-        fname = os.path.join(table_savedir, "timecourse_{}_{}_table.csv".format(tag, model_id))
+        fname = os.path.join(table_savedir, "timecourse_{}_{}_{}_table.csv".format(scenario, tag, model_id))
         print("Writing {}".format(fname))
         stat.to_csv(fname)
 
@@ -642,7 +649,7 @@ for model_id, suptitle, arc, tag, ylim in zip(model_ids, titles, arcs, tags, yli
                             caption="{} surprisal values for four initial token positions, list type and second list condition.".format(suptitle))
 
         # now save as .tex file
-        fname = os.path.join(table_savedir, "timecourse_{}_{}_table.tex".format(tag, model_id))
+        fname = os.path.join(table_savedir, "timecourse_{}_{}_{}_table.tex".format(scenario, tag, model_id))
         print("Writing {}".format(fname))
         with open(fname, "w") as f:
             f.writelines(tex)
