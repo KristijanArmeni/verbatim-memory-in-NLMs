@@ -1,10 +1,9 @@
-
-
 import os
 import json
 import torch
 import logging
 import pandas as pd
+from transformers import GPT2LMHeadModel
 
 logging.basicConfig(format="[INFO] %(message)s", level=logging.INFO)
 
@@ -47,8 +46,8 @@ for ckp_key in cols:
         df.loc[param_key, ckp_key] = train_args[param_key]
 
     # get number of parameters
-    state_dict = torch.load(os.path.join(checkpoint_path, "pytorch_model.bin"), map_location=torch.device('cpu'))
-    n_params = sum(p.numel() for p in state_dict.values())
+    model = GPT2LMHeadModel.from_pretrained(os.path.join(checkpoint_path))
+    n_params = model.num_parameters(only_trainable=True)
 
     df.loc["n params (M)", ckp_key] = round(n_params/1e6, 1)
 
