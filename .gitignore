@@ -10,8 +10,7 @@ train_gpt2_jobs.sh  # ignore the high-level script with login key info
 .vscode
 
 # Python
-data/__pycache__
-rnn/__pycache__
+*/__pycache__
 
 # Models
 rnn_models
