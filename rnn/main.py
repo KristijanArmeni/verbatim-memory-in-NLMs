@@ -168,7 +168,7 @@ if args.adapt:
 if args.view_layer != -1:
     # There shouldn't be a cheader if we're looking at model internals
     args.nocheader = True
-    
+
 # Set the random seed manually for reproducibility.
 torch.manual_seed(args.seed)
 if torch.cuda.is_available():
