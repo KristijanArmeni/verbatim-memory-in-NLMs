@@ -33,12 +33,13 @@ Pytorch 1.3 was used with RNN code base because the model objects that stored ch
 
 We used the conda management toolkit, so the easiest way to create the environment with dependencies is as follows:
 
-`conda create -n env_name /path/to/where/dependencies/are/installed -f ./reqs_pytorch1.3.yaml`
+`conda env create -n env_name_gpt2 -f ./reqs_pytorch1.6.yaml`
+`conda env create -n env_name_lstm -f ./reqs_pytorch1.3.yaml`
 
 ## Running [gpt2_surprisal.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/gpt2_surprisal.py)
 
 Activate the installed conda enviroment with dependencies:
-`conda activate env_name`
+`conda activate env_name_gpt2`
 
 Navigate to root folger of github repository.
 
@@ -49,7 +50,7 @@ python gpt2_surprisal.py --setup
 
 The job as follows:
 ```bash
-python /root_folder_with_code/gpt2_surprisal.py
+python ./gpt2_surprisal.py
 --condition control \
 --scenario sce1 \
 --paradigm with-context \
@@ -90,17 +91,29 @@ parser.add_argument("--output_filename", type=str,
 ## Running an LSTM job
 
 In bash script, activate the conda environment with [LSTM dependencies](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/reqs_pytorch1.3.yaml):
-`conda activate ~/code/conda_envs/lmpytorch1.3`
+`conda activate env_name_lstm`
+
+Download LSTM model into a folder `rnn_models` from here:
+https://doi.org/10.5281/zenodo.3559340 or use following
+commands in the root directory:
+```bash
+mkdir rnn_models
+cd rnn_models
+wget https://zenodo.org/record/3559340/files/LSTM_40m.tar.gz?download=1 -O LSTM_40m.tar.gz
+tar -xvzf LSTM_40.tar.gz
+```
+
+Navigate to your root folder and use following command:
 
 ```bash
-python /root_folder_with_code/rnn/main.py \
---model_file /root_folder_with_code/rnn_models/LSTM_400_40m_a_10-d0.2.pt \
---vocab_file /root_folder_with_code/rnn/vocab.txt \
---data_dir /root_folder_with_code/data/rnn_input_files \
+python ./rnn/main.py \
+--model_file ./rnn_models/LSTM_400_40m_a_10-d0.2.pt \
+--vocab_file ./rnn/vocab.txt \
+--data_dir ./data/rnn_input_files \
 --testfname categorized_lists_sce1_control.txt \
 --csvfname surprisal_rnn_a-10_sce1_control_categorized.csv  \
 --markersfname categorized_lists_sce1_control_markers.txt  \
---output_dir /root_folder_with_code/code/lm-mem/output  \
+--output_dir ./code/lm-mem/output  \
 --lowercase \
 --test \
 --words
