@@ -457,17 +457,23 @@ if __name__ == "__main__":
     import pandas as pd
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint_folder", type=str)
-    parser.add_argument("--model_weights", type=str)
-    parser.add_argument("--vocab_file", type=str)
-    parser.add_argument("--config_file", type=str)
-    parser.add_argument("--input_file", type=str)
-    parser.add_argument("--scenario", type=str)
-    parser.add_argument("--condition", type=str)
-    parser.add_argument("--list_type", type=str)
-    parser.add_argument("--marker_file", type=str)
-    parser.add_argument("--output_folder", type=str)
-    parser.add_argument("--output_filename", type=str)
+    parser.add_argument("--checkpoint_folder", type=str,
+        help="path/to/folder in which model is save")
+    parser.add_argument("--model_weights", type=str,
+        help="path/to/model_weights.pt of LSTM model")
+    parser.add_argument("--vocab_file", type=str, default="./rnn_/vocab.text",
+        help="path/to/vocab_file.txt which contains every word in data")
+    parser.add_argument("--config_file", type=str,
+        help="path/to/config_file which contains the LSTM model's configuration")
+    parser.add_argument("-i", "--input_file", type=str,
+        help="path/to/input_file.txt which contains input sentences")
+    parser.add_argument("--marker_file", type=str,
+        help="path/to/marker_file.txt which contains metadata information about"\
+            + " input sentences")
+    parser.add_argument("--output_folder", type=str,
+        help="path/to/output_folder in which all outputs will be saved")
+    parser.add_argument("--output_filename", type=str,
+        help="output_file.csv - file with results")
 
     args = parser.parse_args()
 
@@ -516,7 +522,9 @@ if __name__ == "__main__":
     #                 store_states=False)
 
     # make this input argument at some point
-    model.load_state_dict(torch.load(args.model_weights))
+    print(device)
+    model.load_state_dict(
+        torch.load(args.model_weights, map_location=torch.device(device)))
     #model2.load_state_dict(torch.load(args.model_weights))
 
     model.eval()
