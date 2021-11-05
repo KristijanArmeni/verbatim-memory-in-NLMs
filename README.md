@@ -1,9 +1,9 @@
 # Folder contents
 
-- `./`         |  main scripts  
+- `./`         |  main scripts
 - `/data`      |  scripts and .txt files for creating inputs
 - `/rnn` |  rnn code by Van Schijndel et al https://github.com/vansky/neural-complexity
-- `/output`    |  LM script outputs (.txt files)  
+- `/output`    |  LM script outputs (.txt files)
 - `/notebooks` |  .ipynb notebooks with EDA analyses and prototyping
 
 # Dependencies
@@ -25,31 +25,38 @@ For our experiments, we used the following dependencies:
 
 ## Installing dependencies
 
-There are two separate sets of dependencies, defined in the requirements files: 
+There are two separate sets of dependencies, defined in the requirements files:
 - [reqs_pytorch1.3.yaml](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/reqs_pytorch1.3.yaml) is for the rnn code
 - [reqs_pytorch1.6.yaml](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/reqs_pytorch1.6.yaml) is for the gpt-2 code.
 
 Pytorch 1.3 was used with RNN code base because the model objects that stored checkpoints contained attributes that were not compatible with pytorch 1.6.
 
-We used the conda management toolkit, so the easiest way to create the environment with dependencies is as follows:  
+We used the conda management toolkit, so the easiest way to create the environment with dependencies is as follows:
 
-`conda create /path/to/where/dependencies/are/installed -f ./reqs_pytorch1.3.yaml`
+`conda create -n env_name /path/to/where/dependencies/are/installed -f ./reqs_pytorch1.3.yaml`
 
 ## Running [gpt2_surprisal.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/gpt2_surprisal.py)
 
-Activate the installed conda enviroment with dependencies:  
-`conda activate /path/to/where/dependencies/are/installed`  
+Activate the installed conda enviroment with dependencies:
+`conda activate env_name`
 
-You can run the job as follows:
+Navigate to root folger of github repository.
+
+Now run with the setup flag to download the models:
 ```bash
-python /root_folder_with_code/gpt2_surprisal.py 
---condition control \  
---scenario sce1 \  
---paradigm with-context \  
---input_filename /root_folder_with_code/data/categorized_lists.json \  
---output_dir /home-3/karmeni1@jhu.edu/code/lm-mem/output \  
---output_file name_of_the_output_file.csv \  
---device cuda  
+python gpt2_surprisal.py --setup
+```
+
+The job as follows:
+```bash
+python /root_folder_with_code/gpt2_surprisal.py
+--condition control \
+--scenario sce1 \
+--paradigm with-context \
+--input_filename ./data/categorized_lists.json \
+--output_dir ./output \
+--output_file name_of_the_output_file.csv \
+--device cuda
 ```
 
 Input arguments are documented in the [gpt2_surprisal.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/gpt2_surprisal.py) script itself:
@@ -82,25 +89,25 @@ parser.add_argument("--output_filename", type=str,
 
 ## Running an LSTM job
 
-In bash script, activate the conda environment with [LSTM dependencies](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/reqs_pytorch1.3.yaml):  
+In bash script, activate the conda environment with [LSTM dependencies](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/reqs_pytorch1.3.yaml):
 `conda activate ~/code/conda_envs/lmpytorch1.3`
 
 ```bash
-python /root_folder_with_code/rnn/main.py \  
---model_file /root_folder_with_code/rnn_models/LSTM_400_40m_a_10-d0.2.pt \  
---vocab_file /root_folder_with_code/rnn/vocab.txt \  
---data_dir /root_folder_with_code/data/rnn_input_files \  
---testfname categorized_lists_sce1_control.txt \  
---csvfname surprisal_rnn_a-10_sce1_control_categorized.csv  \   
---markersfname categorized_lists_sce1_control_markers.txt  \  
---output_dir /root_folder_with_code/code/lm-mem/output  \  
---lowercase \  
---test \  
---words  
+python /root_folder_with_code/rnn/main.py \
+--model_file /root_folder_with_code/rnn_models/LSTM_400_40m_a_10-d0.2.pt \
+--vocab_file /root_folder_with_code/rnn/vocab.txt \
+--data_dir /root_folder_with_code/data/rnn_input_files \
+--testfname categorized_lists_sce1_control.txt \
+--csvfname surprisal_rnn_a-10_sce1_control_categorized.csv  \
+--markersfname categorized_lists_sce1_control_markers.txt  \
+--output_dir /root_folder_with_code/code/lm-mem/output  \
+--lowercase \
+--test \
+--words
 ```
 
 Input args are defined in [rnn/main.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/rnn/main.py).
-The relevant are to this experiment are:  
+The relevant are to this experiment are:
 
 ```python
 
