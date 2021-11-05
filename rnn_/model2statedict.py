@@ -18,10 +18,10 @@ for ckpname in checkpoints:
 
     in_fullfile = os.path.join(source_dir, ckpname)
     model_object = torch.load(in_fullfile, map_location="cpu")
-    
+
     # check if filename is provided, else append weights to input file name for saving
     output_fname = ckpname.replace(".pt", "_statedict.pt")
-    
+
     # save the state dict only
     out_fullfile = os.path.join(source_dir, output_fname)
     print("Saving {}".format(out_fullfile))
