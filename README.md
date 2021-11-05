@@ -95,7 +95,7 @@ In bash script, activate the conda environment with [LSTM dependencies](https://
 
 Download LSTM model into a folder `rnn_models` from here:
 https://doi.org/10.5281/zenodo.3559340 and convert them with
-[rnn_/model2statedict.py](./rnn_/model2statedict.py) to statedicts.
+[rnn/model2statedict.py](./rnn/model2statedict.py) to statedicts.
 
 You can use these commands
 ```bash
@@ -104,9 +104,9 @@ cd rnn_models
 wget https://zenodo.org/record/3559340/files/LSTM_40m.tar.gz?download=1 -O LSTM_40m.tar.gz
 tar -xvzf LSTM_40.tar.gz
 cd ../
-python rnn_/model2statedict.py rnn_models/LSTM_400_40m_a_10-d0.2.pt
+python rnn/model2statedict.py rnn_models/LSTM_400_40m_a_10-d0.2.pt
 # or
-python rnn_/model2statedict.py rnn_models
+python rnn/model2statedict.py rnn_models
 ```
 
 Now you need to convert the models to statedicts.
@@ -114,11 +114,11 @@ Now you need to convert the models to statedicts.
 Navigate to your root folder and use following command:
 
 ```bash
-python ./rnn_/experiment.py \
+python ./rnn/experiment.py \
 --checkpoint_folder checkpoints/ \
---model_weights rnn_models/LSTM_400_40m_a_10-d0.2.pt \
---vocab_file ./rnn_/vocab.txt \
---config_file ./rnn_/config.json \
+--model_weights rnn_models/LSTM_400_40m_a_10-d0.2_statedict.pt \
+--vocab_file ./rnn/vocab.txt \
+--config_file ./rnn/config.json \
 --input_file ./data/rnn_input_files/categorized_lists_sce1_control.txt \
 --marker_file ./data/rnn_input_files/categorized_lists_sce1_control_markers.txt \
 --output_folder ./code/lm-mem/output \
