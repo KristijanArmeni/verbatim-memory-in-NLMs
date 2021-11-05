@@ -558,6 +558,7 @@ def runtime_code():
                         help="length of context window in tokens for transformers")
     parser.add_argument("--model_type", type=str,
                         help="model label controlling which checkpoint to load")
+    # To download a different model look at https://huggingface.co/models?filter=gpt2
     parser.add_argument("--checkpoint", type=str, default="gpt2",
                         help="the path to folder with pretrained models (expected to work with model.from_pretraiend() method)")
     parser.add_argument("--path_to_tokenizer", type=str, default="gpt2",
