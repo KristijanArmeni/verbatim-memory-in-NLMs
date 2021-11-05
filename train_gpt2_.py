@@ -36,15 +36,15 @@ def batchify(x, bs):
     (batch_size, -1, *)
     """
     nb = len(x)//bs
-    
+
     # trim the remainder samples along dimension 1
     print("Batching data, using batch size of {}".format(bs))
     print("Trimming {} remainer sample points".format(x.shape[0]-(bs*nb)))
     xtmp = x[0:(nb*bs)]
-    
+
     # define the shape (batch_size, training samples, *)
     newshape = tuple([bs, -1] + [d for d in x.shape[1::]])
-    
+
     return np.reshape(a=xtmp, newshape=newshape)
 
 
@@ -54,14 +54,14 @@ def batchify(x, bs):
 
 # wrapper function
 def print_cuda_mem_info(device_id=0):
-    
+
     t = torch.cuda.get_device_properties(device_id).total_memory
     r = torch.cuda.memory_reserved(device_id)
     a = torch.cuda.memory_allocated(device_id)
     f = r-a
-    
+
     gb_factor = 0.9313*10e-10
-    
+
     print("total GPU mem (gb): {}".format(round(t*gb_factor)))
     print("reserved GPU mem (gb): {}".format(r*gb_factor))
     print("allocated GPU mem (gb): {}".format(a*gb_factor))
@@ -76,7 +76,7 @@ def compute_perplexity(model, input_ids, tokenizer, context_len, stride, device)
 
         llh = []  # variable storing token-by-token neg ll
         tokens = []   # variable storing token strings to have along with -ll in the output
-        
+
         # loop over tokens in input sequence
         for i in trange(0, input_ids.size(1), stride, desc="Computing perplexity: "):
 
@@ -90,26 +90,26 @@ def compute_perplexity(model, input_ids, tokenizer, context_len, stride, device)
 
             # define target labels, use input ids as target outputs
             target_ids = sel_input_ids.clone()
-            
+
             # do not compute the loss on  tokens (-100) that are used for context
-            target_ids[:, :-trg_len] = -100  
+            target_ids[:, :-trg_len] = -100
 
 
             # set model to evaluation mode
             model.eval()
-            
+
             # get model output
             with torch.no_grad():
 
                # compute neg log likelihood over target ids (n+1 in our case)
                # indices are shifted under the hood by model.__call__()
                outputs = model(sel_input_ids, labels=target_ids)
-               
+
                # first element of the tuple contains the loss
                log_likelihood = outputs.loss.item() * trg_len  # not sure about this multiplication here (undoing averaging?)
 
                llh.append(log_likelihood)
-                
+
                # only output tokens if we are computing token-by-token ppl
                # (i.e. stride == 1)
                if stride == 1:
@@ -126,12 +126,12 @@ def compute_perplexity(model, input_ids, tokenizer, context_len, stride, device)
 # ======================== #
 
 def runtime_code():
-    
+
     import wandb
-    
+
     # collect input arguments
     parser = argparse.ArgumentParser()
-    
+
     # general input args
     parser.add_argument("--datadir", type=str,
                         help="path to dataset .json files")
@@ -163,7 +163,7 @@ def runtime_code():
                         help="number of attention heads, passed to GPT2Config() class")
     parser.add_argument("--embed_dim", type=int, default=100,
                         help="number of attention heads, passed to GPT2Config() class")
-    
+
     # training set arguments
     parser.add_argument("--train_batch_size", type=int,
                         help="batch size to use in training ddataset")
@@ -175,7 +175,7 @@ def runtime_code():
                         help="maximum number of trainin epochs (iterations)")
     parser.add_argument("--train_set_size", type=str, default="40",
                         help="size of the traininset (in million tokens)")
-    
+
     # training regime input args (input to TrainingArguments() class)
     parser.add_argument("--lr", type=float,
                         help="starting learning rate")
@@ -186,22 +186,22 @@ def runtime_code():
     parser.add_argument("--adam_beta2", type=float, default=0.05,
                         help="beta2 parameter for Adam optimizer")
     parser.add_argument("--num_lr_warmup_steps", type=int,
-                        help="number of consecutive epochs for which learning" 
+                        help="number of consecutive epochs for which learning"
                         "rate is increased linearly")
-    parser.add_argument("--num_eval_steps", type=int, 
+    parser.add_argument("--num_eval_steps", type=int,
                         help="number of steps after which evaluation is performed")
     parser.add_argument("--num_logging_steps", type=int,
                         help="number of steps after which to perform logging to wandb")
     parser.add_argument("--num_save_steps", type=int,
                         help="number of steps after which checkpoints are saved")
     parser.add_argument("--es_patience", type=int,
-                        help="nr of consecutive epochs to wait for decreasing loss" 
+                        help="nr of consecutive epochs to wait for decreasing loss"
                         "before stopping training")
     parser.add_argument("--es_delta", type=float, default=0.01,
                         help="the smallest change in loss between two evaluations that still counts as improvement, if c                        hange is less than this value, otherwise early stopping counter starts")
 
     # test arguments
-    parser.add_argument("--test_stride", type=int, 
+    parser.add_argument("--test_stride", type=int,
                         help="stride to use on ppl computation")
 
     # wandb params
@@ -212,9 +212,9 @@ def runtime_code():
     parser.add_argument("--wandb_project", type=str, help="project name for wandb logging")
     parser.add_argument("--wandb_group", type=str, help="label to group runs into")
     parser.add_argument("--wandb_tags", type=str, help="wandb tags to add to the run")
-    parser.add_argument("--wandb_mode", type=str, choices=["disabled", "offline", "online"], 
+    parser.add_argument("--wandb_mode", type=str, choices=["disabled", "offline", "online"],
                         help="control of wandb logging mode")
-    parser.add_argument("--wandb_disabled", action='store_true', 
+    parser.add_argument("--wandb_disabled", action='store_true',
                         help="whether to turn wandb loggin off")
 
     # savedir params
@@ -222,41 +222,41 @@ def runtime_code():
                         help="path where the model weights will be stored")
     parser.add_argument("--logdir", type=str,
                         help="path where the model weights will be stored")
-    
+
     args = parser.parse_args()
     print(args)
 
     # use cuda if available
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
-    
+
     if args.device == "cuda":
         print_cuda_mem_info()
-    
+
     # utility function from transformers (sets seed in torch and numpy)
-    transformers.set_seed(args.seed)  
-    
+    transformers.set_seed(args.seed)
+
     # set logging verbosity output
     transformers.logging.set_verbosity_info()
 
     # load tokenizer trained in dataset.py
     tokenizer = GPT2TokenizerFast.from_pretrained(args.tokenizer_path)
-    
+
     # load in retokenized files
     train_ds = WikiTextDataset(tokenizer=tokenizer)
     train_ds.make_input_sequences(json_path=args.train_ds,
                                   sequence_length=args.sequence_len)
-    
+
     eval_ds = WikiTextDataset(tokenizer=tokenizer)
     eval_ds.make_input_sequences(json_path=args.val_ds,
                                  sequence_length=args.sequence_len)
-    
+
     test_ds = WikiTextDataset(tokenizer=tokenizer)
     test_ds.make_input_sequences(json_path=args.test_ds,
                                  sequence_length=None)
-    
-    
+
+
     # set up some GPT2Config parameters
-    # we keep n_positions and n_ctx equal 
+    # we keep n_positions and n_ctx equal
     config = GPT2Config(n_positions=args.sequence_len,
                         n_ctx=args.sequence_len,
                         n_embd=args.embed_dim,
@@ -265,7 +265,7 @@ def runtime_code():
                         vocab_size=len(tokenizer.get_vocab()),
                         bos_token_id=tokenizer.bos_token_id,
                         eos_token_id=tokenizer.eos_token_id)
-    
+
 
     # Training arguments
     train_args = TrainingArguments(
@@ -290,14 +290,14 @@ def runtime_code():
         report_to="wandb",
         run_name=args.wandb_name,
         )
-    
+
     # initialize data collator class
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer,
                                                     mlm=False)
-    
+
     # add authorization token for wandb logging
     os.environ["WANDB_API_KEY"] = args.wandb_key
-    
+
     # init wandb before Trainer, this will override the default callback in Trainer
     wandb.init(
         dir=args.wandb_dir if args.wandb_dir else None,
@@ -308,7 +308,7 @@ def runtime_code():
         group=args.wandb_group if args.wandb_group else None,
         mode=args.wandb_mode if args.wandb_mode else "online",
         )
-   
+
     # initialize the model from configuration
     model = GPT2LMHeadModel(config=config)
 
@@ -322,7 +322,7 @@ def runtime_code():
 
     # run training routine
     if args.do_train:
-        
+
         # initialize trainer class and model form config
         trainer = Trainer(args=train_args,
                           model=model,
@@ -332,37 +332,37 @@ def runtime_code():
                           callbacks=[EarlyStoppingCallback(early_stopping_patience=args.es_patience,
                                                            early_stopping_threshold=args.es_delta)]
                           )
-    
+
         # hyper-param search here if needed
         # best_trial = trainer.hyperparameter_search(
         #                               direction='minimize',
         #                               search_alg='something')
-        
+
         # call training routine
         trainer.train()
-    
+
         # this must hold, so that we just refer to <model> name below
         assert id(model) == id(trainer.model)
 
     # compute and log test perplexity
     if args.do_test:
-        
+
         ppl, _, _ = compute_perplexity(model=model,
                                        tokenizer=tokenizer,
                                        input_ids=torch.tensor([test_ds.x]),
                                        context_len=args.sequence_len,
                                        stride=args.test_stride,
                                        device=device)
-        
+
         logging.info("Test ppl: {}".format(ppl))
 
         # log some info from testing
         wandb.log(
-            data={'test-ppl': ppl, 
-                  'test-stride': args.test_stride, 
+            data={'test-ppl': ppl,
+                  'test-stride': args.test_stride,
                   'test-context-len':args.sequence_len}
             )
-    
+
     # end logging
     wandb.finish()
 

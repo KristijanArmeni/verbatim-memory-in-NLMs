@@ -26,12 +26,12 @@ with open(cfg_json_path, "r") as fhandle:
 for ckp_key in cols:
 
     checkpoint_path = ckp_cfg[ckp_key][1]
-    
+
     logging.info("Working on {}".format(checkpoint_path))
 
     model_config_path = os.path.join(checkpoint_path, "config.json")
     training_args_path = os.path.join(checkpoint_path, "training_args.bin")
-    
+
     with open(model_config_path, "r") as fhandle:
         model_cfg = json.load(fhandle)
 
@@ -41,7 +41,7 @@ for ckp_key in cols:
     # collect model parameters
     for param_key in model_params:
         df.loc[param_key, ckp_key] = model_cfg[param_key]
-    
+
     for param_key in train_params:
         df.loc[param_key, ckp_key] = train_args[param_key]
 

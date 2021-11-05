@@ -28,56 +28,56 @@ def load_and_preproc_csv(output_folder, filenames):
         dftmp["second_list"] = file.split("_")[-2]  # store information on second list
         dftmp["scenario"] = file.split("_")[-3]
         dftmp["model_id"] = file.split("_")[-4]
-        
+
         ngram_list_labels = ["ngram-random", "ngram-categorized"]
-        
+
         # remove punctuation prior to creating token index
         # filter out punctuation
         if arc == "gpt2":
-                         
+
             # rename some columns to avoid the need for if/else lower
             dftmp.rename(columns={"stimID": "sentid", "trialID" : "marker", "prompt": "prompt_len"}, inplace=True)
-            
+
             # throw out punctuation and eos
             dftmp = dftmp.loc[(~dftmp.token.isin(list(punctuation) + ['<|endoftext|>']))]
-            
+
             # we need these columns in the output after merging
-            columns = ["subtok", "sentid", "stimid", "list_len", "prompt_len", 
+            columns = ["subtok", "sentid", "stimid", "list_len", "prompt_len",
                         "scenario", "list", "second_list", "model_id", "marker"]
-            
+
             # ngram experiment doesn't have prompts, but distractors
             if list_type in ngram_list_labels:
-                
+
                 # we need these columns in the output after merging
-                columns = ["subtok", "subtok_markers", "sentid", "stimid", "list_len", "prompt_len", 
+                columns = ["subtok", "subtok_markers", "sentid", "stimid", "list_len", "prompt_len",
                            "scenario", "list", "second_list", "model_id", "marker"]
 
-            
+
             # merge subtokens add the token markers and relative markers
             dftmp = preprocess_gpt_dataframe(dfin=dftmp.copy(), has_subtoks=True,
                                              keep_groups=columns)
-            
+
             # change some column names for ngram experiment appropriately
             if list_type in ngram_list_labels:
-                
+
                 dftmp.rename(columns = {"prompt_len": "dist_len", "list_len": "ngram_len" }, inplace=True)
 
         elif "rnn" in arc:
-            
+
             dftmp = dftmp.loc[~dftmp.word.isin([":", ".", ","])].copy()
-            
+
             # temporarily
             dftmp.rename(columns= {"markers": "marker"}, inplace = True)
-            
+
             # only add the token markers and relative markers
-            dftmp = preprocess_rnn_dataframe(dfin=dftmp)            
-            
+            dftmp = preprocess_rnn_dataframe(dfin=dftmp)
+
             # TEMP rename column to make it consistent, consdier fixing
             # this upstream
             if list_type in ngram_list_labels:
-                
+
                 dftmp.rename(columns={"list_len": "ngram_len", "prompt_len": "dist_len"}, inplace=True)
-        
+
         # append df for this experiment
         out.append(dftmp)
 
@@ -85,40 +85,40 @@ def load_and_preproc_csv(output_folder, filenames):
 
 
 def preprocess_gpt_dataframe(dfin, has_subtoks=None, keep_groups=None):
-    
+
     # now do the massive loops and merge subtokens
     merged_dfs = []       # here we will store merged dfs
     marker_pos = []       # this is for marker arrays
     marker_pos_rel = []
-    
+
     # loop over list conditions
     for llen in dfin.list_len.unique():
-        
+
         sel1 = (dfin.list_len==llen)
-        
+
         # loop over markers
         for sent in tqdm(dfin.loc[sel1].sentid.unique(), desc="list len == {}".format(llen)):
-            
+
             sel2 = (dfin.list_len==llen) & (dfin.sentid==sent)
-            
+
             # loop over sentences
             for mark in dfin.loc[sel2].marker.unique():
-                
+
                 # merge tokens for this list_len, this sentece and this  marker
                 sel3 = (dfin.list_len == llen) &\
                        (dfin.sentid == sent) &\
                        (dfin.marker == mark)
-                
+
                 n_rows = len(dfin.loc[sel3])
-                
+
                 # only gpt-2 outputs have subtoks that need to be merged
                 if has_subtoks and (keep_groups is not None):
-                    
-                    df_merged = merge_subtoks(df=dfin.loc[sel3].copy(), 
+
+                    df_merged = merge_subtoks(df=dfin.loc[sel3].copy(),
                                               group_levels=keep_groups,
                                               merge_operation="sum")
-                    
-                    n_rows = len(df_merged)                        
+
+                    n_rows = len(df_merged)
                     merged_dfs.append(df_merged)
 
                 # code markers relative to target tokens lists
@@ -127,18 +127,18 @@ def preprocess_gpt_dataframe(dfin, has_subtoks=None, keep_groups=None):
                     marker_pos_rel.append(-1*((np.arange(0, n_rows)+1)[::-1]))
                 else:
                     marker_pos_rel.append(np.arange(0, n_rows))
-                    
+
                 # code marker position without negative indices
-                marker_pos.append(np.arange(0, n_rows)) 
-    
+                marker_pos.append(np.arange(0, n_rows))
+
     if has_subtoks:
         dfout = pd.concat(merged_dfs)
     else:
         dfout = dfin
-        
+
     dfout["marker_pos"] = np.concatenate(marker_pos)
     dfout["marker_pos_rel"] = np.concatenate(marker_pos_rel)
-    
+
     return dfout
 
 
@@ -146,30 +146,30 @@ def merge_subtoks(df, group_levels, merge_operation="sum"):
     """
     helper function to perform averging over subtokens via .groupby and .agg
     """
-    
+
     dfout = df.groupby(group_levels, sort=False)\
               .agg({"surp": merge_operation, "token": "_".join})\
               .reset_index()
-    
-    return dfout 
+
+    return dfout
 
 
 def preprocess_rnn_dataframe(dfin, has_subtoks=None, keep_groups=None):
-    
+
     # now do the massive loops and merge subtokens
     marker_pos = []       # this is for marker arrays
     marker_pos_rel = []
-    
+
     # loop over list conditions
     for sent in tqdm(dfin.sentid.unique(), desc="sentid"):
-        
+
         # loop over sentences
         for mark in dfin.loc[dfin.sentid==sent].marker.unique():
-            
+
             # merge tokens for this list_len, this sentece and this  marker
             sel1 = (dfin.sentid == sent) &\
                    (dfin.marker == mark)
-            
+
             n_rows = len(dfin.loc[sel1])
 
             # code markers relative to target tokens lists
@@ -178,15 +178,15 @@ def preprocess_rnn_dataframe(dfin, has_subtoks=None, keep_groups=None):
                 marker_pos_rel.append(-1*((np.arange(0, n_rows)+1)[::-1]))
             else:
                 marker_pos_rel.append(np.arange(0, n_rows))
-                
+
             # code marker position without negative indices
-            marker_pos.append(np.arange(0, n_rows)) 
+            marker_pos.append(np.arange(0, n_rows))
 
     dfout = dfin
-        
+
     dfout["marker_pos"] = np.concatenate(marker_pos)
     dfout["marker_pos_rel"] = np.concatenate(marker_pos_rel)
-    
+
     return dfout
 
 #===== LOAD CSV FILES =====#
