@@ -45,7 +45,7 @@ for tag in modeldict.keys():
                                                                 list_type)
                 
                 # create absolute paths
-                python_script = os.path.join(root_dir, "src", "rnn_", "experiment.py")
+                python_script = os.path.join(root_dir, "src", "rnn", "experiment.py")
                 checkpoint_folder = os.path.join(checkpoint_root, modeldict[tag]["dir"])
                 model_weights = os.path.join(checkpoint_folder, modeldict[tag]["weights"]) 
                 config_file = os.path.join(checkpoint_folder, modeldict[tag]["config_file"])
