@@ -54,7 +54,7 @@ sel = (data_gpt.prompt_len == 8) & \
       (data_gpt.list=="random") & \
       (data_gpt.sentid.isin([40, 41])) & \
       (data_gpt.model_id=="a-10") & \
-      (~data_gpt.token.isin([" ", "<|endoftext|>"]))      
+      (~data_gpt.token.isin([" ", "<|endoftext|>"]))
 
 # select data
 data = data_gpt.loc[sel].copy()
@@ -103,7 +103,7 @@ sel = (data_rnn.prompt_len==8) &\
 
 data = data_rnn.loc[sel].copy()
 
-# %% 
+# %%
 
 x = data.loc[data.sentid==41].reset_index().index.values
 y = data.loc[data.sentid==41].surp.to_numpy()
@@ -145,7 +145,7 @@ w, h, w_disp, h_disp = 10, 1.5, 17, 3
 
 data = pd.concat([data_gpt, data_rnn])
 
-# rename row values 
+# rename row values
 data.loc[data["list"]=="categorized", "list"] = "semantic"
 data.loc[data["list"]=="random", "list"] = "arbitrary"
 data.loc[data["second_list"]=="control", "second_list"] = "novel"
@@ -168,7 +168,7 @@ sel = (data.prompt_len == context_len) & \
       (data.model_id == "a-10") & \
       (data.marker.isin(markers)) & \
       (data.marker_pos_rel.isin(marker_range))
-      
+
 d = data.loc[sel].copy()
 
 # name column manually
@@ -179,8 +179,8 @@ d.rename(columns={"list": "list structure", "second_list": "condition"}, inplace
 
 
 def plot_timecourse(data, nouns):
-    
-    p = sns.relplot(kind="line", data=data, x="marker_pos_rel", y="surp", style="condition", col="model", 
+
+    p = sns.relplot(kind="line", data=data, x="marker_pos_rel", y="surp", style="condition", col="model",
                     estimator=np.mean, ci=95.0, err_style="bars",
                     markers=True, style_order=["repeated", "permuted", "novel"],
                     legend="auto", linewidth=1)
@@ -252,21 +252,21 @@ dagg = d.groupby(units).agg({"surp": ["mean", "std"]}, {"token": list}).reset_in
 dagg.columns = ['_'.join(col_v) if col_v[-1] != '' else col_v[0] for col_v in dagg.columns.values]
 
 
-# %% 
+# %%
 # Define function that computes relative change in average surprisal
 def get_relative_change(x1=None, x2=None, labels1=None, labels2=None):
-    
+
     """
     computes relative change across data in x1 and x2. Sizes of arrays x1 and x2
     should match.
     """
-    
+
     # check that labels match
     if (labels1 is not None) & (labels2 is not None):
         assert (labels1 == labels2).all()
-    
+
     x_del = ((x2-x1)/(x1+x2))*100
-    
+
     return x_del
 
 
@@ -277,11 +277,11 @@ def make_bar_plot(data_frame, x, y, hue, col,
                   size_inches=(5, 3), legend_title=None, hue_order=["unseen", "permuted", "repeated"]):
 
 
-    g = sns.catplot(data=data_frame, x=x, y=y, hue=hue, col=col, 
+    g = sns.catplot(data=data_frame, x=x, y=y, hue=hue, col=col,
                     kind="bar", dodge=0.5, palette="tab10", zorder=2, legend=False, seed=12345,
                     hue_order=hue_order,
                     facecolor=(1, 1, 1, 0), edgecolor=["tab:gray"], ecolor=["tab:gray"], bottom=0)
-    
+
     ax = g.axes[0]
 
     # left panel
@@ -300,7 +300,7 @@ def make_bar_plot(data_frame, x, y, hue, col,
     ax[1].set_ylabel("")
     ax[0].set_xlabel(xlabel)
     ax[1].set_xlabel(xlabel)
-    
+
     # make bars darker than pointclouds for visual benefit
     blue, orange, green = sns.color_palette("dark")[0:3]
     n_x_groups = len(data_frame[x].unique())
@@ -311,20 +311,20 @@ def make_bar_plot(data_frame, x, y, hue, col,
             patch.set_edgecolor(orange)
         for patch in ax[i].patches[n_x_groups*2::]:
             patch.set_edgecolor(green)
-    
+
     # annotate
     x_levels = data_frame.loc[x].unique()
     col_levels = data_frame.loc[col].unique()
     hue_levels = data_frame.loc[hue].unique()
-    
+
     # find n rows for one plotted group
     one_group = (data_frame[x]==x_levels[0]) & (data_frame[hue]==hue_levels[0]) & (data_frame[col] == col_levels[0])
-    n = len(data_frame.loc[one_group])  
-    
+    n = len(data_frame.loc[one_group])
+
     ax[1].text(x=ax[1].get_xlim()[0], y=ax[1].get_ylim()[0]*0.9, s="N = {}".format(n))
-    
+
     # legend
-    # Improve the legend 
+    # Improve the legend
     ax[0].get_legend().remove()
 
     handles, labels = ax[1].get_legend_handles_labels()
@@ -337,18 +337,18 @@ def make_bar_plot(data_frame, x, y, hue, col,
     g.set_titles(col_template="{col_name}")
     g.despine(left=True)
     g.fig.set_size_inches(size_inches[0], size_inches[1])
-    
+
     return g, ax
 
 
 # %% compute relative change
-# apply relatvie change to each group and apply to 
+# apply relatvie change to each group and apply to
 df_list = []
 for model in ["gpt-2", "lstm"]:
     for length in [3, 5, 10]:
         for condition in ["repeat", "permute", "control"]:
             for list_type in ["categorized", "random"]:
-            
+
                 cols = ["x1", "x2", "x_del"]
                 df = pd.DataFrame(columns=cols)
 
@@ -391,9 +391,9 @@ data.loc[data["condition"]=="permute", "condition"] = "permuted"
 
 
 list_type="arbitrary"
-p1, a = make_bar_plot(data_frame=data.loc[data.list==list_type], 
+p1, a = make_bar_plot(data_frame=data.loc[data.list==list_type],
                   x="list_len", y="x_del", hue="condition", col="model",
-                  xlabel="list length (n. tokens)", ylabel="surprisal level on target list\n(% change)", 
+                  xlabel="list length (n. tokens)", ylabel="surprisal level on target list\n(% change)",
                   suptitle="LM recognition memory as change in surprisal", legend_title="target list",
                   size_inches=(5, 3))
 
@@ -410,9 +410,9 @@ if savefigs:
 
 
 list_type="semantic"
-p2, _ = make_bar_plot(data_frame=data.loc[data.list==list_type], 
+p2, _ = make_bar_plot(data_frame=data.loc[data.list==list_type],
                   x="list_len", y="x_del", hue="condition", col="model",
-                  xlabel="list length (n. tokens)", ylabel="surprisal level on target list\n(% change)", 
+                  xlabel="list length (n. tokens)", ylabel="surprisal level on target list\n(% change)",
                   suptitle="LM recognition memory as change in surprisal", legend_title="target list",
                   size_inches=(5, 3))
 
@@ -459,14 +459,14 @@ dagg.columns = ['_'.join(col_v) if col_v[-1] != '' else col_v[0] for col_v in da
 # In[118]:
 
 
-# apply relative change computation and apply to 
+# apply relative change computation and apply to
 
 df_list = []
 for model in ["gpt-2", "lstm"]:
     for length in [8,  30, 100, 200, 400]:
         for condition in ["repeat", "permute", "control"]:
             for list_type in ["categorized", "random"]:
-            
+
                 cols = ["x1", "x2", "x_del"]
                 df = pd.DataFrame(columns=cols)
 
@@ -513,9 +513,9 @@ data.loc[data["condition"]=="permute", "condition"] = "permuted"
 
 
 list_type="arbitrary"
-p3, _ = make_bar_plot(data_frame=data.loc[data.list==list_type], 
+p3, _ = make_bar_plot(data_frame=data.loc[data.list==list_type],
                       x="prompt_len", y="x_del", hue="condition", col="model",
-                      xlabel="context length (n. tokens)", ylabel="surprisal level on target list\n(% change)", 
+                      xlabel="context length (n. tokens)", ylabel="surprisal level on target list\n(% change)",
                       suptitle="LM recognition memory as change in surprisal", legend_title="target list",
                       size_inches=(6, 3))
 
@@ -524,9 +524,9 @@ if savefigs:
     p3.savefig(os.path.join(savedir, "context_length_{}_nouns.png".format(list_type)), dpi=300, transparent=True, bbox_inches="tight")
 
 list_type="semantic"
-p4, _ = make_bar_plot(data_frame=data.loc[data.list==list_type], 
+p4, _ = make_bar_plot(data_frame=data.loc[data.list==list_type],
                       x="prompt_len", y="x_del", hue="condition", col="model",
-                      xlabel="context length (n. tokens)", ylabel="surprisal level on target list\n(% change)", 
+                      xlabel="context length (n. tokens)", ylabel="surprisal level on target list\n(% change)",
                       suptitle="LM recognition memory as change in surprisal", legend_title="target list",
                       size_inches=(6, 3))
 
@@ -567,7 +567,7 @@ def make_bar_plot2(data_frame, x, y, hue,
     #ax[1].set_ylabel("")
     ax[0].set_xlabel(xlabel)
     #ax[1].set_xlabel(xlabel)
-    
+
     blue, orange, green = sns.color_palette("dark")[0:3]
     n_x_groups = len(data_frame[x].unique())
     for i in [0]:
@@ -579,7 +579,7 @@ def make_bar_plot2(data_frame, x, y, hue,
             patch.set_edgecolor(green)
 
     # legend
-    # Improve the legend 
+    # Improve the legend
     #ax[0].get_legend().remove()
 
     handles, labels = ax[0].get_legend_handles_labels()
@@ -592,7 +592,7 @@ def make_bar_plot2(data_frame, x, y, hue,
     g.set_titles(col_template="{col_name}")
     g.despine(left=True)
     g.fig.set_size_inches(size_inches[0], size_inches[1])
-    
+
     return g, ax
 
 
@@ -669,14 +669,14 @@ dagg.columns = ['_'.join(col_v) if col_v[-1] != '' else col_v[0] for col_v in da
 # In[140]:
 
 
-# apply relative change computation and apply to 
+# apply relative change computation and apply to
 
 df_list = []
 for model in ["lstm"]:
     for length in [3,  5, 10]:
         for condition in ["repeat", "permute", "control"]:
             for list_type in ["categorized", "random"]:
-            
+
                 cols = ["x1", "x2", "x_del"]
                 df = pd.DataFrame(columns=cols)
 
@@ -723,9 +723,9 @@ data.loc[data["condition"]=="permute", "condition"] = "permuted"
 
 
 list_type="arbitrary"
-p5, _ = make_bar_plot2(data_frame=data.loc[data.list==list_type], 
+p5, _ = make_bar_plot2(data_frame=data.loc[data.list==list_type],
                       x="list_len", y="x_del", hue="condition",
-                      xlabel="list length (n. tokens)", ylabel="surprisal level on target list\n(% change)", 
+                      xlabel="list length (n. tokens)", ylabel="surprisal level on target list\n(% change)",
                       suptitle="LM recognition memory as change in surprisal", legend_title="target list",
                       size_inches=(2, 4))
 
@@ -734,9 +734,9 @@ if savefigs:
     p5.savefig(os.path.join(savedir, "short_context_{}_nouns.png".format(list_type)), dpi=300, transparent=True, bbox_inches="tight")
 
 list_type="semantic"
-p6, _ = make_bar_plot2(data_frame=data.loc[data.list==list_type], 
+p6, _ = make_bar_plot2(data_frame=data.loc[data.list==list_type],
                       x="list_len", y="x_del", hue="condition",
-                      xlabel="list length (n. tokens)", ylabel="surprisal level on target list\n(% change)", 
+                      xlabel="list length (n. tokens)", ylabel="surprisal level on target list\n(% change)",
                       suptitle="LM recognition memory as change in surprisal", legend_title="target list",
                       size_inches=(2, 4))
 
@@ -778,19 +778,19 @@ rnn.drop(columns=sel+["hs", "dHs"], inplace=True)
 
 # let's create a ngram position counter
 def add_ngram_columns(data_frame):
-    
+
     df= None
     df = data_frame.copy()
-    
+
     tmp = []
     tmp2 = []
     tmp3 = []
     tmp4 = []
-    
+
     for ind in df.sentid.unique():
 
         sel = df.loc[df.sentid == ind]
-        
+
         listlen = len(sel)
         ngram_ = int(sel.ngram_len.iloc[0])
         dist_ = int(sel.dist_len.iloc[0])
@@ -799,17 +799,17 @@ def add_ngram_columns(data_frame):
         ngram_pos = np.repeat(np.arange(0, 5), ngram_+dist_)
         if dist_ != 0:
             ngram_pos = ngram_pos[:-dist_]
-            
+
         tmp.append(ngram_pos) # index ngram position withing sequence
         #tmp2.append(np.full(listlen, ngram))                   # index ngram lenght
         #tmp3.append(np.tile(np.arange(0, ngram), npositions))  # index tokens
         #tmp4.append(np.tile(np.repeat((ngram != ngram_), ngram), npositions))
-        
+
     df["ngram_pos"] = np.concatenate(tmp)
     #df["ngram_size"] = np.concatenate(tmp2)
     #df["token_id"] = np.concatenate(tmp3)
     #df["has_subtokens"] = np.concatenate(tmp4)
-    
+
     return df
 
 
@@ -842,26 +842,26 @@ indexNames = gpt.loc[(gpt.has_subtokens) & (gpt.ngram_size == 4) & (gpt.token_id
 gpt.drop(indexNames, axis=0, inplace=True)
 indexNames = gpt.loc[(gpt.has_subtokens) & (gpt.ngram_size == 6) & (gpt.token_id==6)].index
 gpt.drop(indexNames, axis=0, inplace=True)
-         
+
 # then rename the truncated rows accordingly
 gpt.loc[gpt.ngram_size==4, "ngram_size"] = 3
 gpt.loc[gpt.ngram_size==6, "ngram_size"] = 5
 
 
-# ### Plot some trial trime courses for n-grams 
+# ### Plot some trial trime courses for n-grams
 
 # In[ ]:
 
 
 def plot_trial(data, sentence_id, ylabel, title=None, size_inches=(10, 2)):
-    
+
     x = data.loc[data.sentid==sentence_id].reset_index().index.values
     y = data.loc[data.sentid==sentence_id].surp.to_numpy()
     l = data.loc[data.sentid==sentence_id].token.to_numpy()
     groups = data.loc[data.sentid==sentence_id].ngram_pos
-    
+
     f, a = plt.subplots(figsize=size_inches)
-    
+
     a.plot(x, y, marker=".", markerfacecolor="white", linestyle="--", linewidth=1)
 
     a.vlines(x=np.where(l==l[0]), ymin=a.get_ylim()[0], ymax=a.get_ylim()[-1], color="r", linestyle="--", linewidth=1)
@@ -876,7 +876,7 @@ def plot_trial(data, sentence_id, ylabel, title=None, size_inches=(10, 2)):
     a.spines["right"].set_visible(False)
 
     a.set(ylabel=ylabel, title=title);
-    
+
     return f, a
 
 
@@ -884,16 +884,16 @@ def plot_trial(data, sentence_id, ylabel, title=None, size_inches=(10, 2)):
 
 
 def plot_trial2(data, sentence_id, ylabel, title=None, size_inches=(10, 2)):
-    
+
     x = data.loc[data.sentid==sentence_id].reset_index().index.values
     y = data.loc[data.sentid==sentence_id].surp.to_numpy()
     l = data.loc[data.sentid==sentence_id].token.to_numpy()
     groups = data.loc[data.sentid==sentence_id].marker
-    
+
     last_tok = data.loc[(data.sentid==sentence_id) & (data.marker == 1) & (data.ngram_pos == 0)].token.to_list()[-1]
-    
+
     f, a = plt.subplots(figsize=size_inches)
-    
+
     a.plot(x, y, marker=".", markerfacecolor="white", linestyle="--", linewidth=1)
 
     a.vlines(x=np.where(l==l[0]), ymin=a.get_ylim()[0], ymax=a.get_ylim()[-1], color="r", linestyle="--", linewidth=1)
@@ -909,7 +909,7 @@ def plot_trial2(data, sentence_id, ylabel, title=None, size_inches=(10, 2)):
     a.spines["right"].set_visible(False)
 
     a.set(ylabel=ylabel, title=title);
-    
+
     return f, a
 
 
@@ -976,7 +976,7 @@ p = sns.catplot(data=rnngpt_agg, kind="point", x="ngram_pos", y="surp_mean", hue
                 estimator=np.mean, ci=95.0, n_boot=1000, seed=12345,
                 legend_out=False, dodge=0.15, sharey=True,
                 palette=sns.color_palette("rocket_r"))
-p.fig.set_size_inches(20, 4)  
+p.fig.set_size_inches(20, 4)
 p.fig.subplots_adjust(top=0.75)
 p.fig.suptitle("Are immediately repeated word lists lingering in memory?")
 p.set_axis_labels( "ngram serial position in list" , "mean surprisal\n(95% ci)")
@@ -1010,7 +1010,7 @@ p = sns.catplot(data=agg, kind="point", x="token_id", y="surp_mean", hue="ngram_
                 estimator=np.mean, ci=95.0, n_boot=1000, seed=12345,
                 legend_out=False, dodge=0.15, sharey=False,
                 palette=sns.color_palette("rocket_r"))
-p.fig.set_size_inches(6, 2)  
+p.fig.set_size_inches(6, 2)
 p.fig.subplots_adjust(top=0.75)
 p.fig.suptitle("Are early tokens remembered better than late?")
 p.set_axis_labels( "token position within ngram" , "mean surprisal\n(95% ci)")
@@ -1025,7 +1025,7 @@ p.despine(left=True);
 
 
 def make_plot2(data, nouns):
-    p = sns.relplot(kind="line", data=data, x="marker_pos_rel", y="surp", hue="model_id", 
+    p = sns.relplot(kind="line", data=data, x="marker_pos_rel", y="surp", hue="model_id",
                     estimator=np.mean, ci=95.0, err_style="bars",
                     markers=True, style_order=["repeated", "permuted", "unseen"],
                     legend="auto", linewidth=2.5)

@@ -1,9 +1,9 @@
 # Folder contents
 
-- `./`         |  main scripts  
+- `./`         |  main scripts
 - `/data`      |  scripts and .txt files for creating inputs
 - `/rnn` |  rnn code by Van Schijndel et al https://github.com/vansky/neural-complexity
-- `/output`    |  LM script outputs (.txt files)  
+- `/output`    |  LM script outputs (.txt files)
 - `/notebooks` |  .ipynb notebooks with EDA analyses and prototyping
 
 # Dependencies
@@ -25,31 +25,39 @@ For our experiments, we used the following dependencies:
 
 ## Installing dependencies
 
-There are two separate sets of dependencies, defined in the requirements files: 
+There are two separate sets of dependencies, defined in the requirements files:
 - [reqs_pytorch1.3.yaml](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/reqs_pytorch1.3.yaml) is for the rnn code
 - [reqs_pytorch1.6.yaml](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/reqs_pytorch1.6.yaml) is for the gpt-2 code.
 
 Pytorch 1.3 was used with RNN code base because the model objects that stored checkpoints contained attributes that were not compatible with pytorch 1.6.
 
-We used the conda management toolkit, so the easiest way to create the environment with dependencies is as follows:  
+We used the conda management toolkit, so the easiest way to create the environment with dependencies is as follows:
 
-`conda create /path/to/where/dependencies/are/installed -f ./reqs_pytorch1.3.yaml`
+`conda env create -n env_name_gpt2 -f ./reqs_pytorch1.6.yaml`
+`conda env create -n env_name_lstm -f ./reqs_pytorch1.3.yaml`
 
 ## Running [gpt2_surprisal.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/gpt2_surprisal.py)
 
-Activate the installed conda enviroment with dependencies:  
-`conda activate /path/to/where/dependencies/are/installed`  
+Activate the installed conda enviroment with dependencies:
+`conda activate env_name_gpt2`
 
-You can run the job as follows:
+Navigate to root folger of github repository.
+
+Now run with the setup flag to download the models:
 ```bash
-python /root_folder_with_code/gpt2_surprisal.py 
---condition control \  
---scenario sce1 \  
---paradigm with-context \  
---input_filename /root_folder_with_code/data/categorized_lists.json \  
---output_dir /home-3/karmeni1@jhu.edu/code/lm-mem/output \  
---output_file name_of_the_output_file.csv \  
---device cuda  
+python gpt2_surprisal.py --setup
+```
+
+The job as follows:
+```bash
+python ./gpt2_surprisal.py
+--condition control \
+--scenario sce1 \
+--paradigm with-context \
+--input_filename ./data/categorized_lists.json \
+--output_dir ./output \
+--output_file name_of_the_output_file.csv \
+--device cuda
 ```
 
 Input arguments are documented in the [gpt2_surprisal.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/gpt2_surprisal.py) script itself:
@@ -82,50 +90,44 @@ parser.add_argument("--output_filename", type=str,
 
 ## Running an LSTM job
 
-In bash script, activate the conda environment with [LSTM dependencies](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/reqs_pytorch1.3.yaml):  
-`conda activate ~/code/conda_envs/lmpytorch1.3`
+In bash script, activate the conda environment with [LSTM dependencies](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/reqs_pytorch1.3.yaml):
+`conda activate env_name_lstm`
+
+Download LSTM model into a folder `rnn_models` from here:
+https://doi.org/10.5281/zenodo.3559340 and convert them with
+[rnn/model2statedict.py](./rnn/model2statedict.py) to statedicts.
+
+You can use these commands
+```bash
+mkdir rnn_models
+cd rnn_models
+wget https://zenodo.org/record/3559340/files/LSTM_40m.tar.gz?download=1 -O LSTM_40m.tar.gz
+tar -xvzf LSTM_40.tar.gz
+cd ../
+python rnn/model2statedict.py rnn_models/LSTM_400_40m_a_10-d0.2.pt
+# or
+python rnn/model2statedict.py rnn_models
+```
+
+Now you need to convert the models to statedicts.
+
+Navigate to your root folder and use following command:
 
 ```bash
-python /root_folder_with_code/rnn/main.py \  
---model_file /root_folder_with_code/rnn_models/LSTM_400_40m_a_10-d0.2.pt \  
---vocab_file /root_folder_with_code/rnn/vocab.txt \  
---data_dir /root_folder_with_code/data/rnn_input_files \  
---testfname categorized_lists_sce1_control.txt \  
---csvfname surprisal_rnn_a-10_sce1_control_categorized.csv  \   
---markersfname categorized_lists_sce1_control_markers.txt  \  
---output_dir /root_folder_with_code/code/lm-mem/output  \  
---lowercase \  
---test \  
---words  
+python ./rnn/experiment.py \
+--checkpoint_folder checkpoints/ \
+--model_weights rnn_models/LSTM_400_40m_a_10-d0.2_statedict.pt \
+--vocab_file ./rnn/vocab.txt \
+--config_file ./rnn/config.json \
+--input_file ./data/rnn_input_files/categorized_lists_sce1_control.txt \
+--marker_file ./data/rnn_input_files/categorized_lists_sce1_control_markers.txt \
+--output_folder ./code/lm-mem/output \
+--output_filename output_test.csv
 ```
 
-Input args are defined in [rnn/main.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/rnn/main.py).
-The relevant are to this experiment are:  
+## Inputs
 
-```python
-
-parser = argparse.ArgumentParser(description='PyTorch RNN/LSTM Language Model')
-
-# Data parameters
-parser.add_argument('--model_file', type=str, default='model.pt',
-                    help='path to save the final model')
-parser.add_argument('--data_dir', type=str, default='./data/wikitext-2',
-                    help='location of the corpus data')
-parser.add_argument('--vocab_file', type=str, default='vocab.txt',
-                    help='path to save the vocab file')
-parser.add_argument('--testfname', type=str, default='test.txt',
-                    help='name of the test file')
-parser.add_argument('--markersfname', type=str, default='markers.txt',
-                    help='name of the .txt file containting marker values for each token')
-parser.add_argument('--csvfname', type=str,
-                    help='filename for storing complexity output')
-parser.add_argument('--output_dir', type=str,
-                    help='path where csvfname is written to (word-by-word complexity output)')
-parser.add_argument('--test', action='store_true',
-                    help='test a trained LM')
-parser.add_argument('--words', action='store_true',
-                    help='evaluate word-level complexities (instead of sentence-level loss)')
-parser.add_argument('--lowercase', action='store_true',
-                    help='force all input to be lowercase')
-
-```
+- TODO: explain inputs
+- What is sce1, sce2,...
+- What is condition? repeated, permuted, control?
+- What is categorized? arbitrary, categorized

@@ -24,7 +24,7 @@ for scenario in ["sce1"]:
             # create command string
             command = "python generate.py --scenario {} " \
                       "--input_list ./data/{} " \
-                      "--savename {} " \ 
+                      "--savename {} " \
                       "{} " \
                       "--min_tokens 10" \
                       "--max_tokens 25" \

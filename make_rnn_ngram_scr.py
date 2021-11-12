@@ -20,21 +20,21 @@ for model_id in model_ids:
     for scenario in ["sce1"]:
         for condition in ["repeat"]:
             for list_type in ["ngram-random", "ngram-categorized"]:
-    
+
                 outname = "surprisal_rnn_{}_{}_{}_{}.csv".format(model_id, scenario, condition, list_type)
-                
+
                 # select a pretrained model from Van Schijndel et al (10.18653/v1/D19-1592)
                 # these hyperparameters made the most significant improvement in loss
                 # increasing further hasn't (see Table 1)
                 nhidden=2     # number of hidden layers
                 hiddendim=400 # dimensionality of hidden layer
                 textgb=40     # size of input data (M tokens)
-                                
-                model_file = "LSTM_{}_{}m_{}-d0.2.pt".format(hiddendim, 
-                                                             textgb, 
+
+                model_file = "LSTM_{}_{}m_{}-d0.2.pt".format(hiddendim,
+                                                             textgb,
                                                              model_id.replace("-", "_"))
                 model_path = os.path.join(root_dir, "rnn_models", model_file)
-                
+
                 # create absolute paths
                 python_script = os.path.join(root_dir, "rnn", "main.py")
                 data_dir = os.path.join(root_dir, "data", "rnn_input_files")
@@ -42,7 +42,7 @@ for model_id in model_ids:
                 test_input_file = "{}_{}_{}.txt".format(list_type, scenario, condition)
                 markers_fname = test_input_file.replace(".txt", "_markers.txt")
                 output_dir = os.path.join(root_dir, "output")
-    
+
                 # create command string
                 command = "python {} " \
                           "--model_file {} " \
@@ -57,19 +57,19 @@ for model_id in model_ids:
                                   model_path,
                                   vocab_path,
                                   data_dir,
-                                  test_input_file, 
-                                  outname, 
+                                  test_input_file,
+                                  outname,
                                   markers_fname,
                                   output_dir)
-                
+
                 # construct script filename, open it and write commands
-                scr_filename = "script_surp_rnn_{}_{}_{}_{}".format(model_id, 
-                                                                    scenario, 
-                                                                    condition, 
+                scr_filename = "script_surp_rnn_{}_{}_{}_{}".format(model_id,
+                                                                    scenario,
+                                                                    condition,
                                                                     list_type)
 
                 f = open(os.path.join(scripts_dir, scr_filename) + '.scr', 'w')
-    
+
                 f.write("#!/bin/bash\n")
                 f.write("#SBATCH --job-name=" + scr_filename + "\n")
                 f.write("#SBATCH --time=10:00:00\n")
@@ -80,13 +80,13 @@ for model_id in model_ids:
                 f.write("#SBATCH --mail-user=karmeni1@jhu.edu\n")
                 f.write("#SBATCH --output=" + os.path.join(log_dir, scr_filename) + ".log\n")
                 f.write("#SBATCH --error=" + os.path.join(log_dir, scr_filename) + ".err\n\n\n")
-    
+
                 f.write("ml anaconda\n")
-    
+
                 f.write("conda activate ~/code/conda_envs/lmpytorch1.3\n\n") # load environment with pytorch 1.3
                 f.write(command + "\n\n")  # write the python command to be executed
                 f.close()
-    
+
                 print("Writing {}".format(scr_filename))
                 master_bash.write("sbatch " + scr_filename + ".scr\n")
 

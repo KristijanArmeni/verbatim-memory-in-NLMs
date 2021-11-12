@@ -12,4 +12,3 @@ python dataset.py --train_tokens $wikipath/wiki.train.tokens_40m \
                   --train_tokenizer True \
                   --tokenizer_savedir $HOME/work/karmeni1/lm-mem/gpt2_wikitext103 \
                   --savedir $wikipath
-                  
