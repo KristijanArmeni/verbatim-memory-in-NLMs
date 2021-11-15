@@ -462,14 +462,15 @@ if __name__ == "__main__":
     parser.add_argument("--model_weights", type=str,
         help="path/to/model_weights.pt of LSTM model")
     parser.add_argument("--vocab_file", type=str, default="./rnn_/vocab.text",
-        help="path/to/vocab_file.txt which contains every word in data")
+        help="path/to/vocab_file.txt which contains all tokens in model's vocabulary")
     parser.add_argument("--config_file", type=str,
-        help="path/to/config_file which contains the LSTM model's configuration")
+        help="path/to/config_file.json which contains the LSTM model's configuration")
     parser.add_argument("-i", "--input_file", type=str,
         help="path/to/input_file.txt which contains input sentences")
-    parser.add_argument("--marker_file", type=str,
-        help="path/to/marker_file.txt which contains metadata information about"\
-            + " input sentences")
+    parser.add_argument("--marker_file", type=str, default="",
+        help="(optional) empty string or path/to/marker_file.txt which contains metadata information about"\
+                + " each input sequence (default: empty string)")
+    parser.add_argument("--per_token_output", action="store_true")
     parser.add_argument("--output_folder", type=str,
         help="path/to/output_folder in which all outputs will be saved")
     parser.add_argument("--output_filename", type=str,
@@ -481,16 +482,25 @@ if __name__ == "__main__":
     logging.info("device = {}".format(device))
     if device == "cuda":
         logging.info("device name = {}".format(torch.cuda.get_device_name()))
+
     # load json file, should be a list of strings where eash string
     # (can be multiple sentences) is a single input stream to the model
     with open(args.input_file, "r") as f:
-
-        if ".txt" in args.input_file:
-            input_set = [l.strip("\n").lower() for l in f.readlines()]
-        elif ".json" in args.input_file:
+        
+        logging.info("Loading {}".format(args.input_file))
+        
+        # load .json otherwise assume you can read input sequences line by line
+        if ".json" in args.input_file:
             input_set = json.load(f)
+        else:
+            input_set = [l.strip("\n").lower() for l in f.readlines()]
 
-    markers = read_marker_file(args.marker_file)
+    # read in the marker files where (optional) metadata about input sequences is stored
+    if args.marker_file:
+        markers = read_marker_file(args.marker_file)
+    # otherwise use empty dict, Dataset() can deal with this
+    else:
+        markers = {}
 
     # initialize dataset class
     ds = Dataset(metadict=markers)
@@ -531,6 +541,8 @@ if __name__ == "__main__":
     #model2.eval()
 
     # ===== EXPERIMENT CLASS ===== #
+    logging.info("Running experiment...")
+    logging.info("Per token output == {}".format(args.per_token_output))
     exp = Experiment(model=model.to(device), dictionary=ds.dictionary, device=device)
 #exp2 = Experiment(model=model2, dictionary=ds.dictionary)
 
@@ -551,10 +563,10 @@ if __name__ == "__main__":
     datadict = [{'trial': o.trial,
                  'token': o.labels,
                  'step': o.step,
-                 'stimid': o.meta['stimid'],
-                 'markers': o.meta['markers'],
-                 'list_len': o.meta['list_len'],
-                 'prompt_len': o.meta['prompt_len'],
+                 'stimid': o.meta['stimid'] if 'stimid' in o.meta.keys() else np.nan,
+                 'markers': o.meta['markers'] if 'markers' in o.meta.keys() else np.nan,
+                 'list_len': o.meta['list_len'] if 'list_len' in o.meta.keys() else np.nan,
+                 'prompt_len': o.meta['prompt_len'] if 'prompt_len' in o.meta.keys() else np.nan,
                  'ppl': o.ppl,
                  'log_probs': o.log_probs,
                  'states': [SimpleNamespace(**vars(s)) if s else [] for s in o.states],}
@@ -563,33 +575,44 @@ if __name__ == "__main__":
     # convert dict to a SimpleNamespace to have dot indexing instead of brackets
     data = [SimpleNamespace(**el) for el in datadict]
 
-    # wratpper
+    # wrapper
     def datanamespace_to_df(data):
 
         dfs = []
 
         for el in data:
+            
+            # if per token output is to be saved, create appropriate columns in data frame
+            if args.per_token_output:
+                cols = ["word", "corpuspos", "markers", "surp"]
 
-            cols = ["word", "corpuspos", "markers", "surp"]
+                input_arrays = [np.array(el.token),
+                                el.step,
+                                el.markers,
+                                el.log_probs[:, 0, 0]]
 
-            input_arrays = [np.array(el.token),
-                            el.step,
-                            el.markers,
-                            el.log_probs[:, 0, 0]]
+                tmp = pd.DataFrame(data=np.array(input_arrays).T, columns=cols)
+                
+                tmp['stimid'] = el.stimid
+                tmp['list_len'] = el.list_len     # read-in from markers file
+                tmp['prompt_len'] = el.prompt_len # read-in from markers file
+                tmp['stimid'] = el.stimid         # read-in from markers file, counts over conditions (0-229)
 
-            tmp = pd.DataFrame(data=np.array(input_arrays).T, columns=cols)
+            else:
+                # only store perplexity if per token loss in not stored
+                tmp = pd.DataFrame()
+                tmp['ppl'] = el.ppl
 
-            tmp['sentid'] = el.trial     # this counds over entire experiment
-            tmp['stimid'] = el.stimid    # this counts over conditions (0-229)
-            tmp['list_len'] = el.list_len
-            tmp['prompt_len'] = el.prompt_len
+            tmp['sentid'] = el.trial     # this counts over all input sequences in the experiment
 
-            dfs.append(tmp)
+        dfs.append(tmp)
 
         return pd.concat(dfs)
-
+    
+    # convert data struct to data frame
     df = datanamespace_to_df(data)
-
+    
+    # save output as csv
     savename = os.path.join(args.output_folder, args.output_filename)
 
     logging.info('Saving {}'.format(savename))
