@@ -239,7 +239,10 @@ sce6 = {
     "5": replace_tokens(" ".join(add_sections((a2, a3, a4, a5), skip_last_item=False)), token_pairs),
 }
 
-# Join the context and the prompt
+# copy sce1 before it has the prompt string added
+sce7 = sce1.copy()
+
+# Join the context strings and the prompt
 prompt_string = "When she got back, she read the list again:"
 for scen in (sce1, sce1rnd, sce2, sce4):
     for key in scen.keys():
@@ -254,7 +257,6 @@ for key in sce6.keys():
     sce6[key] = sce6[key] + " " + replace_tokens(prompt_string, token_pairs)
 
 # permute the prompt text
-sce7 = sce1.copy()
 for key in sce7.keys():
     sce7[key] = sce7[key] + " " + permute_tokens(prompt_string.strip(":"), 324873) + ":"
 
