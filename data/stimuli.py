@@ -21,10 +21,10 @@ def add_sections(chunks, skip_last_item=True):
     return out
 
 
-def permute_tokens(token_string):
+def permute_tokens(token_string, seed=12345):
 
     # set random seed
-    rng = np.random.RandomState(12345)
+    rng = np.random.RandomState(seed)
 
     # lower case the first character prior to shuffling, such that it can't appear capitalized
     # in other positions, don't do that for proper names
@@ -248,19 +248,25 @@ for scen in (sce1, sce1rnd, sce2, sce4):
 # treat sce5 separately and replace final column
 for key in sce5.keys():
     sce5[key] = sce5[key] + " " + prompt_string.replace(":", ",")
-    
+
+# replace Mary --> John and the pronouns accordingly
 for key in sce6.keys():
     sce6[key] = sce6[key] + " " + replace_tokens(prompt_string, token_pairs)
 
+# permute the prompt text
+sce7 = sce1.copy()
+for key in sce7.keys():
+    sce7[key] = sce7[key] + " " + permute_tokens(prompt_string.strip(":"), 324873) + ":"
 
 prompts = {
-    "sce1": sce1,
-    "sce1rnd": sce1rnd,
-    "sce2": sce2,
-    "sce3": sce3,
-    "sce4": sce4,
-    "sce5": sce5,
-    "sce6": sce6,
+    "sce1": sce1,         # intact condition
+    "sce1rnd": sce1rnd,   # scrambled intervening text
+    "sce2": sce2,         # incongruent intervening text
+    "sce3": sce3,         # short intervening text
+    "sce4": sce4,         # permuted preface string
+    "sce5": sce5,         # replacing ":" --> ","
+    "sce6": sce6,         # replace "Mary" --> "John"
+    "sce7": sce7,         # permute the prompt string 
 }
 
 if __name__ == "__main__":
