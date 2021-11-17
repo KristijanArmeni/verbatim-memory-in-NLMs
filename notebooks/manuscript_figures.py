@@ -65,10 +65,10 @@ table_savedir = os.path.join(home_dir, "tables", "revised")
 savefigs = False
 
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # # Helper functions
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # ## plot_example()
 
 # %%
@@ -113,14 +113,14 @@ def plot_example(x, y, markers, xlabels, ylabel, fh, fw, ylim, title):
 # ## make_bar_plot()
 
 # %% tags=[]
-def make_bar_plot(data_frame, x, y, hue, col,
+def make_bar_plot(data_frame, estimator, x, y, hue, col,
                   ylim=None, xlabel=None, ylabel=None, suptitle=None,
                   size_inches=(5, 3), legend=False, legend_out=False, legend_title=None,
                   hue_order=["Repeated", "Permuted", "Novel"], col_order=["arbitrary", "semantic"]):
 
 
     g = sns.catplot(data=data_frame, x=x, y=y, hue=hue, col=col, 
-                    estimator=np.median, ci=95.0,
+                    estimator=estimator, ci=95.0,
                     kind="bar", dodge=0.5, zorder=2, legend=legend, legend_out=legend_out,
                     seed=12345,
                     hue_order=hue_order, col_order=col_order,
@@ -245,14 +245,14 @@ def get_data_lineplot_with_bars(axis):
 # ## make_point_plot()
 
 # %%
-def make_point_plot(data_frame, x, y, hue, col,
+def make_point_plot(data_frame, estimator, x, y, hue, col,
                    xlabel=None, ylabel=None, suptitle=None, ylim=(None, None),
                    size_inches=(5, 3), join=True, scale=1, errwidth=None,
                    legend=False, legend_out=False, custom_legend=True, legend_title=None, 
                    hue_order=["Repeated", "Permuted", "Novel"], col_order=["arbitrary", "semantic"]):
 
     g = sns.catplot(data=data_frame, x=x, y=y, hue=hue, col=col, 
-                    estimator=np.median, ci=95.0,
+                    estimator=estimator, ci=95.0,
                     kind="point", join=join, dodge=0.2, scale=scale, errwidth=errwidth,
                     zorder=2, legend=legend, legend_out=legend_out,
                     seed=12345,
@@ -317,7 +317,7 @@ def make_point_plot(data_frame, x, y, hue, col,
 # ## make_timecourse_plot()
 
 # %%
-def make_timecourse_plot(datain, x, style, col, col_order, style_order, hue_order, err_style, xticks):
+def make_timecourse_plot(datain, x, style, col, col_order, style_order, hue_order, estimator, err_style, xticks):
     
     usetex = plt.rcParams["text.usetex"]
     
@@ -331,7 +331,7 @@ def make_timecourse_plot(datain, x, style, col, col_order, style_order, hue_orde
     n = len(datain.loc[one_group])  
     
     p = sns.relplot(kind="line", data=datain, x=x, y="surp", style=style, hue=style, col=col, 
-                    estimator=np.median, ci=95.0, err_style=err_style, seed=12345,
+                    estimator=estimator, ci=95.0, err_style=err_style, seed=12345,
                     markers=True, style_order=style_order, hue_order=hue_order, col_order=col_order,
                     legend=True, linewidth=0.7)
     
@@ -2113,6 +2113,98 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         tex = stat.to_latex(bold_rows=True,
                             label="tab:{}_{}_{}".format(basename, scenario, tag),
                             caption="{} word list surprisal as a function of set size when tokens in preface string are randomly permuted. We report the percentage of ".format(suptitle) + \
+                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around " \
+                            "the observed median (bootstrap estimate, $N^{resample} = 1000$). " \
+                            "The length of intervening text is fixed at 26 tokens.")
+
+        # now save as .tex file
+        fname = os.path.join(table_savedir, "{}_{}_{}.tex".format(basename, scenario, tag))
+        print("Writing {}".format(fname))
+        with open(fname, "w") as f:
+            f.writelines(tex)
+
+# %% [markdown]
+# # Control: median vs. mean
+
+# %%
+data_gpt = pd.read_csv(os.path.join(data_dir, "output_gpt2_a-10_sce1.csv"), sep="\t", index_col=0)
+data_40m = pd.read_csv(os.path.join(data_dir, "output_gpt2_w-12_sce1.csv"), sep="\t", index_col=0)
+
+data_rnn = pd.read_csv(os.path.join(data_dir, "output_rnn_a-10_sce1.csv"), sep="\t", index_col=None)
+data_rnn2 = pd.read_csv(os.path.join(data_dir, "output_rnn-vs2019_a-70_sce1.csv"), sep="\t", index_col=None)
+
+data_rnn.rename(columns={"word": "token"}, inplace=True)
+data_rnn2.rename(columns={"word": "token"}, inplace=True)
+data_rnn["model"] = "lstm"
+data_rnn2["model"] = "lstm"
+
+data_gpt["model"] = "gpt-2"
+data_40m["model"] = "gpt-2"
+
+# %%
+variables = [{"list_len": [3, 5, 7, 10]},
+             {"prompt_len": [8]},
+             {"context": ["intact"]},
+             {"marker_pos_rel": list(range(1, 10))}]
+
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
+dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables)
+
+# %% [markdown]
+# ## Plot
+
+# %%
+dfs = (dat_40m_, dat_gpt_, dat_rnn_)
+suptitles = ("Transformer (Wikitext-103)", "Transformer (Radford et al, 2019)", "LSTM (Wikitext-103)")
+savetags = ("trf-w12", "trf-a10", "lstm-a10")
+ylims=((60, 115), (None, None), (80, 120))
+basename="set-size-mean-est"
+scenario = "sce1"
+
+for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
+    
+    plot_size=(4, 3)
+    
+    df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
+    
+    grid, ax, stat = make_point_plot(data_frame=df, estimator=np.mean, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+                                      xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                      suptitle=suptitle, scale=0.8,
+                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
+                                      size_inches=plot_size)
+    
+    grid.fig.subplots_adjust(top=0.70)
+    
+    ax[0].set_title("Arbitrary list\n")
+    ax[1].set_title("Semantically coherent\nlist")
+    for i in range(len(ax)):
+        ax[i].set_xlabel("set size\n(n. tokens)", color='#23a952')
+    
+    if savefigs:
+        
+        print("Saving {}".format(os.path.join(savedir, "{}_{}_{}.".format(basename, scenario, tag))))
+        grid.savefig(os.path.join(savedir, "{}_{}_{}.pdf".format(basename, scenario, tag)), transparent=True, bbox_inches="tight")
+        grid.savefig(os.path.join(savedir, "{}_{}_{}.png".format(basename, scenario, tag)), dpi=300, bbox_inches="tight")
+        
+        # create a column with string formated and save the table as well
+        stat = stat.round({"ci_min": 1, "ci_max": 1, "est": 1})
+        strfunc = lambda x: str(x["est"]) + "% " + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        stat["report_str"] = stat.apply(strfunc, axis=1)
+
+        # save the original .csv
+        fname = os.path.join(table_savedir, "{}_{}_{}.csv".format(basename, scenario, tag))
+        print("Writing {}".format(fname))
+        stat.to_csv(fname)
+
+        # save for latex
+        stat.rename(columns={"hue": "Condition", "cond": "List", "xlabel": "Set-Size"}, inplace=True)
+        stat = stat.pivot(index=["List", "Condition"], columns=["Set-Size"], values="report_str")
+        stat.columns = stat.columns.astype(int)
+        stat.sort_index(axis=1, ascending=True, inplace=True)
+        tex = stat.to_latex(bold_rows=True,
+                            label="tab:{}_{}_{}".format(basename, scenario, tag),
+                            caption="{} word list surprisal as a function of set size. We report the percentage of ".format(suptitle) + \
                             "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around " \
                             "the observed median (bootstrap estimate, $N^{resample} = 1000$). " \
                             "The length of intervening text is fixed at 26 tokens.")
