@@ -189,7 +189,7 @@ def make_bar_plot(data_frame, x, y, hue, col,
             #ax[0].get_legend().remove()
         
         handles, labels = ax[axis_with_legend].get_legend_handles_labels()
-        ax[axis_with_legend].legend(handles[0:3], labels[0:3],
+        ax[axis_with_legend].legend(handles[0:3], labels[0:3], labelcolor=['#00BEFF', '#D4CA3A', '#FF6DAE'],
                                     handletextpad=1, columnspacing=1, bbox_to_anchor=(1, 1),
                                     loc="upper left", ncol=1, frameon=False, title=legend_title)
 
@@ -730,7 +730,7 @@ def filter_and_aggregate(datain, model, model_id, groups):
     return dataout, dagg
 
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # ## Prepare data
 
 # %%
@@ -1240,14 +1240,14 @@ if savefigs:
 variables = [{"list_len": [3, 5, 7, 10]},
              {"prompt_len": [8]},
              {"context": ["no-comma"]},
-             {"marker_pos_rel": list(range(0, 10))}]
+             {"marker_pos_rel": list(range(1, 10))}]
 
 dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
 dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
-suptitles = ("{} (Wikitext-103 transformer)".format(scenario_title), "{} (Radford et al, 2019, transformer)".format(scenario_title))
+suptitles = ("{} (Wikitext-103 transformer)".format(scenario_title), "{} (GPT-2)".format(scenario_title))
 savetags = ("trf-w12", "trf-a10")
 ylims=((60, 115), (None, None))
 basename="set-size"
@@ -1270,7 +1270,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
     for i in range(len(ax)):
-        ax[i].set_xlabel("set size\n(n. tokens)", color='#23a952')
+        ax[i].set_xlabel("set size\n(n. tokens)")
     
     if savefigs:
         
@@ -2138,6 +2138,105 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
 
         # now save as .tex file
         fname = os.path.join(table_savedir, "{}_{}_{}-{}.tex".format(basename, scenario, tag, model_id))
+        print("Writing {}".format(fname))
+        with open(fname, "w") as f:
+            f.writelines(tex)
+
+# %% [markdown]
+# # Additional transformer checkpoints
+
+# %%
+data_gptB = pd.read_csv(os.path.join(data_dir, "output_gpt2_w-12b_sce1.csv"), sep="\t", index_col=0)
+data_gptC = pd.read_csv(os.path.join(data_dir, "output_gpt2_w-12c_sce1.csv"), sep="\t", index_col=0)
+
+data_gptB["model"] = "gpt-2"
+data_gptC["model"] = "gpt-2"
+
+# %% [markdown]
+# ## Data check
+
+# %%
+# show original and target lists for stimulus input 11
+for dat in (data_gptB, data_gptC):
+    
+    sel = (dat.list_len==5) & (dat.prompt_len==8) & (dat.context=="intact") & (dat.list=="random") & (dat.second_list=="permute") & (dat.marker.isin([1, 3]))
+    d = dat.loc[sel]
+    stimid=11
+    display("Original and target lists for stimulus {}:".format(stimid))
+    display(d.loc[d.stimid==stimid, ["token", "marker", "model", "second_list"]])
+
+# %% [markdown] tags=[]
+# ## Prepare data
+
+# %%
+variables = [{"list_len": [3, 5, 7, 10]},
+             {"prompt_len": [8]},
+             {"context": ["intact"]},
+             {"marker_pos_rel": list(range(1, 10))}]
+
+dat_gptB_, _ = filter_and_aggregate(datain=data_gptB, model="gpt-2", model_id="w-12b", groups=variables)
+dat_gptC_, _ = filter_and_aggregate(datain=data_gptC, model="gpt-2", model_id="w-12c", groups=variables)
+
+# %% [markdown]
+# ## Plot
+
+# %%
+dfs = (dat_gptB_, dat_gptC_)
+suptitles = ("Transformer (Wikitext-103) B", "Transformer (Wikitext-103) C")
+savetags = ("trf-w12b", "trf-w12c")
+ylims=((70, 115), (70, 115))
+basename = "set-size"
+scenario = "sce1"
+
+for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
+    
+    plot_size=(4, 3)
+    
+    df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
+    
+    grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+                                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                  suptitle=suptitle, scale=0.8,
+                                  legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
+                                  size_inches=plot_size)
+    
+    grid.fig.subplots_adjust(top=0.70)
+    
+    ax[0].set_title("Arbitrary list\n")
+    ax[1].set_title("Semantically coherent\nlist")
+    for i in range(len(ax)):
+        ax[i].set_xlabel("set size\n(n. tokens)", color='#23a952')
+    
+    if savefigs:
+        
+        print("Saving {}".format(os.path.join(savedir, "{}_{}_{}.".format(basename, scenario, tag))))
+        grid.savefig(os.path.join(savedir, "{}_{}_{}.pdf".format(basename, scenario, tag)), transparent=True, bbox_inches="tight")
+        grid.savefig(os.path.join(savedir, "{}_{}_{}.png".format(basename, scenario, tag)), dpi=300, bbox_inches="tight")
+        
+        # create a column with string formated and save the table as well
+        stat = stat.round({"ci_min": 1, "ci_max": 1, "est": 1})
+        strfunc = lambda x: str(x["est"]) + "% " + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        stat["report_str"] = stat.apply(strfunc, axis=1)
+
+        # save the original .csv
+        fname = os.path.join(table_savedir, "{}_{}_{}.csv".format(basename, scenario, tag))
+        print("Writing {}".format(fname))
+        stat.to_csv(fname)
+
+        # save for latex
+        stat.rename(columns={"hue": "Condition", "cond": "List", "xlabel": "Set-Size"}, inplace=True)
+        stat = stat.pivot(index=["List", "Condition"], columns=["Set-Size"], values="report_str")
+        stat.columns = stat.columns.astype(int)
+        stat.sort_index(axis=1, ascending=True, inplace=True)
+        tex = stat.to_latex(bold_rows=True,
+                            label="tab:{}_{}_{}".format(basename, scenario, tag),
+                            caption="{} word list surprisal as a function of set size. We report the percentage of ".format(suptitle) + \
+                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around " \
+                            "the observed median (bootstrap estimate, $N^{resample} = 1000$). " \
+                            "The length of intervening text is fixed at 26 tokens.")
+
+        # now save as .tex file
+        fname = os.path.join(table_savedir, "{}_{}_{}.tex".format(basename, scenario, tag))
         print("Writing {}".format(fname))
         with open(fname, "w") as f:
             f.writelines(tex)
