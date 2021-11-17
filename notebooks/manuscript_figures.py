@@ -1984,18 +1984,18 @@ data_gpt_time, data_40m_time = tmp
 ids = ("a-10", "w-12")
 tags = ("trf", "trf")
 scenario = "sce7"
-scenario_txt = "Permuted prompt string"
+scenario_txt = "Shuffled prompt string"
 titles = ("{} (Radford et al, 2019)".format(scenario_txt), "{} (Wikitext-103 transformer)".format(scenario_txt))
 
 for dat, model_id, tag, title in zip((data_gpt_time, data_40m_time), ids, tags, titles):
 
-    p, ax, _ = make_timecourse_plot(dat, x="marker-pos-rel", style="Second list", col="list structure", 
+    p, ax, _ = make_timecourse_plot(dat, estimator=np.median, x="marker-pos-rel", style="Second list", col="list structure", 
                                        col_order=["arbitrary", "semantic"], err_style="band", 
                                        hue_order=["Repeated", "Permuted", "Novel"],
                                        style_order=["Repeated", "Permuted", "Novel"],
                                        xticks=list(range(-4, 10)))
 
-    _, _, stat = make_timecourse_plot(dat, x="marker-pos-rel", style="Second list", col="list structure", 
+    _, _, stat = make_timecourse_plot(dat, estimator=np.median, x="marker-pos-rel", style="Second list", col="list structure", 
                                       col_order=["arbitrary", "semantic"], err_style="bars", 
                                       hue_order=["Repeated", "Permuted", "Novel"],
                                       style_order=["Repeated", "Permuted", "Novel"],
@@ -2023,7 +2023,7 @@ for dat, model_id, tag, title in zip((data_gpt_time, data_40m_time), ids, tags, 
 
     if savefigs:
 
-        print("Saving {}".format(os.path.join(savedir, "timecourse_{}__{}_{}".format(scenario, tag, model_id))))
+        print("Saving {}".format(os.path.join(savedir, "timecourse_{}_{}_{}".format(scenario, tag, model_id))))
         p.savefig(os.path.join(savedir, "timecourse_{}_{}_{}.pdf".format(scenario, tag, model_id)), transparent=True, bbox_inches="tight")
         p.savefig(os.path.join(savedir, "timecourse_{}_{}_{}.png".format(scenario, tag, model_id)), dpi=300, bbox_inches="tight")
 
@@ -2078,7 +2078,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     
     df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
     
-    grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+    grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
                                   xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
                                   suptitle=suptitle, scale=0.8,
                                   legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
@@ -2112,7 +2112,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         stat.sort_index(axis=1, ascending=True, inplace=True)
         tex = stat.to_latex(bold_rows=True,
                             label="tab:{}_{}_{}".format(basename, scenario, tag),
-                            caption="{} word list surprisal as a function of set size when tokens in preface string are randomly permuted. We report the percentage of ".format(suptitle) + \
+                            caption="{} word list surprisal as a function of set size when tokens in prompt string are randomly permuted. We report the percentage of ".format(suptitle) + \
                             "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around " \
                             "the observed median (bootstrap estimate, $N^{resample} = 1000$). " \
                             "The length of intervening text is fixed at 26 tokens.")
@@ -2125,6 +2125,9 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
 
 # %% [markdown]
 # # Control: median vs. mean
+
+# %% [markdown]
+# ## Get data
 
 # %%
 data_gpt = pd.read_csv(os.path.join(data_dir, "output_gpt2_a-10_sce1.csv"), sep="\t", index_col=0)
@@ -2179,7 +2182,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
     for i in range(len(ax)):
-        ax[i].set_xlabel("set size\n(n. tokens)", color='#23a952')
+        ax[i].set_xlabel("set size\n(n. tokens)")
     
     if savefigs:
         
