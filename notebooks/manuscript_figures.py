@@ -379,7 +379,7 @@ def get_relative_change(x1=None, x2=None, labels1=None, labels2=None):
 # ## relative_change_wrapper()
 
 # %%
-def relative_change_wrapper(df_agg, groups):
+def relative_change_wrapper(df_agg, groups, compared_col):
     
     # unpack the dicts
     g1, g2, g3, g4 = groups
@@ -410,8 +410,8 @@ def relative_change_wrapper(df_agg, groups):
                     tmp = df_agg.loc[select].copy()
 
                     # get vectors with aggregated surprisal values from first and second list
-                    x1=tmp.loc[tmp.marker==1].surp_mean.to_numpy()           # average per sentence surprisal on first list
-                    x2=tmp.loc[tmp.marker==3].surp_mean.to_numpy()           # average per sentence surprisal on second list
+                    x1=tmp.loc[tmp.marker==1, compared_col].to_numpy()           # average per sentence surprisal on first list
+                    x2=tmp.loc[tmp.marker==3, compared_col].to_numpy()           # average per sentence surprisal on second list
                     labels1 = tmp.loc[tmp.marker==1].stimid.to_numpy()  # use sentence id for check
                     labels2 = tmp.loc[tmp.marker==3].stimid.to_numpy()
 
@@ -662,7 +662,7 @@ for model_id, suptitle, arc, tag, ylim in zip(model_ids, titles, arcs, tags, yli
 # ## filter_and_aggregate()
 
 # %%
-def filter_and_aggregate(datain, model, model_id, groups):
+def filter_and_aggregate(datain, model, model_id, groups, aggregating_metric):
     """
     Parameters:
     ----------
@@ -706,20 +706,23 @@ def filter_and_aggregate(datain, model, model_id, groups):
     # average separately per list_len, stimulus id (sentid), model (lstm or gpt2), marker (1 or 3), list (random, categorized) and second list (repeated, permuted or control)
     units = [var1, "stimid", "model", "marker", "list", "second_list"]
     
+    logging.info("Aggregating metric == {}".format(aggregating_metric))
     logging.info("Aggregating over these variables:")
     display(units)
     
     # aggregate with .groupby and .agg
-    dagg = d.groupby(units).agg({"surp": ["mean", "std"], "token": list}).reset_index()
+    dagg = d.groupby(units).agg({"surp": [aggregating_metric, "std"], "token": list}).reset_index()
     dagg.columns = ['_'.join(col_v) if col_v[-1] != '' else col_v[0] for col_v in dagg.columns.values]
     
+    target_colname = "surp_" + aggregating_metric    
     ## Compute metric
     dataout = relative_change_wrapper(df_agg=dagg, 
                                       groups = [{"model": [model]}, 
                                                  d1,  # this is the manipulated variable
                                                 {"second_list": ["repeat", "permute", "control"]},
                                                 {"list": ["categorized", "random"]}
-                                                ]
+                                                ],
+                                      compared_col=target_colname,
                                       )
     
     # rename some column/row names for plotting
@@ -739,9 +742,9 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["intact"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
-dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables)
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="median")
 
 # %% [markdown]
 # ## Plot
@@ -760,7 +763,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     
     df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
     
-    grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+    grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
                                   xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
                                   suptitle=suptitle, scale=0.8,
                                   legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
@@ -820,9 +823,9 @@ variables = [{"prompt_len": [8, 100, 200, 400]},
              {"marker_pos_rel": list(range(1, 10))}]
 
 dat_40m_, dat_gpt_, dat_rnn_ = None, None, None
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
-dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables)
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="median")
 
 # %%
 dat_40m_.prompt_len = dat_40m_.prompt_len.astype(int)
@@ -851,7 +854,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     
     plot_size=(4, 3)
     
-    grid, ax, stat = make_point_plot(data_frame=df, x="prompt_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+    grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="prompt_len", y="x_perc", hue="condition", col="list", ylim=ylim,
                                  xlabel="intervening text\nlen. (n. tokens)", ylabel="repeat surprisal\n(\%)",
                                  suptitle=suptitle, scale=0.8,
                                  legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
@@ -933,9 +936,9 @@ variables = [{"context": ["intact", 'scrambled', 'incongruent']},
              {"marker_pos_rel": list(range(1, 10))}]
 
 dat_40m_, dat_gpt_, dat_rnn_ = None, None, None
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
-dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables)
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="median")
 
 # %% [markdown]
 # ## Plot
@@ -951,7 +954,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     
     plot_size=(6, 3)
     
-    grid, ax, stat = make_bar_plot(data_frame=df, x="context", y="x_perc", hue="condition", col="list", ylim=ylim,
+    grid, ax, stat = make_bar_plot(data_frame=df, estimator=np.median, x="context", y="x_perc", hue="condition", col="list", ylim=ylim,
                                  xlabel="intervening text", ylabel="repeat surprisal\n(\%)",
                                  suptitle=suptitle,
                                  legend=False, legend_out=True, legend_title="Second list",
@@ -1050,9 +1053,9 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["short"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_gpt40m_, _ = filter_and_aggregate(datain=data_gpt40m, model="gpt-2", model_id="w-12", groups=variables)
-dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables)
-dat_rnn2_, _ = filter_and_aggregate(datain=data_rnn2, model="lstm", model_id="a-70", groups=variables)
+dat_gpt40m_, _ = filter_and_aggregate(datain=data_gpt40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
+dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_rnn2_, _ = filter_and_aggregate(datain=data_rnn2, model="lstm", model_id="a-70", groups=variables, aggregating_metric="median")
 
 # %% [markdown] tags=[]
 # ## Point plots
@@ -1069,11 +1072,11 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     
     plot_size=(4, 3)
     
-    grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
-                                  suptitle=suptitle, scale=0.8,
-                                  legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
-                                  size_inches=plot_size)
+    grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+                                     xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                     suptitle=suptitle, scale=0.8,
+                                     legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
+                                     size_inches=plot_size)
     
     grid.fig.subplots_adjust(top=0.7)
     ax[0].set_title("Arbitrary list\n")
@@ -1172,13 +1175,13 @@ data_gpt_time.rename(columns={"list": "list structure", "second_list": "Second l
 w, h = 12, 2
 
 p, ax, _ = make_timecourse_plot(data_gpt_time, x="marker-pos-rel", style="Second list", col="list structure", 
-                                   col_order=["arbitrary", "semantic"], err_style="band", 
+                                   col_order=["arbitrary", "semantic"], err_style="band", estimator=np.median,
                                    hue_order=["Repeated", "Permuted", "Novel"],
                                    style_order=["Repeated", "Permuted", "Novel"],
                                    xticks=list(range(-4, 10)))
 
 _, _, stat = make_timecourse_plot(data_gpt_time, x="marker-pos-rel", style="Second list", col="list structure", 
-                                  col_order=["arbitrary", "semantic"], err_style="bars", 
+                                  col_order=["arbitrary", "semantic"], err_style="bars", estimator=np.median,
                                   hue_order=["Repeated", "Permuted", "Novel"],
                                   style_order=["Repeated", "Permuted", "Novel"],
                                   xticks=list(range(-4, 10)))
@@ -1242,8 +1245,8 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["no-comma"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -1315,8 +1318,8 @@ variables = [{"marker_pos_rel": list(range(0, 3))},
              {"context": ["no-comma"]},
              {"list_len": [10]}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -1440,13 +1443,13 @@ data_gpt_time.rename(columns={"list": "list structure", "second_list": "Second l
 
 # %%
 p, ax, _ = make_timecourse_plot(data_gpt_time, x="marker-pos-rel", style="Second list", col="list structure", 
-                                   col_order=["arbitrary", "semantic"], err_style="band", 
+                                   col_order=["arbitrary", "semantic"], err_style="band", estimator=np.median,
                                    hue_order=["Repeated", "Permuted", "Novel"],
                                    style_order=["Repeated", "Permuted", "Novel"],
                                    xticks=list(range(-4, 10)))
 
 _, _, stat = make_timecourse_plot(data_gpt_time, x="marker-pos-rel", style="Second list", col="list structure", 
-                                  col_order=["arbitrary", "semantic"], err_style="bars", 
+                                  col_order=["arbitrary", "semantic"], err_style="bars", estimator=np.median,
                                   hue_order=["Repeated", "Permuted", "Novel"],
                                   style_order=["Repeated", "Permuted", "Novel"],
                                   xticks=list(range(-4, 10)))
@@ -1511,8 +1514,8 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["mary-john"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -1528,11 +1531,11 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     
     df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
     
-    grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
-                                  suptitle=suptitle, scale=0.8,
-                                  legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
-                                  size_inches=plot_size)
+    grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+                                     xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                     suptitle=suptitle, scale=0.8,
+                                     legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
+                                     size_inches=plot_size)
     
     grid.fig.subplots_adjust(top=0.70)
     
@@ -1582,8 +1585,8 @@ variables = [{"marker_pos_rel": list(range(0, 3))},
              {"context": ["mary-john"]},
              {"list_len": [10]}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -1605,7 +1608,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     #                              legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
     #                              size_inches=plot_size)
     
-    grid, ax, stat = make_bar_plot(data_frame=df, x="marker_pos_rel", y="x_perc", hue="condition", col="list", ylim=ylim,
+    grid, ax, stat = make_bar_plot(data_frame=df, estimator=np.median, x="marker_pos_rel", y="x_perc", hue="condition", col="list", ylim=ylim,
                               xlabel="intervening text", ylabel="repeat surprisal\n(\%)",
                               suptitle=suptitle,
                               legend=False, legend_out=True, legend_title="Second list",
@@ -1708,13 +1711,13 @@ data_gpt_time.rename(columns={"list": "list structure", "second_list": "Second l
 
 # %%
 p, ax, _ = make_timecourse_plot(data_gpt_time, x="marker-pos-rel", style="Second list", col="list structure", 
-                                   col_order=["arbitrary", "semantic"], err_style="band", 
+                                   col_order=["arbitrary", "semantic"], err_style="band", estimator=np.median,
                                    hue_order=["Repeated", "Permuted", "Novel"],
                                    style_order=["Repeated", "Permuted", "Novel"],
                                    xticks=list(range(-4, 10)))
 
 _, _, stat = make_timecourse_plot(d.loc[sel], x="marker-pos-rel", style="Second list", col="list structure", 
-                                  col_order=["arbitrary", "semantic"], err_style="bars", 
+                                  col_order=["arbitrary", "semantic"], err_style="bars", estimator=np.median,
                                   hue_order=["Repeated", "Permuted", "Novel"],
                                   style_order=["Repeated", "Permuted", "Novel"],
                                   xticks=list(range(-4, 10)))
@@ -1778,8 +1781,8 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["shuf-preface"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -1795,11 +1798,11 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     
     df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
     
-    grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
-                                  suptitle=suptitle, scale=0.8,
-                                  legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
-                                  size_inches=plot_size)
+    grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+                                     xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                     suptitle=suptitle, scale=0.8,
+                                     legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
+                                     size_inches=plot_size)
     
     grid.fig.subplots_adjust(top=0.70)
     
@@ -1849,8 +1852,8 @@ variables = [{"marker_pos_rel": list(range(0, 3))},
              {"context": ["shuf-preface"]},
              {"list_len": [10]}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -2061,8 +2064,8 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["shuf-prompt"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -2150,9 +2153,9 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["intact"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables)
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables)
-dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables)
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="median")
 
 # %% [markdown]
 # ## Plot
@@ -2265,10 +2268,10 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["intact"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-gptrnd_r10, _ = filter_and_aggregate(datain=gptlst[0], model="gpt-2", model_id="r-10", groups=variables)
-gptrnd_r20, _ = filter_and_aggregate(datain=gptlst[1], model="gpt-2", model_id="r-20", groups=variables)
-gptrnd_r25, _ = filter_and_aggregate(datain=gptlst[2], model="gpt-2", model_id="r-25", groups=variables)
-gptrnd_r30, _ = filter_and_aggregate(datain=gptlst[3], model="gpt-2", model_id="r-30", groups=variables)
+gptrnd_r10, _ = filter_and_aggregate(datain=gptlst[0], model="gpt-2", model_id="r-10", groups=variables, aggregating_metric="median")
+gptrnd_r20, _ = filter_and_aggregate(datain=gptlst[1], model="gpt-2", model_id="r-20", groups=variables, aggregating_metric="median")
+gptrnd_r25, _ = filter_and_aggregate(datain=gptlst[2], model="gpt-2", model_id="r-25", groups=variables, aggregating_metric="median")
+gptrnd_r30, _ = filter_and_aggregate(datain=gptlst[3], model="gpt-2", model_id="r-30", groups=variables, aggregating_metric="median")
 
 # %%
 scenario = "sce1"
@@ -2374,7 +2377,7 @@ variables = [{"list_len": [3, 5, 7, 10]},
 dfs_ = []
 for i, model_id in enumerate(model_ids):
     
-    tmp, _ = filter_and_aggregate(datain=dfs[i], model="gpt-2", model_id=model_id, groups=variables)
+    tmp, _ = filter_and_aggregate(datain=dfs[i], model="gpt-2", model_id=model_id, groups=variables, aggregating_metric="median")
     dfs_.append(tmp)
 
 
@@ -2392,7 +2395,7 @@ basename = "set-size"
 for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_ids, savetags):
     
     plot_size=(5, 3)
-    grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
+    grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
                                      xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
                                      suptitle=suptitle, scale=0.8,
                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
@@ -2473,8 +2476,8 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["intact"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_gptB_, _ = filter_and_aggregate(datain=data_gptB, model="gpt-2", model_id="w-12b", groups=variables)
-dat_gptC_, _ = filter_and_aggregate(datain=data_gptC, model="gpt-2", model_id="w-12c", groups=variables)
+dat_gptB_, _ = filter_and_aggregate(datain=data_gptB, model="gpt-2", model_id="w-12b", groups=variables, aggregating_metric="median")
+dat_gptC_, _ = filter_and_aggregate(datain=data_gptC, model="gpt-2", model_id="w-12c", groups=variables, aggregating_metric="median")
 
 # %% [markdown]
 # ## Plot
