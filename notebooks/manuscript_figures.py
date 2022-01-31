@@ -591,13 +591,15 @@ for model_id, suptitle, arc, tag, ylim in zip(model_ids, titles, arcs, tags, yli
     
     d.rename(columns={"marker_pos_rel": "marker-pos-rel", "condition": "Second list"}, inplace=True)
     
-    p, ax, _ = make_timecourse_plot(d.loc[sel], x="marker-pos-rel", style="Second list", col="list structure", 
-                                       col_order=["arbitrary", "semantic"], err_style="band", 
-                                       hue_order=["Repeated", "Permuted", "Novel"],
-                                       style_order=["Repeated", "Permuted", "Novel"],
-                                       xticks=list(range(-4, 10)))
+    p, ax, _ = make_timecourse_plot(d.loc[sel], x="marker-pos-rel", style="Second list", col="list structure",
+                                    estimator=np.median,
+                                    col_order=["arbitrary", "semantic"], err_style="band", 
+                                    hue_order=["Repeated", "Permuted", "Novel"],
+                                    style_order=["Repeated", "Permuted", "Novel"],
+                                    xticks=list(range(-4, 10)))
     
     _, _, stat = make_timecourse_plot(d.loc[sel], x="marker-pos-rel", style="Second list", col="list structure", 
+                                      estimator = np.median,
                                       col_order=["arbitrary", "semantic"], err_style="bars", 
                                       hue_order=["Repeated", "Permuted", "Novel"],
                                       style_order=["Repeated", "Permuted", "Novel"],
@@ -612,9 +614,9 @@ for model_id, suptitle, arc, tag, ylim in zip(model_ids, titles, arcs, tags, yli
     
     ax[0].set_title("Arbitrary list", fontsize=16)
     ax[1].set_title("Semantically coherent list", fontsize=16)
-    ax[0].set_ylabel("surprisal\n(bit)")
+    ax[0].set_ylabel("Surprisal\n(bit)")
     for a in ax:
-        a.set_xlabel("token position relative to list onset")
+        a.set_xlabel("Token position relative to list onset")
         a.set_xticks(list(range(-4, 10, 2)))
         a.set_xticklabels(list(range(-4, 10, 2)))
             
@@ -742,9 +744,9 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["intact"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
-dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
+dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %% [markdown]
 # ## Plot
@@ -764,7 +766,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
     
     grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                  xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
                                   suptitle=suptitle, scale=0.8,
                                   legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                   size_inches=plot_size)
@@ -774,7 +776,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
     for i in range(len(ax)):
-        ax[i].set_xlabel("set size\n(n. tokens)", color='#23a952')
+        ax[i].set_xlabel("Set size\n(n. tokens)", color='#23a952')
     
     if savefigs:
         
@@ -823,9 +825,9 @@ variables = [{"prompt_len": [8, 100, 200, 400]},
              {"marker_pos_rel": list(range(1, 10))}]
 
 dat_40m_, dat_gpt_, dat_rnn_ = None, None, None
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
-dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
+dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %%
 dat_40m_.prompt_len = dat_40m_.prompt_len.astype(int)
@@ -864,7 +866,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
     for i in range(len(ax)):
-        ax[i].set_xlabel("intervening text\nlen. (n. tokens)", color="#FF8000")
+        ax[i].set_xlabel("Intervening Text\nlen. (n. tokens)", color="#FF8000")
     
     if savefigs:
         
@@ -936,9 +938,9 @@ variables = [{"context": ["intact", 'scrambled', 'incongruent']},
              {"marker_pos_rel": list(range(1, 10))}]
 
 dat_40m_, dat_gpt_, dat_rnn_ = None, None, None
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
-dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
+dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %% [markdown]
 # ## Plot
@@ -955,7 +957,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     plot_size=(6, 3)
     
     grid, ax, stat = make_bar_plot(data_frame=df, estimator=np.median, x="context", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                 xlabel="intervening text", ylabel="repeat surprisal\n(\%)",
+                                 xlabel="Intervening text", ylabel="Repeat surprisal\n(\%)",
                                  suptitle=suptitle,
                                  legend=False, legend_out=True, legend_title="Second list",
                                  size_inches=plot_size)
@@ -964,8 +966,9 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
     
-    ax[0].set_xticklabels(labels=ax[0].get_xticklabels(), rotation=20)
-    ax[1].set_xticklabels(labels=ax[0].get_xticklabels(), rotation=20)
+    xlabels_capitalized = [text.get_text().capitalize() for text in ax[0].get_xticklabels()]
+    ax[0].set_xticklabels(labels=xlabels_capitalized, rotation=20)
+    ax[1].set_xticklabels(labels=xlabels_capitalized, rotation=20)
     
     if savefigs:
         
@@ -1053,9 +1056,9 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["short"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_gpt40m_, _ = filter_and_aggregate(datain=data_gpt40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
-dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="median")
-dat_rnn2_, _ = filter_and_aggregate(datain=data_rnn2, model="lstm", model_id="a-70", groups=variables, aggregating_metric="median")
+dat_gpt40m_, _ = filter_and_aggregate(datain=data_gpt40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="mean")
+dat_rnn2_, _ = filter_and_aggregate(datain=data_rnn2, model="lstm", model_id="a-70", groups=variables, aggregating_metric="mean")
 
 # %% [markdown] tags=[]
 # ## Point plots
@@ -1073,7 +1076,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     plot_size=(4, 3)
     
     grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                     xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
                                      suptitle=suptitle, scale=0.8,
                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                      size_inches=plot_size)
@@ -1195,9 +1198,9 @@ plt.close(plt.gcf())
 
 ax[0].set_title("Arbitrary list", fontsize=16)
 ax[1].set_title("Semantically coherent list", fontsize=16)
-ax[0].set_ylabel("surprisal\n(bit)")
+ax[0].set_ylabel("Surprisal\n(bit)")
 for a in ax:
-    a.set_xlabel("token position relative to list onset")
+    a.set_xlabel("Token position relative to list onset")
     a.set_xticks(list(range(-4, 10, 2)))
     a.set_xticklabels(list(range(-4, 10, 2)))
 
@@ -1245,8 +1248,8 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["no-comma"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -1263,17 +1266,16 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
     
     grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
-                                  suptitle=suptitle, scale=0.8,
-                                  legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
-                                  size_inches=plot_size)
+                                     estimator=np.median,
+                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
+                                     suptitle=suptitle, scale=0.8,
+                                     legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
+                                     size_inches=plot_size)
     
     grid.fig.subplots_adjust(top=0.70)
     
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
-    for i in range(len(ax)):
-        ax[i].set_xlabel("set size\n(n. tokens)")
     
     if savefigs:
         
@@ -1318,8 +1320,8 @@ variables = [{"marker_pos_rel": list(range(0, 3))},
              {"context": ["no-comma"]},
              {"list_len": [10]}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -1342,17 +1344,18 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     #                              size_inches=plot_size)
     
     grid, ax, stat = make_bar_plot(data_frame=df, x="marker_pos_rel", y="x_perc", hue="condition", col="list", ylim=ylim,
-                              xlabel="intervening text", ylabel="repeat surprisal\n(\%)",
-                              suptitle=suptitle,
-                              legend=False, legend_out=True, legend_title="Second list",
-                              size_inches=plot_size)
+                                   estimator=np.median,
+                                   xlabel="Intervening text", ylabel="Repeat surprisal\n(\%)",
+                                   suptitle=suptitle,
+                                   legend=False, legend_out=True, legend_title="Second list",
+                                   size_inches=plot_size)
     
     grid.fig.subplots_adjust(top=0.60)
     
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
     for i in range(len(ax)):
-        ax[i].set_xlabel("token position\nin list")
+        ax[i].set_xlabel("Token position\nin list")
     
     if savefigs:
         
@@ -1463,9 +1466,9 @@ ax[0].set(ylim=(ymin, ymax))
 
 ax[0].set_title("Arbitrary list", fontsize=16)
 ax[1].set_title("Semantically coherent list", fontsize=16)
-ax[0].set_ylabel("surprisal\n(bit)")
+ax[0].set_ylabel("Surprisal\n(bit)")
 for a in ax:
-    a.set_xlabel("token position relative to list onset")
+    a.set_xlabel("Token position relative to list onset")
     a.set_xticks(list(range(-4, 10, 2)))
     a.set_xticklabels(list(range(-4, 10, 2)))
 
@@ -1514,8 +1517,8 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["mary-john"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -1532,7 +1535,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
     
     grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                     xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
                                      suptitle=suptitle, scale=0.8,
                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                      size_inches=plot_size)
@@ -1585,8 +1588,8 @@ variables = [{"marker_pos_rel": list(range(0, 3))},
              {"context": ["mary-john"]},
              {"list_len": [10]}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -1609,7 +1612,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     #                              size_inches=plot_size)
     
     grid, ax, stat = make_bar_plot(data_frame=df, estimator=np.median, x="marker_pos_rel", y="x_perc", hue="condition", col="list", ylim=ylim,
-                              xlabel="intervening text", ylabel="repeat surprisal\n(\%)",
+                              xlabel="Intervening text", ylabel="Repeat surprisal\n(\%)",
                               suptitle=suptitle,
                               legend=False, legend_out=True, legend_title="Second list",
                               size_inches=plot_size)
@@ -1619,7 +1622,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
     for i in range(len(ax)):
-        ax[i].set_xlabel("token position\nin list")
+        ax[i].set_xlabel("Token position\nin list")
     
     if savefigs:
         
@@ -1711,10 +1714,10 @@ data_gpt_time.rename(columns={"list": "list structure", "second_list": "Second l
 
 # %%
 p, ax, _ = make_timecourse_plot(data_gpt_time, x="marker-pos-rel", style="Second list", col="list structure", 
-                                   col_order=["arbitrary", "semantic"], err_style="band", estimator=np.median,
-                                   hue_order=["Repeated", "Permuted", "Novel"],
-                                   style_order=["Repeated", "Permuted", "Novel"],
-                                   xticks=list(range(-4, 10)))
+                                col_order=["arbitrary", "semantic"], err_style="band", estimator=np.median,
+                                hue_order=["Repeated", "Permuted", "Novel"],
+                                style_order=["Repeated", "Permuted", "Novel"],
+                                xticks=list(range(-4, 10)))
 
 _, _, stat = make_timecourse_plot(d.loc[sel], x="marker-pos-rel", style="Second list", col="list structure", 
                                   col_order=["arbitrary", "semantic"], err_style="bars", estimator=np.median,
@@ -1731,9 +1734,9 @@ ax[0].set(ylim=(ymin, ymax))
 
 ax[0].set_title("Arbitrary list", fontsize=16)
 ax[1].set_title("Semantically coherent list", fontsize=16)
-ax[0].set_ylabel("surprisal\n(bit)")
+ax[0].set_ylabel("Surprisal\n(bit)")
 for a in ax:
-    a.set_xlabel("token position relative to list onset")
+    a.set_xlabel("Token position relative to list onset")
     a.set_xticks(list(range(-4, 10, 2)))
     a.set_xticklabels(list(range(-4, 10, 2)))
 
@@ -1781,8 +1784,8 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["shuf-preface"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -1799,7 +1802,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
     
     grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                     xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
                                      suptitle=suptitle, scale=0.8,
                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                      size_inches=plot_size)
@@ -1852,8 +1855,8 @@ variables = [{"marker_pos_rel": list(range(0, 3))},
              {"context": ["shuf-preface"]},
              {"list_len": [10]}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -2013,9 +2016,9 @@ for dat, model_id, tag, title in zip((data_gpt_time, data_40m_time), ids, tags, 
 
     ax[0].set_title("Arbitrary list", fontsize=16)
     ax[1].set_title("Semantically coherent list", fontsize=16)
-    ax[0].set_ylabel("surprisal\n(bit)")
+    ax[0].set_ylabel("Surprisal\n(bit)")
     for a in ax:
-        a.set_xlabel("token position relative to list onset")
+        a.set_xlabel("Token position relative to list onset")
         a.set_xticks(list(range(-4, 10, 2)))
         a.set_xticklabels(list(range(-4, 10, 2)))
 
@@ -2064,8 +2067,8 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["shuf-prompt"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
@@ -2082,7 +2085,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
     
     grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                  xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
                                   suptitle=suptitle, scale=0.8,
                                   legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                   size_inches=plot_size)
@@ -2153,9 +2156,9 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["intact"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="median")
-dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="median")
-dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="median")
+dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
+dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %% [markdown]
 # ## Plot
@@ -2175,7 +2178,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
     
     grid, ax, stat = make_point_plot(data_frame=df, estimator=np.mean, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                      xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                      xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
                                       suptitle=suptitle, scale=0.8,
                                       legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                       size_inches=plot_size)
@@ -2184,8 +2187,6 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
-    for i in range(len(ax)):
-        ax[i].set_xlabel("set size\n(n. tokens)")
     
     if savefigs:
         
@@ -2268,10 +2269,10 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["intact"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-gptrnd_r10, _ = filter_and_aggregate(datain=gptlst[0], model="gpt-2", model_id="r-10", groups=variables, aggregating_metric="median")
-gptrnd_r20, _ = filter_and_aggregate(datain=gptlst[1], model="gpt-2", model_id="r-20", groups=variables, aggregating_metric="median")
-gptrnd_r25, _ = filter_and_aggregate(datain=gptlst[2], model="gpt-2", model_id="r-25", groups=variables, aggregating_metric="median")
-gptrnd_r30, _ = filter_and_aggregate(datain=gptlst[3], model="gpt-2", model_id="r-30", groups=variables, aggregating_metric="median")
+gptrnd_r10, _ = filter_and_aggregate(datain=gptlst[0], model="gpt-2", model_id="r-10", groups=variables, aggregating_metric="mean")
+gptrnd_r20, _ = filter_and_aggregate(datain=gptlst[1], model="gpt-2", model_id="r-20", groups=variables, aggregating_metric="mean")
+gptrnd_r25, _ = filter_and_aggregate(datain=gptlst[2], model="gpt-2", model_id="r-25", groups=variables, aggregating_metric="mean")
+gptrnd_r30, _ = filter_and_aggregate(datain=gptlst[3], model="gpt-2", model_id="r-30", groups=variables, aggregating_metric="mean")
 
 # %%
 scenario = "sce1"
@@ -2289,7 +2290,8 @@ for df, suptitle, ylim, model_id, tag in zip(dfs, suptitles, ylims, model_ids, s
     
     plot_size=(5, 3)
     grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                     xlabel="set size (n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                     estimator=np.median,
+                                     xlabel="Set size (n. tokens)", ylabel="Repeat surprisal\n(\%)",
                                      suptitle=suptitle, scale=0.8,
                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                      size_inches=plot_size)
@@ -2366,7 +2368,7 @@ for dat, model_id, tag, title in zip(dfs, model_ids, tags, titles):
         f.savefig(os.path.join(savedir, "example_{}_{}-{}.png".format(scenario, tag, model_id)), dpi=300, bbox_inches="tight")
 
 # %% [markdown]
-# ## Main plots
+# ## Main plot
 
 # %%
 variables = [{"list_len": [3, 5, 7, 10]},
@@ -2377,14 +2379,14 @@ variables = [{"list_len": [3, 5, 7, 10]},
 dfs_ = []
 for i, model_id in enumerate(model_ids):
     
-    tmp, _ = filter_and_aggregate(datain=dfs[i], model="gpt-2", model_id=model_id, groups=variables, aggregating_metric="median")
+    tmp, _ = filter_and_aggregate(datain=dfs[i], model="gpt-2", model_id=model_id, groups=variables, aggregating_metric="mean")
     dfs_.append(tmp)
 
 
 # %%
 scenario = "sce3"
-savetags = ("trf", "trf", "trf", "trf", "trf")
-ylims = ((70, None), (70, None), (70, None), (70, None), (70, None))
+savetags = ("trf", "trf", "trf", "trf")
+ylims = ((70, None), (70, None), (70, None), (70, None))
 titles = ("Transformer (1 layer)", 
           "Transformer (3 layer)", 
           "Transformer (6 layer)",
@@ -2396,7 +2398,7 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
     
     plot_size=(5, 3)
     grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                     xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
                                      suptitle=suptitle, scale=0.8,
                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                      size_inches=plot_size)
@@ -2476,8 +2478,8 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["intact"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_gptB_, _ = filter_and_aggregate(datain=data_gptB, model="gpt-2", model_id="w-12b", groups=variables, aggregating_metric="median")
-dat_gptC_, _ = filter_and_aggregate(datain=data_gptC, model="gpt-2", model_id="w-12c", groups=variables, aggregating_metric="median")
+dat_gptB_, _ = filter_and_aggregate(datain=data_gptB, model="gpt-2", model_id="w-12b", groups=variables, aggregating_metric="mean")
+dat_gptC_, _ = filter_and_aggregate(datain=data_gptC, model="gpt-2", model_id="w-12c", groups=variables, aggregating_metric="mean")
 
 # %% [markdown]
 # ## Plot
@@ -2497,7 +2499,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
     
     grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                  xlabel="set size\n(n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                  xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
                                   suptitle=suptitle, scale=0.8,
                                   legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                   size_inches=plot_size)
@@ -2507,7 +2509,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
     for i in range(len(ax)):
-        ax[i].set_xlabel("set size\n(n. tokens)", color='#23a952')
+        ax[i].set_xlabel("Set size\n(n. tokens)", color='#23a952')
     
     if savefigs:
         
