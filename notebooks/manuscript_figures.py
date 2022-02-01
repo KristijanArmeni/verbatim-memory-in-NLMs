@@ -110,6 +110,24 @@ def plot_example(x, y, markers, xlabels, ylabel, fh, fw, ylim, title):
 
 
 # %% [markdown]
+# ## set_bars_hatches()
+
+# %%
+def set_bars_hatches(axes, patterns):
+    """
+    taken from: https://stackoverflow.com/questions/55826167/matplotlib-assigning-different-hatch-to-bars
+    """
+    bars = axes.patches
+
+    hatches = []          # list for hatches in the order of the bars
+    for h in patterns:    # loop over patterns to create bar-ordered hatches
+        for i in range(int(len(bars) / len(patterns))):
+            hatches.append(h)
+    for bar, hatch in zip(bars, hatches):  # loop over bars and hatches to set hatches in correct order
+        bar.set_hatch(hatch)
+
+
+# %% [markdown]
 # ## make_bar_plot()
 
 # %% tags=[]
@@ -128,6 +146,11 @@ def make_bar_plot(data_frame, estimator, x, y, hue, col,
     
     ax = g.axes[0]
 
+    # set hatches manually
+    hatch_patterns = ['-', '/', '\\']
+    set_bars_hatches(axes=ax[0], patterns=hatch_patterns)
+    set_bars_hatches(axes=ax[1], patterns=hatch_patterns)
+    
     # set labels
     ax[0].set_ylabel(ylabel)
     ax[0].set_xlabel(xlabel)
@@ -146,13 +169,6 @@ def make_bar_plot(data_frame, estimator, x, y, hue, col,
     
     #blue, orange, green = sns.color_palette("dark")[0:3]
     n_x_groups = len(data_frame[x].unique())
-    #for i, a in enumerate(ax):
-    #    for patch in a.patches[0:n_x_groups]:
-    #        patch.set_edgecolor(blue)
-    #    for patch in a.patches[n_x_groups:n_x_groups*2]:
-    #        patch.set_edgecolor(orange)
-    #    for patch in a.patches[n_x_groups*2::]:
-    #        patch.set_edgecolor(green)
     
     # annotate
     x_levels = data_frame.loc[:, x].unique()
@@ -163,7 +179,6 @@ def make_bar_plot(data_frame, estimator, x, y, hue, col,
     one_group = (data_frame[x]==x_levels[0]) & (data_frame[hue]==hue_levels[0]) & (data_frame[col] == col_levels[0])
     n = len(data_frame.loc[one_group])  
     print("N per group == {}".format(n))
-    # ax[0].text(x=ax[0].get_xlim()[0], y=ax[0].get_ylim()[-1]*0.9, s="N = {}".format(n))
     
     # find numerical values
     ci = {}
@@ -245,19 +260,20 @@ def get_data_lineplot_with_bars(axis):
 # ## make_point_plot()
 
 # %%
-def make_point_plot(data_frame, estimator, x, y, hue, col,
+def make_point_plot(data_frame, estimator, x, y, hue, style, col,
                    xlabel=None, ylabel=None, suptitle=None, ylim=(None, None),
                    size_inches=(5, 3), join=True, scale=1, errwidth=None,
                    legend=False, legend_out=False, custom_legend=True, legend_title=None, 
                    hue_order=["Repeated", "Permuted", "Novel"], col_order=["arbitrary", "semantic"]):
-
+    
     g = sns.catplot(data=data_frame, x=x, y=y, hue=hue, col=col, 
                     estimator=estimator, ci=95.0,
                     kind="point", join=join, dodge=0.2, scale=scale, errwidth=errwidth,
+                    linestyles=["solid", "dotted", "dashed"], markers=['.', 's', 'X'],
                     zorder=2, legend=legend, legend_out=legend_out,
                     seed=12345,
                     hue_order=hue_order, col_order=col_order,
-                    facecolor=(1, 1, 1, 0), edgecolor=["tab:gray"], ecolor=["tab:gray"], bottom=0, linewidth=1, ms=0.2)
+                    facecolor=(1, 1, 1, 0), edgecolor=["tab:white"], ecolor=["tab:gray"], bottom=0, linewidth=1, ms=0.2)
     
     ax = g.axes[0]
 
@@ -765,11 +781,12 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     
     df, suptitle, ylim, tag = zipped[0], zipped[1], zipped[2], zipped[3]
     
-    grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                  xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
-                                  suptitle=suptitle, scale=0.8,
-                                  legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
-                                  size_inches=plot_size)
+    grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", style="condition", 
+                                     col="list", ylim=ylim,
+                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
+                                     suptitle=suptitle, scale=0.8,
+                                     legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
+                                     size_inches=plot_size)
     
     grid.fig.subplots_adjust(top=0.70)
     
@@ -802,8 +819,8 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         tex = stat.to_latex(bold_rows=True,
                             label="tab:{}_{}_{}".format(basename, scenario, tag),
                             caption="{} word list surprisal as a function of set size. We report the percentage of ".format(suptitle) + \
-                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around " \
-                            "the observed median (bootstrap estimate, $N^{resample} = 1000$). " \
+                            "list-averaged surprisal on second relative to first lists. Error bars denote 95\% confidence intervals around " \
+                            "the group median (bootstrap estimate). " \
                             "The length of intervening text is fixed at 26 tokens.")
 
         # now save as .tex file
@@ -857,7 +874,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     plot_size=(4, 3)
     
     grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="prompt_len", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                 xlabel="intervening text\nlen. (n. tokens)", ylabel="repeat surprisal\n(\%)",
+                                 xlabel="Intervening text\nlen. (n. tokens)", ylabel="Repeat surprisal\n(\%)",
                                  suptitle=suptitle, scale=0.8,
                                  legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                  size_inches=plot_size)
@@ -866,7 +883,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
     for i in range(len(ax)):
-        ax[i].set_xlabel("Intervening Text\nlen. (n. tokens)", color="#FF8000")
+        ax[i].set_xlabel("Intervening text\nlen. (n. tokens)", color="#FF8000")
     
     if savefigs:
         
@@ -893,8 +910,8 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         tex = stat.to_latex(bold_rows=True,
                             label="tab:{}_{}_{}".format(basename, scenario, tag),
                             caption="{} word list surprisal as a function of intervening text size. We report the percentage of ".format(suptitle) + \
-                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
-                            "the observed median (bootstrap estimate, $N^{resample} = 1000$). "\
+                            "list-averaged surprisal on second relative to first lists. Error bars denote 95\% confidence intervals around "\
+                            "the group median (bootstrap estimate). "\
                             "The list length is fixed at 10 tokens.")
 
         # now save as .tex file
@@ -993,8 +1010,8 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         tex = stat.to_latex(bold_rows=True,
                             label="tab:{}_{}".format(basename, tag),
                             caption="{} word list surprisal as a function of intervening context. We report the percentage of ".format(suptitle) + \
-                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
-                            "the observed median (bootstrap estimate, N^{resample} = 1000). "\
+                            "list-averaged surprisal on second relative to first lists. Error bars denote 95\% confidence intervals around "\
+                            "the observed median (bootstrap estimate). "\
                             "The set-size and the length of intervening text are fixed at 10, and 435 tokens, respectively.")
 
         # now save as .tex file
@@ -1084,7 +1101,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     grid.fig.subplots_adjust(top=0.7)
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
-    plt.suptitle(suptitle, x=0.3)
+    plt.suptitle(suptitle)
     
     if savefigs:
         
@@ -1109,8 +1126,8 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         stat.sort_index(axis=1, ascending=True, inplace=True)
         tex = stat.to_latex(bold_rows=True,
                             label="tab:{}_{}_{}".format(basename, scenario, tag),
-                            caption="{} word list surprisal as a function of set size with intervening text of 3 tokens. ".format(suptitle) + \
-                            "We report the percentage of list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
+                            caption="{} word list surprisal as a function of set size with intervening text of 4 tokens. ".format(suptitle) + \
+                            "We report the percentage of list-averaged surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
                             "the observed median (bootstrap estimate, $N^{resample}$ = 1000).")
 
         # now save as .tex file
@@ -1253,7 +1270,7 @@ dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-1
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
-suptitles = ("{} (Wikitext-103 transformer)".format(scenario_title), "{} (GPT-2)".format(scenario_title))
+suptitles = (f"{scenario_title}", f"{scenario_title}")
 savetags = ("trf-w12", "trf-a10")
 ylims=((60, 115), (None, None))
 basename="set-size"
@@ -1301,8 +1318,8 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         tex = stat.to_latex(bold_rows=True,
                             label="tab:{}_{}_{}".format(basename, scenario, tag),
                             caption="{} word list surprisal as a function of set size when ':' token is replaced by ',' in preface in prompt strings ".format(suptitle) + \
-                            "We report the percentage of list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around " \
-                            "the observed median (bootstrap estimate, $N^{resample} = 1000$). " \
+                            "We report the percentage of list-averaged surprisal on second relative to first lists. Ranges are 95\% confidence intervals around " \
+                            "the observed median (bootstrap estimate). " \
                             "The length of intervening text is fixed at 26 tokens.")
 
         # now save as .tex file
@@ -1522,7 +1539,7 @@ dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-1
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
-suptitles = ("{} (Wikitext-103 transformer)".format(scenario_txt), "{} (GPT-2)".format(scenario_txt))
+suptitles = (f"{scenario_txt}", f"{scenario_txt}")
 savetags = ("trf-w12", "trf-a10")
 ylims=((60, 115), (None, None))
 basename="set-size"
@@ -1569,7 +1586,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         tex = stat.to_latex(bold_rows=True,
                             label="tab:{}_{}_{}".format(basename, scenario, tag),
                             caption="{} word list surprisal as a function of set size when 'Mary' is replaced with 'John'. We report the percentage of ".format(suptitle) + \
-                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around " \
+                            "list-averaged surprisal on second relative to first lists. Ranges are 95\% confidence intervals around " \
                             "the observed median (bootstrap estimate, $N^{resample} = 1000$). " \
                             "The length of intervening text is fixed at 26 tokens.")
 
@@ -1789,7 +1806,7 @@ dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-1
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
-suptitles = ("{} (Wikitext-103 transformer)".format(scenario_txt), "{} (GPT-2)".format(scenario_txt))
+suptitles = (f"{scenario_txt}", f"{scenario_txt}")
 savetags = ("trf-w12", "trf-a10")
 ylims=((60, 115), (None, None))
 basename="set-size"
@@ -2072,7 +2089,7 @@ dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-1
 
 # %%
 dfs = (dat_40m_, dat_gpt_)
-suptitles = ("{} (Wikitext-103 transformer)".format(scenario_txt), "{} (GPT-2)".format(scenario_txt))
+suptitles = (f"{scenario_txt}", f"{scenario_txt}")
 savetags = ("trf-w12", "trf-a10")
 ylims=((60, 115), (None, None))
 basename="set-size"
@@ -2277,10 +2294,10 @@ gptrnd_r30, _ = filter_and_aggregate(datain=gptlst[3], model="gpt-2", model_id="
 # %%
 scenario = "sce1"
 dfs = (gptrnd_r10, gptrnd_r20, gptrnd_r25, gptrnd_r30)
-suptitles = ("Transformer (random init.)", 
-             "Transformer (shuffled attn. weights)", 
-             "Transformer (shuffled attn. weights per head)",
-             "Transformer (shuffled position embed.)")
+suptitles = ("Random initialization", 
+             "Shuffled attn. weights", 
+             "Shuffled attn. weights per head",
+             "Shuffled position embed.")
 savetags = ("trf", "trf", "trf", "trf")
 ylims = ((70, 120), (70, 120), (70, 120), (30, 100))
 
@@ -2387,10 +2404,10 @@ for i, model_id in enumerate(model_ids):
 scenario = "sce3"
 savetags = ("trf", "trf", "trf", "trf")
 ylims = ((70, None), (70, None), (70, None), (70, None))
-titles = ("Transformer (1 layer)", 
-          "Transformer (3 layer)", 
-          "Transformer (6 layer)",
-          "Transformer (12 layer)")
+titles = ("1-layer", 
+          "3-layer", 
+          "6-layer",
+          "12-layer")
 
 basename = "set-size"
 
@@ -2406,6 +2423,8 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
     grid.fig.subplots_adjust(top=0.70)
     ax[0].set_title("Arbitrary list\n")
     ax[1].set_title("Semantically coherent\nlist")
+    
+    plt.suptitle(suptitle, fontsize=24)
     
     # handle yticks and labels
     ax[0].set_yticks(list(range(ylim[0], 120, 10)))
@@ -2437,8 +2456,8 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
         tex = stat.to_latex(bold_rows=True,
                             label="{}_{}_{}-{}.tex".format(basename, scenario, tag, model_id),
                             caption="{} word list surprisal as a function of set size. We report the percentage of ".format(suptitle) + \
-                            "list-median surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
-                            "the observed median (bootstrap estimate ($N^{resample} = 1000$).")
+                            "list-averaged surprisal on second relative to first lists. Ranges are 95\% confidence intervals around "\
+                            "the observed median (bootstrap estimate).")
 
         # now save as .tex file
         fname = os.path.join(table_savedir, "{}_{}_{}-{}.tex".format(basename, scenario, tag, model_id))
