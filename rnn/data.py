@@ -71,11 +71,6 @@ class Dictionary(object):
 
         return ids
 
-
-    def batchify(self, bs):
-
-        pass
-
     def load_dict(self, path):
         """ Loads dictionary from disk """
 
@@ -136,12 +131,18 @@ class WT103Dataset(Dataset):
 
 
     def make_batch_sequences_and_targets(self, samples: List, sequence_len: int):
-
+        """
+        make_batch_sequences_and_targets() will split input list into chunks of length <sequence_len>
+        and will return targets list with values shifted, to be used in nn.NLLLoss
+        This method is called upon initialization of the class.
+        """
         chunk_onsets = np.arange(0, len(samples), sequence_len)
         target_onsets = chunk_onsets + 1
 
+        # see if there's trailing tokens (all chunks should be the same length)
         mod = len(samples)%sequence_len
 
+        # if mod > 0, drop the last chunk that has trailing tokens
         if mod == 0:
             n_good_size = len(chunk_onsets)
             n_bad_size = 0
@@ -151,8 +152,9 @@ class WT103Dataset(Dataset):
             n_bad_size = 1
 
         logging.info(f"{type(self).__name__}: chunking sequence of {len(samples)} elements into {n_good_size} chunks of size {sequence_len}" +
-                    f" and {n_bad_size} chunk of size {mod}")
+                    f" and dropping {n_bad_size} chunk of size {mod}")
 
+        # do the chunking
         chunks = []
         target_chunks = []
         for onset, target_onset in zip(chunk_onsets, target_onsets):
