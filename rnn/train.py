@@ -14,6 +14,8 @@ from data import WT103DataModule, Dictionary
 
 # bookkeeping etc.
 import logging
+from typing import Union, Tuple
+
 
 # ===== LSTM CLASS ===== #
 
@@ -155,6 +157,18 @@ class NeuralLM(pl.LightningModule):
 
             return torch.tensor(weight.new(self.nlayers, bsz, self.nhid).zero_())
 
+    def detach_hidden(self, hiddens: Union[torch.Tensor, Tuple]):
+
+        #if lstm, unpack hidden tuple and return a tuple
+        if self.rnn_type in ["LSTM", "LSTMWithStates"]:
+            hidden, cellstate = hiddens
+            hiddens_detached = (hidden.detach(), cellstate.detach())
+        else:
+            hiddens_detached = hidden.detach()
+
+        return hiddens_detached
+
+
     def set_parameters(self, init_val):
 
         for weight in self.rnn.parameters():
@@ -185,7 +199,10 @@ class NeuralLM(pl.LightningModule):
         output = self.drop(output)
         decoded = self.decoder(output.reshape(output.size(0)*output.size(1), output.size(2)))
 
-        return (decoded.reshape(output.size(0), output.size(1), decoded.size(1)), hidden)
+        # reshape to (batch_size, vocab_size, sequence_len)
+        logits = decoded.reshape(output.size(0), decoded.size(1), output.size(1))
+
+        return (logits, hidden)
 
     def training_step(self, batch, batch_idx, hiddens=None):
 
@@ -204,8 +221,11 @@ class NeuralLM(pl.LightningModule):
 
         self.log("train_loss", loss, prog_bar=True, on_step=True)
 
+        # detach hidden state (it unpack tuple under the hood)
+        hiddens_detached = self.detach_hidden(hiddens)
+
         # make sure to detach hidden state
-        return {"loss": loss, "hiddens": hiddens.detach()}
+        return {"loss": loss, "hiddens": hiddens_detached}
 
     def validation_step(self, batch, batch_idx, hiddens=None):
 
