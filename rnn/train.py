@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import sigmoid, tanh
 import pytorch_lightning as pl
+from pytorch_lightning.loggers import WandbLogger
 
 # own modules
 from layers import LSTMWithStates
@@ -30,27 +31,38 @@ class NeuralLM(pl.LightningModule):
                  nlayers: int,
                  batch_first=True,
                  embedding_file=None,
+                 lr=None,
+                 beta1=None,
+                 beta2=None,
                  dropout=0.5, 
                  tie_weights=False, 
                  freeze_embedding=False,
                  store_states=True, 
                  truncated_bptt_steps=0,
+                 example_input_array=True,
                  loss_fct=nn.NLLLoss):
 
         super(NeuralLM, self).__init__()
 
-        # basic properties
+        # Adam parameters
+        self.lr = lr
+        self.beta1 = beta1
+        self.beta2 = beta2
+
+        # pytorch lightning options
         self.truncated_bptt_steps = truncated_bptt_steps
+        self.example_input_array = example_input_array
         self.loss_fct = loss_fct
         
         self.drop = nn.Dropout(dropout) # dropout layer
 
-
         # set self.encoder attr, input layer
         if embedding_file:
+        
             # Use pre-trained embeddings
             embed_weights = self.load_embeddings(embedding_file, ntoken, ninp)
             self.encoder = nn.Embedding.from_pretrained(embed_weights)
+        
         else:
             self.encoder = nn.Embedding(ntoken, ninp)
 
@@ -186,9 +198,11 @@ class NeuralLM(pl.LightningModule):
     def configure_optimizers(self):
 
         optimizer = torch.optim.Adam(self.parameters(), 
-                                     lr=1e-5)
+                                     lr=self.lr,
+                                     betas=(self.beta1, self.beta2))
 
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1)
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 
+                                                       step_size=1)
 
         return [optimizer], [lr_scheduler]
 
@@ -274,16 +288,32 @@ if __name__ == "__main__":
 
     }
 
+    # config for lightning-specific options
+    pl_config = {
+
+        "example_input_array": False,
+
+    }
+
     # initialize main model class
     model = NeuralLM(rnn_type='LSTM',
                      ntoken=model_config['n_vocab'],
                      ninp=model_config['n_inp'],
                      nhid=model_config['n_hid'],
                      nlayers=model_config['n_layers'],
+                     truncated_bptt_steps=model_config['truncated_bptt_steps'],
                      batch_first=True,
                      store_states=False,
-                     loss_fct=nn.NLLLoss(reduction='mean'))
+                     lr=1e-5,
+                     beta1=0.5,
+                     beta2=0.99,
+                     loss_fct=nn.NLLLoss(reduction='mean'),
+                     example_input_array=pl_config["example_input_array"])
 
+
+    #############################
+    # initialize dataset module #
+    #############################
 
     # set up dictionary and load up vocabulary from file
     vocab = "C:\\Users\\karmeni1\\project\\lm-mem\\src\\rnn\\vocab.txt"
@@ -300,7 +330,6 @@ if __name__ == "__main__":
             "bptt_len": 20              # detach gradients every 20 tokens, pl.Trainer takes care of this
             }
 
-    # initialize data module instance
     dataset = WT103DataModule(data_dir = p,
                               train_fname = "wiki.train.tokens",
                               valid_fname = "wiki.valid.tokens",
@@ -311,14 +340,48 @@ if __name__ == "__main__":
     # prepare training and validation datasets
     dataset.setup(stage="fit")
 
-    # initialize trainer module
-    trainer = pl.Trainer()
+    ###########################
+    # initialize wandb logger #
+    ###########################
+    # for debug, log this manually, don't version this
+    # os.environ["WANDB_API_KEY"] = args.wandb_key
 
-    # start training
+    logger = WandbLogger(project='lm-mem',
+                         name='run-name',
+                         group='group-name',
+                         notes=None,
+                         save_dir=None,
+                         id='test',
+                         )
+
+    #############################
+    # initialize trainer module #
+    #############################
+    # root_dir = args.savepath
+    root_dir = "C:\\Users\\karmeni1\\project\\lm-mem\\data\\checkpoints\\lstm\\train-test"
+    log_dir = "C:\\Users\\karmeni1\\project\\lm-mem\\data\\logs\\lstm\\"
+    trainer = pl.Trainer(default_root_dir=root_dir,
+                         accelerator='gpu',
+                         fast_dev_run=False,
+                         log_every_n_steps=10,
+                         accumulate_grad_batches=1,
+                         num_sanity_val_steps=2,
+                         enable_model_summary=False,
+                         auto_lr_find=True,
+                         weights_save_path=None,
+                         logger=logger)
+
+
+    ################
+    # run training #
+    ################
     trainer.fit(model=model, 
                 train_dataloaders=dataset.train_dataloader(),
                 val_dataloaders=dataset.val_dataloader())
 
-    # test the model
+
+    #########################
+    # test-time performance #
+    #########################
     dataset.setup(stage="test")
     trainer.test(model=model, dataloaders=dataset.test_dataloader())
