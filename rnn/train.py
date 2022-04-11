@@ -1,7 +1,8 @@
 """module containing the Trainer() class and associated functions"""
 
-import os
+import os, argparse, json
 import numpy as np
+from sklearn import get_config
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,6 +13,7 @@ from pytorch_lightning.loggers import WandbLogger
 # own modules
 from layers import LSTMWithStates
 from data import WT103DataModule, Dictionary
+from utils import get_configs_for_dev, load_json_config
 
 # bookkeeping etc.
 import logging
@@ -278,22 +280,19 @@ class NeuralLM(pl.LightningModule):
 
 if __name__ == "__main__":
 
-    model_config = {
+    parser = argparse.ArgumentParser()
 
-        "n_vocab": 50000,
-        "n_inp": 50,
-        "n_hid": 100,
-        "n_layers": 4,
-        "truncated_bptt_steps": 20, 
+    parser.add_argument("--model_config", type=str, default="")
+    parser.add_argument("--data_config", type=str, default="")
+    parser.add_argument("--trainer_config", type=str, default="")
 
-    }
+    args = parser.parse_args()
 
-    # config for lightning-specific options
-    pl_config = {
-
-        "example_input_array": False,
-
-    }
+    # check if config paths are passed, else load minimum defaults
+    if args.model_config == "":
+        model_config = get_configs_for_dev("model_config")
+    else:
+        model_config = load_json_config(args.model_config) 
 
     # initialize main model class
     model = NeuralLM(rnn_type='LSTM',
@@ -308,34 +307,28 @@ if __name__ == "__main__":
                      beta1=0.5,
                      beta2=0.99,
                      loss_fct=nn.NLLLoss(reduction='mean'),
-                     example_input_array=pl_config["example_input_array"])
+                     example_input_array=model_config["example_input_array"])
 
 
     #############################
     # initialize dataset module #
     #############################
 
+    if args.data_config == "": 
+        data_config = get_configs_for_dev("data_config")
+    else: 
+        data_config = load_json_config(args.data_config)
+
     # set up dictionary and load up vocabulary from file
-    vocab = "C:\\Users\\karmeni1\\project\\lm-mem\\src\\rnn\\vocab.txt"
     dictionary = Dictionary()
-    dictionary.load_dict(path=vocab)
+    dictionary.load_dict(path=data_config["vocab"])
 
-    # set up dataset configuration
-    p = "C:\\Users\\karmeni1\\project\\lm-mem\\data\\wikitext-103"
-    cfg = {
-            "train_bs": 64, 
-            "valid_bs": 64, 
-            "test_bs": 5, 
-            "per_batch_seq_len": 1000,  # sequence len per batch, this is in memory for forward pass
-            "bptt_len": 20              # detach gradients every 20 tokens, pl.Trainer takes care of this
-            }
-
-    dataset = WT103DataModule(data_dir = p,
+    dataset = WT103DataModule(data_dir = data_config["datadir"],
                               train_fname = "wiki.train.tokens",
                               valid_fname = "wiki.valid.tokens",
                               test_fname = "wiki.test.tokens",
                               dictionary = dictionary,
-                              config = cfg)
+                              config = data_config)
 
     # prepare training and validation datasets
     dataset.setup(stage="fit")
@@ -343,6 +336,7 @@ if __name__ == "__main__":
     ###########################
     # initialize wandb logger #
     ###########################
+
     # for debug, log this manually, don't version this
     # os.environ["WANDB_API_KEY"] = args.wandb_key
 
@@ -357,10 +351,13 @@ if __name__ == "__main__":
     #############################
     # initialize trainer module #
     #############################
-    # root_dir = args.savepath
-    root_dir = "C:\\Users\\karmeni1\\project\\lm-mem\\data\\checkpoints\\lstm\\train-test"
-    log_dir = "C:\\Users\\karmeni1\\project\\lm-mem\\data\\logs\\lstm\\"
-    trainer = pl.Trainer(default_root_dir=root_dir,
+    if args.trainer_config == "":
+        trainer_config = get_configs_for_dev("trainer_config")
+    else:
+        trainer_config = load_json_config(args.trainer_config)
+
+
+    trainer = pl.Trainer(default_root_dir=trainer_config["root_dir"],
                          accelerator='gpu',
                          fast_dev_run=False,
                          log_every_n_steps=10,

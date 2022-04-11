@@ -1,0 +1,47 @@
+from typing import Dict
+import json
+
+def get_configs_for_dev(config: str) -> Dict:
+
+    model_config = {
+
+        "n_vocab": 50000,
+        "n_inp": 50,
+        "n_hid": 100,
+        "n_layers": 4,
+        "truncated_bptt_steps": 20, 
+        "example_input_array": False,
+
+    }
+
+    # set up dataset configuration
+    data_config = { "datadir": "C:\\Users\\karmeni1\\project\\lm-mem\\data\\wikitext-103",
+                    "vocab_path": "C:\\Users\\karmeni1\\project\\lm-mem\\src\\rnn\\vocab.txt",
+                    "train_bs": 64, 
+                    "valid_bs": 64, 
+                    "test_bs": 5, 
+                    "per_batch_seq_len": 1000,  # sequence len per batch, this is in memory for forward pass
+                    "bptt_len": 20              # detach gradients every 20 tokens, pl.Trainer takes care of this
+                    }
+
+    trainer_config = {
+        "root_dir": "C:\\Users\\karmeni1\\project\\lm-mem\\data\\checkpoints\\lstm\\train-test",
+        "log_dir": "C:\\Users\\karmeni1\\project\\lm-mem\\data\\logs\\lstm\\",
+    }
+
+    if config == "model_config":
+        return_config = model_config 
+    elif config == "data_config":
+        return_config = data_config
+    elif config == "trainer_config":
+        return_config == trainer_config
+    
+    return return_config
+
+
+def load_json_config(config_path: str) -> Dict:
+    
+    with open(config_path, "r") as fh:
+        json_config = json.load(fh)
+
+    return json_config
