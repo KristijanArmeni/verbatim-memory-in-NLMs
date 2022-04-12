@@ -98,13 +98,12 @@ class Dictionary(object):
 
 def load_tokens(path: str) -> List:
 
-    logging.info(f"load_text_strip_split() loading {path}...")
+    logging.info(f"load_tokens() loading {path}...")
 
     with open(path, "r", encoding="utf-8") as fh:
         text = " ".join([l.lower() for l in fh.readlines() if len(l.split()) != 0]).split()
 
     return text
-
 
 
 class WT103Dataset(Dataset):
@@ -137,22 +136,14 @@ class WT103Dataset(Dataset):
         This method is called upon initialization of the class.
         """
         chunk_onsets = np.arange(0, len(samples), sequence_len)
-        target_onsets = chunk_onsets + 1
+        target_onsets = chunk_onsets + 1  # targets are shifted by one position, t+1
 
         # see if there's trailing tokens (all chunks should be the same length)
+        n_good_size = len(chunk_onsets)
         mod = len(samples)%sequence_len
 
-        # if mod > 0, drop the last chunk that has trailing tokens
-        if mod == 0:
-            n_good_size = len(chunk_onsets)
-            n_bad_size = 0
-        elif mod > 0:
-            chunk_onsets = chunk_onsets[0:-1] # drop the last chunk onset as that one has fewer tokens
-            n_good_size = len(chunk_onsets)
-            n_bad_size = 1
-
         logging.info(f"{type(self).__name__}: chunking sequence of {len(samples)} elements into {n_good_size} chunks of size {sequence_len}" +
-                    f" and dropping {n_bad_size} chunk of size {mod}")
+                    f" and 1 chunk with {mod} trailing tokens")
 
         # do the chunking
         chunks = []
@@ -201,19 +192,26 @@ class WT103DataModule(pl.LightningDataModule):
 
     def setup(self, stage: Optional[str] = None):
 
+        # make sure train size in file name (e.g. ids_40m.npy)
+        n_million = int(self.cfg["train_size"]/1e6)
+        train_suffix = f"ids_{n_million}m.npy"
+
         if stage in (None, "fit"):
 
-            train_fname_ids = os.path.join(self.data_dir, self.train_fname.replace("tokens", "ids.npy"))
+            train_fname_ids = os.path.join(self.data_dir, self.train_fname.replace("tokens", train_suffix))
             valid_fname_ids = os.path.join(self.data_dir, self.valid_fname.replace("tokens", "ids.npy"))
             
             # check if indices already exist, otherwise create and save to disk
             if os.path.isfile(train_fname_ids):
+
                 logging.info(f"Loading {train_fname_ids}")
                 train_ids = np.load(train_fname_ids).tolist()
 
             else:
                 train_tokens = load_tokens(os.path.join(self.data_dir, self.train_fname))
-                train_ids = self.dictionary.tokens_to_ids(train_tokens)
+                logging.info(f"Subsetting and using the first {n_million}M wiki.train.tokens...")
+                pad_tokens = 5
+                train_ids = self.dictionary.tokens_to_ids(train_tokens[0:int(self.cfg["train_size"])+pad_tokens])
 
                 logging.info(f"Saving {train_fname_ids}")
                 np.save(train_fname_ids, np.array(train_ids))

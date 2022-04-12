@@ -321,7 +321,7 @@ if __name__ == "__main__":
 
     # set up dictionary and load up vocabulary from file
     dictionary = Dictionary()
-    dictionary.load_dict(path=data_config["vocab"])
+    dictionary.load_dict(path=data_config["vocab_path"])
 
     dataset = WT103DataModule(data_dir = data_config["datadir"],
                               train_fname = "wiki.train.tokens",
