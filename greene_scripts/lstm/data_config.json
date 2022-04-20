@@ -1,0 +1,16 @@
+{
+
+    "datadir": "/home/ka2773/project/lm-mem/data/wikitext-103",
+    "vocab_path": "/home/ka2773/project/lm-mem/src/rnn/vocab.txt",
+    "train_bs": 16, 
+    "valid_bs": 16, 
+    "test_bs": 5, 
+    "num_workers": 8,
+    "train_size": 40e6,
+    "n_train_pad_tokens": 5,
+    "n_valid_pad_tokens": 5,
+    "n_test_pad_tokens": 0,
+    "per_batch_seq_len": 200,  
+    "bptt_len": 20              
+
+}

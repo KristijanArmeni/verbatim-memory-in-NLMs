@@ -1,0 +1,10 @@
+{
+    
+    "root_dir": "/scratch/ka2773/project/lm-mem/checkpoints/lstm/",
+    "log_dir": "/scratch/ka2773/project/lm-mem/logs/lstm",
+    "wandb_project": "",
+    "wandb_group": "",
+    "wandb_name": "",
+    "wandb_id": ""
+
+}

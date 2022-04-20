@@ -1,6 +1,7 @@
 """module containing the Trainer() class and associated functions"""
 
 import os, argparse, json
+from datetime import datetime
 import numpy as np
 from sklearn import get_config
 import torch
@@ -9,6 +10,7 @@ import torch.nn.functional as F
 from torch import sigmoid, tanh
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 # own modules
 from layers import LSTMWithStates
@@ -42,7 +44,8 @@ class NeuralLM(pl.LightningModule):
                  store_states=True, 
                  truncated_bptt_steps=0,
                  example_input_array=True,
-                 loss_fct=nn.NLLLoss):
+                 loss_fct=nn.NLLLoss,
+                 device="cpu"):
 
         super(NeuralLM, self).__init__()
 
@@ -55,7 +58,8 @@ class NeuralLM(pl.LightningModule):
         self.truncated_bptt_steps = truncated_bptt_steps
         self.example_input_array = example_input_array
         self.loss_fct = loss_fct
-        
+        self.device_type = device
+
         self.drop = nn.Dropout(dropout) # dropout layer
 
         # set self.encoder attr, input layer
@@ -160,16 +164,14 @@ class NeuralLM(pl.LightningModule):
     def init_hidden(self, bsz):
         """ Initialize a fresh hidden state """
 
-        weight = next(self.parameters()).data
-        
         if self.rnn_type in ['LSTM', 'LSTMWithStates']:
 
-            return (torch.tensor(weight.new(self.nlayers, bsz, self.nhid).zero_()),
-                    torch.tensor(weight.new(self.nlayers, bsz, self.nhid).zero_()))
+            return (torch.zeros(self.nlayers, bsz, self.nhid).to(self.device_type),
+                    torch.zeros(self.nlayers, bsz, self.nhid).to(self.device_type))
         
         else:
 
-            return torch.tensor(weight.new(self.nlayers, bsz, self.nhid).zero_())
+            return torch.zeros(self.nlayers, bsz, self.nhid).to(self.device_type)
 
     def detach_hidden(self, hiddens: Union[torch.Tensor, Tuple]):
 
@@ -181,7 +183,6 @@ class NeuralLM(pl.LightningModule):
             hiddens_detached = hidden.detach()
 
         return hiddens_detached
-
 
     def set_parameters(self, init_val):
 
@@ -196,6 +197,20 @@ class NeuralLM(pl.LightningModule):
         initrange = 0.1
         for weight in self.rnn.parameters():
             weight.data.uniform_(-initrange, initrange)
+
+    def count_params(self):
+
+        total_params = sum(p.numel() for p in self.parameters())
+        train_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+        unit = 1e6
+        
+        logging.info(f"Model params\n" +
+                     f"Total params (M): {round(total_params/unit, 1)}\n" +
+                     f"Trainable params (M): {round(train_params/unit, 1)}\n"
+                     f"Non-trainable params (M): {round(total_params/unit, 1) - round(train_params/unit, 1)}")
+
+        return {"total": total_params, "trainable": train_params}
 
     def configure_optimizers(self):
 
@@ -235,7 +250,7 @@ class NeuralLM(pl.LightningModule):
         # targets are shifted inside WT103Dataset() class upon .setup()
         loss = self.loss_fct(lm_logits, targets)
 
-        self.log("train_loss", loss, prog_bar=True, on_step=True)
+        self.log("train_loss", loss, prog_bar=True, on_step=True, logger=True)
 
         # detach hidden state (it unpack tuple under the hood)
         hiddens_detached = self.detach_hidden(hiddens)
@@ -256,13 +271,13 @@ class NeuralLM(pl.LightningModule):
 
         loss = self.loss_fct(lm_logits, targets)
 
-        self.log("val loss", loss, prog_bar=True, on_step=True)
+        self.log("val_loss", loss, prog_bar=True, on_step=True, logger=True)
 
         return {"loss": loss, "hiddens": hiddens}
 
     def test_step(self, batch, batch_idx, hiddens=None):
 
-        # targets are created in WT103DataModule.val_dataloader()
+        # targets are created in WT103DataModule.test_dataloader()
         inputs, targets = batch
         
         # initialize hiddens somehow
@@ -273,7 +288,7 @@ class NeuralLM(pl.LightningModule):
 
         loss = self.loss_fct(lm_logits, targets)
 
-        self.log("test loss", loss, prog_bar=True, on_step=True)
+        self.log("test_loss", loss, prog_bar=True, on_step=True, logger=True)
 
         return {"loss": loss, "hiddens": hiddens}
 
@@ -288,11 +303,23 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
     # check if config paths are passed, else load minimum defaults
     if args.model_config == "":
         model_config = get_configs_for_dev("model_config")
     else:
         model_config = load_json_config(args.model_config) 
+
+    # data config
+    if args.data_config == "": 
+        data_config = get_configs_for_dev("data_config")
+    else: 
+        data_config = load_json_config(args.data_config)
+
+    # set up dictionary and load up vocabulary from file
+    dictionary = Dictionary()
+    dictionary.load_dict(path=data_config["vocab_path"])
 
     # initialize main model class
     model = NeuralLM(rnn_type='LSTM',
@@ -304,24 +331,22 @@ if __name__ == "__main__":
                      batch_first=True,
                      store_states=False,
                      lr=1e-5,
-                     beta1=0.5,
-                     beta2=0.99,
-                     loss_fct=nn.NLLLoss(reduction='mean'),
-                     example_input_array=model_config["example_input_array"])
+                     beta1=0.001,
+                     beta2=0.9,
+                     loss_fct=nn.CrossEntropyLoss(reduction='mean'),
+                     example_input_array=model_config["example_input_array"],
+                     device=device)
 
+    model_config_str = f"model config:\n {json.dumps(model_config, indent=4)}"
+    data_config_str = f"data config:\n {json.dumps(data_config, indent=4)}"
+    logging.info(model_config_str)
+    logging.info(data_config_str)
+
+    params = model.count_params()
 
     #############################
     # initialize dataset module #
     #############################
-
-    if args.data_config == "": 
-        data_config = get_configs_for_dev("data_config")
-    else: 
-        data_config = load_json_config(args.data_config)
-
-    # set up dictionary and load up vocabulary from file
-    dictionary = Dictionary()
-    dictionary.load_dict(path=data_config["vocab_path"])
 
     dataset = WT103DataModule(data_dir = data_config["datadir"],
                               train_fname = "wiki.train.tokens",
@@ -330,44 +355,67 @@ if __name__ == "__main__":
                               dictionary = dictionary,
                               config = data_config)
 
+    #dataset.find_num_workers(num_workers_range = range(0, 6, 1), n_epochs=5)
+
     # prepare training and validation datasets
     dataset.setup(stage="fit")
 
     ###########################
     # initialize wandb logger #
     ###########################
-
-    # for debug, log this manually, don't version this
-    # os.environ["WANDB_API_KEY"] = args.wandb_key
-
-    logger = WandbLogger(project='lm-mem',
-                         name='run-name',
-                         group='group-name',
-                         notes=None,
-                         save_dir=None,
-                         id='test',
-                         )
-
-    #############################
-    # initialize trainer module #
-    #############################
     if args.trainer_config == "":
         trainer_config = get_configs_for_dev("trainer_config")
     else:
         trainer_config = load_json_config(args.trainer_config)
 
+    # for debug, log this manually, don't version this code snippet
+    os.environ["WANDB_API_KEY"] = "d8b913bbe52746e27b67249e76bbedb6c49ea85b"
+
+    now = datetime.now().strftime("%H-%M-%S")
+
+    if trainer_config["wandb_project"] == "":
+        trainer_config["wandb_project"] = "lm-mem"
+    if trainer_config["wandb_id"] == "":
+        trainer_config["wandb_id"] = f"test-id-{now}"
+
+    logger = WandbLogger(project=trainer_config["wandb_project"],
+                         name=trainer_config["wandb_name"],
+                         group=trainer_config['wandb_group'],
+                         notes=None,
+                         save_dir=None,
+                         id=trainer_config["wandb_id"],
+                         )
+
+    #############################
+    # initialize trainer module #
+    #############################
+
+    accelerator = "gpu" if torch.cuda.is_available() else "cpu"
+    gpus = None if accelerator == "cpu" else [0]
+
+    # save model params
+    # params_fname = os.path.join(trainer_config["root_dir"],
+    #                            trainer_config["wandb_name"])
+
+    callbacks = [EarlyStopping(monitor="val_loss", mode="min", min_delta=0.0, patience=3)]
 
     trainer = pl.Trainer(default_root_dir=trainer_config["root_dir"],
-                         accelerator='gpu',
+                         accelerator=accelerator,
+                         gpus=gpus,
                          fast_dev_run=False,
                          log_every_n_steps=10,
                          accumulate_grad_batches=1,
                          num_sanity_val_steps=2,
+                         check_val_every_n_epoch=1,
+                         callbacks=callbacks,
                          enable_model_summary=False,
                          auto_lr_find=True,
                          weights_save_path=None,
                          logger=logger)
 
+    # print trainer config
+    trainer_config_str = f"trainer config:\n {json.dumps(trainer_config, indent=4)}"
+    logging.info(trainer_config_str)
 
     ################
     # run training #
@@ -376,9 +424,12 @@ if __name__ == "__main__":
                 train_dataloaders=dataset.train_dataloader(),
                 val_dataloaders=dataset.val_dataloader())
 
+    trainer.validate(model=model, dataloaders=dataset.val_dataloader())
 
     #########################
     # test-time performance #
     #########################
     dataset.setup(stage="test")
-    trainer.test(model=model, dataloaders=dataset.test_dataloader())
+    trainer.test(dataloaders=dataset.test_dataloader(), ckpt_path="best")
+
+    logger.close()

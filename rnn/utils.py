@@ -2,6 +2,7 @@ import os
 from typing import Dict
 import json
 import sys
+from datetime import datetime
 
 def get_configs_for_dev(config: str) -> Dict:
 
@@ -17,9 +18,9 @@ def get_configs_for_dev(config: str) -> Dict:
 
     model_config = {
 
-        "n_vocab": 50000,
+        "n_vocab": 28439,
         "n_inp": 50,
-        "n_hid": 100,
+        "n_hid": 50,
         "n_layers": 4,
         "truncated_bptt_steps": 20, 
         "example_input_array": False,
@@ -29,17 +30,24 @@ def get_configs_for_dev(config: str) -> Dict:
     # set up dataset configuration
     data_config = { "datadir": os.path.join(project_root, "data", "wikitext-103"),
                     "vocab_path": os.path.join(project_root, "src", "rnn", "vocab.txt"),
-                    "train_bs": 64, 
-                    "valid_bs": 64, 
+                    "train_bs": 16, 
+                    "valid_bs": 16, 
                     "test_bs": 5, 
+                    "num_workers": 4,
                     "train_size": 40e6,
-                    "per_batch_seq_len": 1000,  # sequence len per batch, this is in memory for forward pass
-                    "bptt_len": 20              # detach gradients every 20 tokens, pl.Trainer takes care of this
+                    "per_batch_seq_len": 200,  # sequence len per batch, this is in memory for forward pass
+                    "bptt_len": 50              # detach gradients every 20 tokens, pl.Trainer takes care of this
                     }
+
+    now = datetime.now().strftime("%H-%M-%S")
 
     trainer_config = {
         "root_dir": checkpoint_dir,
         "log_dir": log_dir,
+        "wandb_project": "",
+        "wandb_group": "test-run",
+        "wandb_name": "test-name",
+        "wandb_id": f"test-id-{now}"
     }
 
     if config == "model_config":
@@ -47,7 +55,7 @@ def get_configs_for_dev(config: str) -> Dict:
     elif config == "data_config":
         return_config = data_config
     elif config == "trainer_config":
-        return_config == trainer_config
+        return_config = trainer_config
     
     return return_config
 

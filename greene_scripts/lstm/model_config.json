@@ -1,0 +1,9 @@
+{
+    "n_vocab": 28439,
+    "n_inp": 100,
+    "n_hid": 400,
+    "n_layers": 4,
+    "truncated_bptt_steps": 50, 
+    "example_input_array": false
+
+}

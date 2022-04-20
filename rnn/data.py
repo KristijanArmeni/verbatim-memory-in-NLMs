@@ -4,6 +4,7 @@ import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader, Dataset
 import os, json
+import time
 from typing import Optional, List
 from tqdm import tqdm
 import logging
@@ -135,12 +136,17 @@ class WT103Dataset(Dataset):
         and will return targets list with values shifted, to be used in nn.NLLLoss
         This method is called upon initialization of the class.
         """
-        chunk_onsets = np.arange(0, len(samples), sequence_len)
+
+        # ignore last chunk which has < sequence_len tokens
+        chunk_onsets = np.arange(0, len(samples), sequence_len)[0:-1]
         target_onsets = chunk_onsets + 1  # targets are shifted by one position, t+1
 
-        # see if there's trailing tokens (all chunks should be the same length)
         n_good_size = len(chunk_onsets)
         mod = len(samples)%sequence_len
+
+        # make sure that we can have equal-size chunks for shifted targets too, add 1 token
+        if mod == 0:
+            raise ValueError("there are no trailing tokens to create shifted targets. Add one more token to samples.")
 
         logging.info(f"{type(self).__name__}: chunking sequence of {len(samples)} elements into {n_good_size} chunks of size {sequence_len}" +
                     f" and 1 chunk with {mod} trailing tokens")
@@ -192,11 +198,11 @@ class WT103DataModule(pl.LightningDataModule):
 
     def setup(self, stage: Optional[str] = None):
 
-        # make sure train size in file name (e.g. ids_40m.npy)
-        n_million = int(self.cfg["train_size"]/1e6)
-        train_suffix = f"ids_{n_million}m.npy"
-
         if stage in (None, "fit"):
+
+            # make sure train size in file name (e.g. ids_40m.npy)
+            n_million = int(self.cfg["train_size"]/1e6)
+            train_suffix = f"ids_{n_million}m.npy"
 
             train_fname_ids = os.path.join(self.data_dir, self.train_fname.replace("tokens", train_suffix))
             valid_fname_ids = os.path.join(self.data_dir, self.valid_fname.replace("tokens", "ids.npy"))
@@ -210,8 +216,7 @@ class WT103DataModule(pl.LightningDataModule):
             else:
                 train_tokens = load_tokens(os.path.join(self.data_dir, self.train_fname))
                 logging.info(f"Subsetting and using the first {n_million}M wiki.train.tokens...")
-                pad_tokens = 5
-                train_ids = self.dictionary.tokens_to_ids(train_tokens[0:int(self.cfg["train_size"])+pad_tokens])
+                train_ids = self.dictionary.tokens_to_ids(train_tokens[0:int(self.cfg["train_size"])+1])
 
                 logging.info(f"Saving {train_fname_ids}")
                 np.save(train_fname_ids, np.array(train_ids))
@@ -229,10 +234,12 @@ class WT103DataModule(pl.LightningDataModule):
                 np.save(valid_fname_ids, np.array(valid_ids))
 
             # train_seqs = chunk_into_sequences(tokens=train_ids, sequence_len=)
-            self.wiki_train = WT103Dataset(samples=train_ids, seq_len=self.cfg["per_batch_seq_len"])
+            self.wiki_train = WT103Dataset(samples=train_ids, 
+                                           seq_len=self.cfg["per_batch_seq_len"])
             
             # valid_seqs = chunk_into_sequences(tokens=valid_ids, sequence_len=self.cfg["bptt_len"])
-            self.wiki_valid = WT103Dataset(samples=valid_ids, seq_len=self.cfg["per_batch_seq_len"])
+            self.wiki_valid = WT103Dataset(samples=valid_ids, 
+                                           seq_len=self.cfg["per_batch_seq_len"])
 
         elif stage in (None, "test"):
 
@@ -250,17 +257,64 @@ class WT103DataModule(pl.LightningDataModule):
                 np.save(test_fname_ids, np.array(test_ids))
 
             #test_seqs = chunk_into_sequences(tokens=test_ids, sequence_len=len(test_ids))
-            self.wiki_test = WT103Dataset(samples=test_ids, seq_len=self.cfg["per_batch_seq_len"])
+            self.wiki_test = WT103Dataset(samples=test_ids, 
+                                          seq_len=self.cfg["per_batch_seq_len"])
 
     def train_dataloader(self):
 
-        return DataLoader(dataset=self.wiki_train, batch_size=self.cfg["train_bs"], shuffle=False)
+        return DataLoader(dataset=self.wiki_train, 
+                          batch_size=self.cfg["train_bs"], 
+                          num_workers=self.cfg["num_workers"],
+                          shuffle=False)
 
     def val_dataloader(self):
         
-        return DataLoader(dataset=self.wiki_valid, batch_size=self.cfg["valid_bs"], shuffle=False)
+        return DataLoader(dataset=self.wiki_valid, 
+                          batch_size=self.cfg["valid_bs"],
+                          num_workers=self.cfg["num_workers"],
+                          shuffle=False)
 
     def test_dataloader(self):
 
-        return DataLoader(dataset=self.wiki_test, batch_size=self.cfg["test_bs"], shuffle=False)
+        return DataLoader(dataset=self.wiki_test, 
+                          batch_size=self.cfg["test_bs"],
+                          num_workers=self.cfg["num_workers"], 
+                          shuffle=False)
+
+    def find_num_workers(self, num_workers_range, n_epochs):
+
+        """
+        Inspired by: http://www.feeny.org/finding-the-ideal-num_workers-for-pytorch-dataloaders/
+        """
+
+        current_workers = self.cfg["num_workers"]
+
+        n = []
+        t = []
+
+        logging.info("Searching for a good number of DataLoader workers...")
+
+        for num_workers in num_workers_range: 
+
+            train_loader = DataLoader(self.wiki_train, 
+                                      batch_size=self.cfg["train_bs"],
+                                      num_workers=num_workers)
+            start = time.time()
+            for epoch in range(n_epochs):
+                for i, data in train_loader:
+                    pass
+            end = time.time()
+            
+            print("Finish with:{} second, num_workers={}".format(end - start, num_workers))
+
+            n.append(num_workers)
+            t.append(end-start)
+
+        ta = np.array(t)
+        best = n[np.where(ta == ta.min())[0]]        
+
+        logging.info(f"Resetting current num workers = {current_workers} to Wiki103DataModule.cfg['num_workers'] = {best}...")
+
+        self.cfg["num_workers"] = best
+
 
