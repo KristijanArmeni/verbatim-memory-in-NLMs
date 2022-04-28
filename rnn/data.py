@@ -237,7 +237,6 @@ class WT103DataModule(pl.LightningDataModule):
             self.wiki_train = WT103Dataset(samples=train_ids, 
                                            seq_len=self.cfg["per_batch_seq_len"])
             
-            # valid_seqs = chunk_into_sequences(tokens=valid_ids, sequence_len=self.cfg["bptt_len"])
             self.wiki_valid = WT103Dataset(samples=valid_ids, 
                                            seq_len=self.cfg["per_batch_seq_len"])
 
@@ -280,6 +279,19 @@ class WT103DataModule(pl.LightningDataModule):
                           batch_size=self.cfg["test_bs"],
                           num_workers=self.cfg["num_workers"], 
                           shuffle=False)
+
+
+    def print_sample(self, idx, numel):
+
+        inputs, targets = self.wiki_train[idx]
+        tokens1 = [self.dictionary.idx2word[id] for id in inputs]
+        tokens2 = [self.dictionary.idx2word[id] for id in targets]
+
+        logging.info(f"Firts {numel} inputs of sample sequence {idx} (train): {tokens1[0:numel]}\n"+
+                     f"First {numel} targets of sample sequence {idx} (train): {tokens2[0:numel]}")
+
+        return tokens1, tokens2
+
 
     def find_num_workers(self, num_workers_range, n_epochs):
 

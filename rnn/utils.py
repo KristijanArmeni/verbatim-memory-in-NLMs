@@ -22,6 +22,8 @@ def get_configs_for_dev(config: str) -> Dict:
         "n_inp": 50,
         "n_hid": 50,
         "n_layers": 4,
+        "nonlinearity": "relu",
+        "dropout": 0.1,
         "truncated_bptt_steps": 20, 
         "example_input_array": False,
 
@@ -36,7 +38,7 @@ def get_configs_for_dev(config: str) -> Dict:
                     "num_workers": 4,
                     "train_size": 40e6,
                     "per_batch_seq_len": 200,  # sequence len per batch, this is in memory for forward pass
-                    "bptt_len": 50              # detach gradients every 20 tokens, pl.Trainer takes care of this
+                    "bptt_len": 50             # detach gradients every 20 tokens, pl.Trainer takes care of this
                     }
 
     now = datetime.now().strftime("%H-%M-%S")
