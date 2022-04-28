@@ -10,7 +10,10 @@ import torch.nn.functional as F
 from torch import sigmoid, tanh
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from pytorch_lightning.utilities.seed import seed_everything
+import wandb
 
 # own modules
 from layers import LSTMWithStates
@@ -21,6 +24,7 @@ from utils import get_configs_for_dev, load_json_config
 import logging
 from typing import Union, Tuple
 
+logging.basicConfig(format="%(levelname)s %(message)s", level=logging.INFO)
 
 # ===== LSTM CLASS ===== #
 
@@ -33,12 +37,13 @@ class NeuralLM(pl.LightningModule):
                  ninp: int, 
                  nhid: int, 
                  nlayers: int,
+                 nonlinearity: str,
                  batch_first=True,
                  embedding_file=None,
                  lr=None,
                  beta1=None,
                  beta2=None,
-                 dropout=0.5, 
+                 dropout=0.2, 
                  tie_weights=False, 
                  freeze_embedding=False,
                  store_states=True, 
@@ -48,6 +53,12 @@ class NeuralLM(pl.LightningModule):
                  device="cpu"):
 
         super(NeuralLM, self).__init__()
+
+        # architecture params
+        nonlin = {"relu": nn.ReLU, "tanh": nn.Tanh}
+        self.act_fct = nonlin[nonlinearity]()
+        self.call_act_fct = self.apply_activation_function if rnn_type in ["LSTM", "LSTMWithStates"] else self.apply_activation_function_dummy
+        self.weight_initrange = 0.1
 
         # Adam parameters
         self.lr = lr
@@ -75,7 +86,8 @@ class NeuralLM(pl.LightningModule):
         # set self.rnn attr, hidden layers
         if rnn_type in ['LSTM', 'GRU']:
 
-            self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, batch_first=batch_first, dropout=dropout)
+            self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, batch_first=batch_first, 
+                                            dropout=dropout)
         
         elif rnn_type == 'LSTMWithStates':
 
@@ -83,8 +95,8 @@ class NeuralLM(pl.LightningModule):
 
             # we use custom LSTMWithStates class which is a subclass of torch.nn.RNN
             # input arguments are the same as for torch.nn.RNN
-            self.rnn = LSTMWithStates(ninp, nhid, nlayers, batch_first=batch_first, dropout=dropout,
-                                      store_states=store_states)
+            self.rnn = LSTMWithStates(ninp, nhid, nlayers, batch_first=batch_first, 
+                                      dropout=dropout, store_states=store_states)
 
         else:
             try:
@@ -104,11 +116,8 @@ class NeuralLM(pl.LightningModule):
                 param.requires_grad = False
 
         # Optionally tie weights as in:
-        # "Using the Output Embedding to Improve Language Models" (Press & Wolf 2017)
-        # https://arxiv.org/abs/1608.05859
-        # and
-        # "Tying Word Vectors and Word Classifiers:
-        # A Loss Framework for Language Modeling" (Inan et al. 2017)
+        # "Using the Output Embedding to Improve Language Models" (Press & Wolf 2017) https://arxiv.org/abs/1608.05859 
+        # "Tying Word Vectors and Word Classifiers: A Loss Framework for Language Modeling" (Inan et al. 2017)
         # https://arxiv.org/abs/1611.01462
         if tie_weights:
             if nhid != ninp:
@@ -120,15 +129,16 @@ class NeuralLM(pl.LightningModule):
         self.nlayers = nlayers
     
     def init_weights(self, freeze_embedding):
-        """ Initialize encoder and decoder weights """
+        """ Initialize encoder and decoder weights to uniform distritbution """
 
-        initrange = 0.1
-        
+        logging.info(f"Initializing weights to uniform distribution with range {-self.weight_initrange} to {self.weight_initrange}")
+        logging.info(f"Initializing bias to {0}")
+
         if not freeze_embedding:
-            self.encoder.weight.data.uniform_(-initrange, initrange)
+            self.encoder.weight.data.uniform_(-self.weight_initrange, self.weight_initrange)
         
         self.decoder.bias.data.fill_(0)
-        self.decoder.weight.data.uniform_(-initrange, initrange)
+        self.decoder.weight.data.uniform_(-self.weight_initrange, self.weight_initrange)
 
     def zero_parameters(self):
         """ Set all parameters to zero (likely as a baseline) """
@@ -218,15 +228,28 @@ class NeuralLM(pl.LightningModule):
                                      lr=self.lr,
                                      betas=(self.beta1, self.beta2))
 
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 
-                                                       step_size=1)
+        lr_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1/3, end_factor=1.0, total_iters=5)
 
         return [optimizer], [lr_scheduler]
+
+    def apply_activation_function(self, input_tuple):
+        """
+        activation function for LSTM inputs as nn.LSTM doesn't accept activation function
+        """
+        h, m = input_tuple
+        outputs = (self.act_fct(h), self.act_fct(m))
+
+        return outputs
+
+    def apply_activation_function_dummy(inputs):
+        """ Dummy identity function, because nn.RNN applies activation function internaly"""
+        return inputs
 
     def forward(self, observation, hidden):
 
         emb = self.drop(self.encoder(observation))
         output, hidden = self.rnn(emb, hidden)
+        #hidden = self.call_act_fct(hidden)
         output = self.drop(output)
         decoded = self.decoder(output.reshape(output.size(0)*output.size(1), output.size(2)))
 
@@ -240,7 +263,7 @@ class NeuralLM(pl.LightningModule):
         # inputs.shape = (batch, sequence_len_bptt, n_features)
         inputs, targets = batch
 
-        # initialize hiddens somehow
+        # initialize hiddens at the start of the epoch
         if batch_idx == 0:
             hiddens = self.init_hidden(bsz=inputs.shape[0])  # assuming batch_first = True, so dim 0 is batch size
 
@@ -252,7 +275,7 @@ class NeuralLM(pl.LightningModule):
 
         self.log("train_loss", loss, prog_bar=True, on_step=True, logger=True)
 
-        # detach hidden state (it unpack tuple under the hood)
+        # detach hidden state (.detach_hidden() unpacks tuple under the hood)
         hiddens_detached = self.detach_hidden(hiddens)
 
         # make sure to detach hidden state
@@ -300,10 +323,14 @@ if __name__ == "__main__":
     parser.add_argument("--model_config", type=str, default="")
     parser.add_argument("--data_config", type=str, default="")
     parser.add_argument("--trainer_config", type=str, default="")
+    parser.add_argument("--global_seed", type=int, default=9876543)
 
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # use pytorch lightning function to set global random seed for numpy, pytorch and python built-ins
+    seed_everything(args.global_seed)
 
     # check if config paths are passed, else load minimum defaults
     if args.model_config == "":
@@ -327,12 +354,14 @@ if __name__ == "__main__":
                      ninp=model_config['n_inp'],
                      nhid=model_config['n_hid'],
                      nlayers=model_config['n_layers'],
+                     nonlinearity=model_config["nonlinearity"],
                      truncated_bptt_steps=model_config['truncated_bptt_steps'],
                      batch_first=True,
                      store_states=False,
-                     lr=1e-5,
-                     beta1=0.001,
-                     beta2=0.9,
+                     lr=5e-5,
+                     beta1=0.7,
+                     beta2=0.1,
+                     dropout=model_config["dropout"],
                      loss_fct=nn.CrossEntropyLoss(reduction='mean'),
                      example_input_array=model_config["example_input_array"],
                      device=device)
@@ -341,6 +370,8 @@ if __name__ == "__main__":
     data_config_str = f"data config:\n {json.dumps(data_config, indent=4)}"
     logging.info(model_config_str)
     logging.info(data_config_str)
+
+    print(model)
 
     params = model.count_params()
 
@@ -355,10 +386,15 @@ if __name__ == "__main__":
                               dictionary = dictionary,
                               config = data_config)
 
+
     #dataset.find_num_workers(num_workers_range = range(0, 6, 1), n_epochs=5)
 
     # prepare training and validation datasets
     dataset.setup(stage="fit")
+
+    # print batch just to make sure all is good
+    sequence_id = np.random.randint(len(dataset.wiki_train))
+    _, _ = dataset.print_sample(idx=sequence_id, numel=7)
 
     ###########################
     # initialize wandb logger #
@@ -372,18 +408,23 @@ if __name__ == "__main__":
     os.environ["WANDB_API_KEY"] = "d8b913bbe52746e27b67249e76bbedb6c49ea85b"
 
     now = datetime.now().strftime("%H-%M-%S")
+    today = datetime.today().strftime("%Y-%m-%d")
+    idstr = today + "_" + now
 
     if trainer_config["wandb_project"] == "":
         trainer_config["wandb_project"] = "lm-mem"
     if trainer_config["wandb_id"] == "":
-        trainer_config["wandb_id"] = f"test-id-{now}"
+        trainer_config["wandb_id"] = f"test-id-{idstr}"
 
+    wandb.finish()  # clear any runs that might be hanging in there
+    mode = "run"
     logger = WandbLogger(project=trainer_config["wandb_project"],
-                         name=trainer_config["wandb_name"],
+                         name=trainer_config["wandb_name"] + f"_{idstr}",
                          group=trainer_config['wandb_group'],
                          notes=None,
                          save_dir=None,
                          id=trainer_config["wandb_id"],
+                         mode=mode,
                          )
 
     #############################
@@ -397,16 +438,19 @@ if __name__ == "__main__":
     # params_fname = os.path.join(trainer_config["root_dir"],
     #                            trainer_config["wandb_name"])
 
-    callbacks = [EarlyStopping(monitor="val_loss", mode="min", min_delta=0.0, patience=3)]
+    # early stopping and learning rate monitor
+    callbacks = [EarlyStopping(monitor="val_loss", mode="min", min_delta=0.02, patience=4),
+                 LearningRateMonitor(logging_interval='step', log_momentum=True)]
 
     trainer = pl.Trainer(default_root_dir=trainer_config["root_dir"],
                          accelerator=accelerator,
                          gpus=gpus,
                          fast_dev_run=False,
-                         log_every_n_steps=10,
+                         log_every_n_steps=50,
                          accumulate_grad_batches=1,
                          num_sanity_val_steps=2,
-                         check_val_every_n_epoch=1,
+                         check_val_every_n_epoch=1,  # check validation loss during an epoch
+                         val_check_interval=50,     # do validation check
                          callbacks=callbacks,
                          enable_model_summary=False,
                          auto_lr_find=True,
