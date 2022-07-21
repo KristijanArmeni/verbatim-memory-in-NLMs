@@ -16,7 +16,9 @@ import sys, os
 import argparse
 import numpy as np
 import pandas as pd
-from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config, top_k_top_p_filtering
+from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config, \
+                         BertForMaskedLM, top_k_top_p_filtering, \
+                         AutoModel, AutoTokenizer 
 import torch
 from torch.nn import functional as F
 from tqdm import trange
@@ -83,137 +85,6 @@ def assign_subtokens_to_groups(subtoken_splits, markers, ngram1_size, ngram2_siz
             out[i] = codes[subtoken_splits[i]-1]
 
     return out
-
-def concat_and_tokenize_inputs(prefixes=None, prompts=None, word_list1=None, word_list2=None,
-                               ngram_size=None, tokenizer=None):
-
-    """
-    function that concatenates and tokenizes
-    """
-
-    metadata = {
-        "stimid": [],
-        "trialID": [],
-        "positionID": [],
-        "subtok": [],
-        "list_len": [],
-        "prefix": [],
-        "prompt": [],
-        }
-
-    # join list elements into strings for tokenizer below
-    input_seqs = [" " + ", ".join(tks) + "." for tks in word_list1]
-    input_seqs2 = [" " + ", ".join(tks) + "." for tks in word_list2]
-
-    # list storing outputs
-    input_seqs_tokenized = []
-
-    # loop over different prefixes:
-    for prefix_key in prefixes.keys():
-
-        # loop over prompts
-        for prompt_key in prompts.keys():
-
-            # loop over trials
-            for i in trange(len(input_seqs), desc="sequence: "):
-
-                # tokenize strings separately to be able to construct markers for prefix, word lists etc.
-                i1 = tokenizer.encode("<|endoftext|> " + prefixes[prefix_key], return_tensors="pt")   # prefix IDs, add eos token
-                i2 = tokenizer.encode(input_seqs[i], return_tensors="pt")
-                i3 = tokenizer.encode(" " + prompts[prompt_key], return_tensors="pt")                       # prompt IDs
-                i4 = tokenizer.encode(input_seqs2[i] + "<|endoftext|>", return_tensors="pt")
-
-                # compose the input ids tensors
-                input_ids = torch.cat((i1, i2, i3, i4), dim=1)
-
-                input_seqs_tokenized.append(input_ids)
-
-                # construct IDs for prefix, word lists and individual tokens
-                # useful for data vizualization etc.
-                trials = []
-                positions = []
-                split_ids = []
-
-                for j, ids in enumerate((i1, i2, i3, i4)):
-                    tmp = np.zeros(shape=ids.shape[1], dtype=int)  # code the trial structure
-                    tmp[:] = j
-                    tmp2 = np.arange(ids.shape[1])                 # create token position index
-                    trials.append(tmp)
-                    positions.append(tmp2)
-                    split_ids.append(mark_subtoken_splits(tokenizer.convert_ids_to_tokens(ids[0])))
-
-                metadata["trialID"].append(np.concatenate(trials).tolist())
-                metadata["stimid"].append(i)
-                metadata["positionID"].append(np.concatenate(positions).tolist())
-                metadata["subtok"].append(np.concatenate(split_ids).tolist())
-                metadata["list_len"].append(ngram_size)
-                metadata["prefix"].append(prefix_key)
-                metadata["prompt"].append(prompt_key)
-
-    return input_seqs_tokenized, metadata
-
-
-def concat_and_tokenize_inputs2(input_sets=None, ngram_size=None,
-                                tokenizer=None):
-
-    """
-    function that concatenates and tokenizes
-    """
-
-    metadata = {
-        "stimid": [],
-        "trialID": [],
-        "positionID": [],
-        "subtok": [],
-        "subtok_markers": [],
-        "list_len": [],
-        "prefix": [],
-        "prompt": [],
-        }
-
-    input_seqs_tokenized = []
-
-    # loop over distractor sets
-    for dst_size in input_sets.keys():
-
-        # get input lists interleaved with distractors of dst_size
-        input_lists = input_sets[dst_size]
-
-        # loop each input sequence
-        for i in trange(len(input_lists), desc="sequence: "):
-
-            # tokenize strings separately to be able to construct markers for prefix, word lists etc.
-            #i1 = tokenizer.encode("<|endoftext|> " + prefixes[prefix_key], return_tensors="pt")   # prefix IDs, add eos token
-            input_ids = tokenizer.encode("<|endoftext|>" + input_lists[i] + "<|endoftext|>", return_tensors="pt")
-
-            # compose the input ids tensors
-            #input_ids = torch.cat((i1, i2), dim=1)
-
-            input_seqs_tokenized.append(input_ids)
-
-            # construct IDs for prefix, word lists and individual tokens
-            # useful for data vizualization etc.
-
-            split_ids = mark_subtoken_splits(tokenizer.convert_ids_to_tokens(input_ids[0]))
-
-            markers, ngram1_size, ngram2_size, n_repet = [1, 2], ngram_size, int(dst_size.strip("n")), 5
-
-            split_ids_markers = assign_subtokens_to_groups(subtoken_splits=split_ids,
-                                                           markers=markers,
-                                                           ngram1_size=ngram1_size,
-                                                           ngram2_size=ngram2_size,
-                                                           n_repet=n_repet)
-
-            metadata["trialID"].append(np.ones(shape=input_ids.shape[1], dtype=int).tolist())
-            metadata["stimid"].append(i)
-            metadata["positionID"].append(np.arange(input_ids.shape[1]).tolist())
-            metadata["subtok"].append(split_ids)
-            metadata["subtok_markers"].append(split_ids_markers)
-            metadata["list_len"].append(ngram_size)
-            metadata["prompt"].append(dst_size.strip("n"))
-
-    return input_seqs_tokenized, metadata
-
 
 def interleave(items1, items2):
 
@@ -326,6 +197,7 @@ def ensure_list2_notequal(list1, list2, start_seed, seed_increment):
 
     return list2_new
 
+
 # ===== EXPERIMENT CLASS ===== #
 
 class Experiment(object):
@@ -337,8 +209,8 @@ class Experiment(object):
     def __init__(self, model, tokenizer, context_len, device):
 
         self.model = model
-        self.tokenizer = tokenizer
         self.device = device
+        self.tokenizer = tokenizer
         self.context_len = context_len
         self.model.to(device)
 
@@ -372,7 +244,7 @@ class Experiment(object):
         return token_prob, token_ids
 
     # loop over input list
-    def ppl(self, input_ids, context_len, stride):
+    def ppl(self, input_ids, input_ids_unmasked, context_len, stride):
         """
         method for computing token-by-token negative log likelihood on input_ids
         taken from: https://huggingface.co/transformers/perplexity.html
@@ -392,8 +264,15 @@ class Experiment(object):
             # select the current input index span
             sel_input_ids = input_ids[:, begin_loc: end_loc].to(self.device)
 
+            # use unmasked tokens as targets for loss if provided
+            if input_ids_unmasked is not None:
+                sel_target_ids = input_ids_unmasked[:, begin_loc: end_loc].to(self.device)
+            # else none of the input ids are masked, so use input ids as targets
+            elif input_ids_unmasked is None:
+                sel_target_ids = input_ids[:, begin_loc: end_loc].to(self.device)
+
             # define target labels, use input ids as target outputs
-            target_ids = sel_input_ids.clone()
+            target_ids = sel_target_ids.clone()
 
             # do not compute the loss on  tokens (-100) that are used for context
             target_ids[:, :-trg_len] = -100
@@ -421,7 +300,7 @@ class Experiment(object):
         ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc).cpu()
         return ppl, llh, tokens
 
-    def start(self, input_sequences_ids) -> List:
+    def start(self, input_sequences_ids=None, input_sequences_ids_unmasked=None) -> List:
         """
         experiment.start() will loop over prefixes, prompts, and word_lists and run the .ppl() method on them
         It returns a dict:
@@ -441,10 +320,11 @@ class Experiment(object):
             }
 
         # loop over trials (input sequences)
-        for input_ids in input_sequences_ids:
+        for i, input_ids in enumerate(input_sequences_ids):
 
             # this returns surprisal (neg log ll)
             ppl, surp, toks = self.ppl(input_ids=input_ids.to(self.device),
+                                       input_ids_unmasked=input_sequences_ids_unmasked[i].to(self.device),
                                        context_len=self.context_len,
                                        stride=1)
 
@@ -537,23 +417,55 @@ def setup():
 
     return 0
 
+# ===== helper function for development ===== #
+def get_argins_for_dev(setup=False, 
+                       inputs_file=None, 
+                       inputs_file_unmasked=None,
+                       inputs_file_info=None,
+                       context_len=1024, 
+                       checkpoint="gpt2",
+                       tokenizer=None,
+                       model_type=None,
+                       model_seed=12345,
+                       device="cuda",
+                       ):
+
+    argins = {
+
+        "setup": setup,
+        "inputs_file": inputs_file,
+        "inputs_file_info": inputs_file_info,
+        "inputs_file_unmasked": inputs_file_unmasked,
+        "context_len": context_len,
+        "checkpoint": checkpoint,
+        "tokenizer": tokenizer,
+        "model_type": model_type,
+        "model_seed": model_seed,
+        "device": device
+
+    }
+
+    return argins
 
 # ===== RUNTIME CODE WRAPPER ===== #
 def runtime_code():
 
     # ===== INITIATIONS ===== #
+    from types import SimpleNamespace
+
 
     # collect input arguments
     parser = argparse.ArgumentParser(description="surprisal.py runs perplexity experiment")
 
     parser.add_argument("--setup", action="store_true",
                         help="downloads and places nltk model and Tokenizer")
-    parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3", "sce4", "sce5", "sce6"],
+    parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3", "sce4", "sce5", "sce6", "sce7"],
                         help="str, which scenario to use")
-    parser.add_argument("--condition", type=str, choices=["repeat", "permute", "control"],
-                        help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
-    parser.add_argument("--paradigm", type=str, choices=["with-context", "repeated-ngrams"],
-                        help="whether or not to permute the second word list")
+    parser.add_argument("--condition", type=str)
+    parser.add_argument("--inputs_file", type=str, help="json file with input sequence IDs which are converted to tensors")
+    parser.add_argument("--inputs_file_unmasked", type=str, help="json file with input sequence IDs which are not masked")
+    parser.add_argument("--inputs_file_info", type=str, help="json file with information about input sequences")
+    parser.add_argument("--tokenizer", type=str)
     parser.add_argument("--context_len", type=int, default=1024,
                         help="length of context window in tokens for transformers")
     parser.add_argument("--model_type", type=str,
@@ -561,14 +473,10 @@ def runtime_code():
     # To download a different model look at https://huggingface.co/models?filter=gpt2
     parser.add_argument("--checkpoint", type=str, default="gpt2",
                         help="the path to folder with pretrained models (expected to work with model.from_pretraiend() method)")
-    parser.add_argument("--path_to_tokenizer", type=str, default="gpt2",
-                        help="the path to tokenizer folder (expected to work with tokenizer.from_pretrained() method")
     parser.add_argument("--model_seed", type=int, default=12345,
                         help="seed value to be used in torch.manual_seed() prior to calling GPT2Model()")
     parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
                         help="whether to run on cpu or cuda")
-    parser.add_argument("--input_filename", type=str,
-                        help="str, the name of the .json file containing word lists")
     parser.add_argument("--output_dir", type=str,
                         help="str, the name of folder to write the output_filename in")
     parser.add_argument("--output_filename", type=str,
@@ -576,112 +484,38 @@ def runtime_code():
 
     argins = parser.parse_args()
 
+    #argins = SimpleNamespace(**get_argins_for_dev(inputs_file="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_5.json",
+    #                                              inputs_file_unmasked="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_5_unmasked.json",
+    #                                              inputs_file_info="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_5_info.json",
+    #                                              checkpoint="bert-base-uncased",
+    #                                              tokenizer="bert-base-uncased"))
+
     if argins.setup:
         return setup()
 
-    sys.path.append("./data/")
-    from stimuli import prefixes, prompts
+    sys.path.append("/home/ka2773/project/lm-mem/src/data/")
+    
+    # ===== LOAD INPUTS ===== #
+    with open(argins.inputs_file, "r") as fh:
+        input_sequences = [torch.tensor(e) for e in json.load(fh)]
 
-    # construct output file name and check that it existst
-    savedir = os.path.join(".", argins.output_dir)
-    assert os.path.isdir(savedir)                                 # check that the folder exists
-    outpath = os.path.join(savedir, argins.output_filename)
+    if argins.inputs_file_unmasked != "":
+        with open(argins.inputs_file_unmasked, "r") as fh:
+            input_sequences_unmasked = [torch.tensor(e) for e in json.load(fh)]
 
-    # manage platform dependent stuff
-    # if "win" in sys.platform:
-    #     data_dir = os.path.join(os.environ["homepath"], "project", "lm-mem", "src", "data")
-    # elif "linux" in sys.platform:
-    #     data_dir = os.path.join(os.environ["HOME"], "code", "lm-mem", "data")
-    data_dir = "./data"
-
-    logging.info("condition == {}".format(argins.condition))
-    logging.info("scenario == {}".format(argins.scenario))
-
-    # ===== DATA MANAGEMENT ===== #
-
-    # load the word lists in .json files
-    fname = os.path.join(data_dir, argins.input_filename)
-    with open(fname) as f:
-
-        logging.info("Loading {} ...".format(fname))
-        stim = json.load(f)
-
-        # convert word lists to strings and permute the second one if needed
-        # add space at the string onset
-        word_lists1 = stim
-
-    if argins.paradigm == "repeated-ngrams":
-
-        fname = os.path.join(data_dir, "ngram-distractors.json")
-        logging.info("Loading {} ...".format(fname))
-        with open(fname) as f:
-            distractors = json.load(f)
-
-    if argins.condition == "permute":
-
-        # This condition test for the effect of word order
-        # Lists have the same words, but the word order is permuted
-        # int the second one
-        word_lists2 = {key: [np.random.RandomState((543+j)*5).permutation(stim[key][j]).tolist()
-                      for j in range(len(stim[key]))]
-                      for key in stim.keys()}
-
-        for list_size in word_lists2.keys():
-
-            word_lists2[list_size] = ensure_list2_notequal(list1=word_lists1[list_size],
-                                                           list2=word_lists2[list_size],
-                                                           start_seed=123,
-                                                           seed_increment=10)
-
-
-        # make sure control tokens do not appear in the target lists
-        for k in stim.keys():
-            assert ~np.any([[t1 == t2] for t1, t2 in zip(word_lists1[k], word_lists2[k])])
-
-    elif argins.condition == "control":
-
-        # This serves as a control conditions
-        # Here list length is the only common factor between two lists
-
-        logging.info("Creating control condition...")
-
-        n_items_per_group = 10
-        n_groups = len(word_lists1["n10"])//n_items_per_group
-        groups = np.repeat(np.arange(0, n_groups), n_items_per_group)
-
-        ids = sample_indices_by_group(groups=groups, seed=12345)
-
-        word_lists2 = {key: np.asarray(stim[key])[ids].tolist() for key in stim.keys()}
-
-        # make sure control tokens do not appear in the target lists
-        for k in stim.keys():
-            assert ~np.any([set(t1).issubset(set(t2))
-                            for t1, t2 in zip(word_lists1[k], word_lists2[k])])
-
-    else:
-
-        word_lists2 = word_lists1
-
-    # if n-gram experiment modify prompt and prefix dicts, recreate them on the fly
-    # to only contain a single prompt
-    if "ngram" in argins.input_filename and argins.paradigm == "with-context":
-        # grab only the first prefix and prompt
-        prefixes = {argins.scenario: {list(prefixes[argins.scenario].keys())[0] : list(prefixes[argins.scenario].values())[0]}}
-        prompts = {argins.scenario: {list(prompts[argins.scenario].keys())[0] : list(prompts[argins.scenario].values())[0]}}
-
+    with open(argins.inputs_file_info, "r") as fh:
+        input_sequences_info = json.load(fh)
 
     # ===== INITIATE EXPERIMENT CLASS ===== #
 
     # declare device and paths
     device = torch.device(argins.device if torch.cuda.is_available() else "cpu")
 
-    # setup the model
-    logging.info("Loading tokenizer {}".format(argins.path_to_tokenizer))
-    tokenizer = GPT2TokenizerFast.from_pretrained(argins.path_to_tokenizer)
-
     logging.info("Using {} model".format(argins.model_type))
     logging.info("Loading checkpoint {}".format(argins.checkpoint))
-    model = GPT2LMHeadModel.from_pretrained(argins.checkpoint)
+    if argins.checkpoint == "bert-base-uncased":
+        model = BertForMaskedLM.from_pretrained(argins.checkpoint)
+        tokenizer = AutoTokenizer.from_pretrained(argins.tokenizer)
 
     # or initialize a random model
     if argins.model_type == "random":
@@ -719,9 +553,9 @@ def runtime_code():
     # set to evaluation mode
     model.eval()
 
-
     #initialize experiment class
-    experiment = Experiment(model=model, tokenizer=tokenizer,
+    experiment = Experiment(model=model,
+                            tokenizer=tokenizer,
                             context_len=argins.context_len,
                             device=device)
 
@@ -731,93 +565,48 @@ def runtime_code():
     # list storing output dataframes
     experiment_outputs = []
 
-    for n_words in list(word_lists1.keys()):
+    # ===== RUN EXPERIMENT LOOP ===== #
 
-        # ===== PREPARE INPUT SEQUENCES ===== #
-
-        # inputs for contextualized paradigm
-        if argins.paradigm == "with-context":
-
-            # this routing loops over prompts and prefixes
-            # it keeps track of that in meta_data
-            logging.info("Tokenizing and concatenating sequences...")
-            input_sequences, meta_data = concat_and_tokenize_inputs(prompts=prompts[argins.scenario],
-                                                                    prefixes=prefixes[argins.scenario],
-                                                                    word_list1=word_lists1[n_words],
-                                                                    word_list2=word_lists2[n_words],
-                                                                    ngram_size=n_words.strip("n"),
-                                                                    tokenizer=tokenizer)
-
-        # prepare input sequences for the repeated ngrams paradigm
-        elif argins.paradigm == "repeated-ngrams":
-
-            logging.info("Interleaving and tokenizing input sequences...")
-            word_lists = interleave_targets_and_distractors(word_lists1[n_words], distractors)
+    output_dict = experiment.start(input_sequences_ids = input_sequences[0:2], 
+                                   input_sequences_ids_unmasked = input_sequences_unmasked[0:2])
 
 
-            input_sequences, meta_data = concat_and_tokenize_inputs2(input_sets=word_lists,
-                                                                     ngram_size=int(n_words.strip("n")),
-                                                                     tokenizer=tokenizer)
+    # ===== FORMAT AND SAVE OUTPUT ===== #
+
+    meta_cols = ["trialID", "positionID", "subtok"]
+    colnames = ["token"] + meta_cols + ["surp"]
+    arrays = [output_dict["token"],
+                input_sequences_info["trialID"],
+                input_sequences_info["positionID"],
+                input_sequences_info["subtok"],
+                output_dict["surp"]]
 
 
-        # ===== RUN EXPERIMENT LOOP ===== #
+    counter = 1  # counter for trials
+    n_sequences = len(output_dict["surp"])
 
-        output_dict = experiment.start(input_sequences)
+    # make a new single dict with all rows for the df below
+    dfrows = {key_arr[0]: key_arr[1] for i, key_arr in enumerate(zip(colnames, arrays))}
 
+    # loop over trials
+    for i in range(0, n_sequences):
 
-        # ===== FORMAT AND SAVE OUTPUT ===== #
+        # a list of lists (row values) for this sequence
+        row_values = [dfrows[key][i] for key in dfrows.keys()]
 
-        # convert the output to dataframe
-        if argins.paradigm == "with-context":
+        # convert the last two elements of the tuple to an array
+        dftmp = pd.DataFrame(np.asarray(row_values).T,
+                                columns=colnames)
 
-            meta_cols = ["trialID", "positionID", "subtok"]
-            colnames = ["token"] + meta_cols + ["surp"]
-            arrays = [output_dict["token"],
-                      meta_data["trialID"],
-                      meta_data["positionID"],
-                      meta_data["subtok"],
-                      output_dict["surp"]]
+        # now add the constant values for the current sequence rows
+        dftmp["stimid"] = input_sequences_info["stimid"][i]                # stimulus id
+        #dftmp['prompt'] = input_sequences_info["prompt"][i]                # add a column of prompt labels
+        dftmp["list_len"] = input_sequences_info["list_len"][i]            # add list length
+        dftmp['stimID'] = counter                               # track sequence id
+        dftmp['second_list'] = argins.condition                 # log condition of the second list
 
-        # this paradigm one has one extra meta column
-        elif argins.paradigm == "repeated-ngrams":
-
-            meta_cols = ["trialID", "positionID", "subtok", "subtok_markers"]
-            colnames = ["token"] + meta_cols + ["surp"]
-            arrays = [output_dict["token"],
-                      meta_data["trialID"],
-                      meta_data["positionID"],
-                      meta_data["subtok"],
-                      meta_data["subtok_markers"],
-                      output_dict["surp"]]
-
-        counter = 1  # counter for trials
-        n_sequences = len(output_dict["surp"])
-
-        # make a new single dict with all rows for the df below
-        dfrows = {key_arr[0]: key_arr[1] for i, key_arr in enumerate(zip(colnames, arrays))}
-
-        # loop over trials
-        for i in range(0, n_sequences):
-
-            # a list of lists (row values) for this sequence
-            row_values = [dfrows[key][i] for key in dfrows.keys()]
-
-            # convert the last two elements of the tuple to an array
-            dftmp = pd.DataFrame(np.asarray(row_values).T,
-                                 columns=colnames)
-
-            # now add the constant values for the current sequence rows
-            dftmp["stimid"] = meta_data["stimid"][i]                # stimulus id
-            dftmp['prompt'] = meta_data["prompt"][i]                # add a column of prompt labels
-            dftmp["list_len"] = meta_data["list_len"][i]            # add list length
-            dftmp['stimID'] = counter                               # track sequence id
-            dftmp['second_list'] = argins.condition                 # log condition of the second list
-
-            if argins.paradigm == "with-context":
-                dftmp['prefix'] = meta_data["prefix"][i]                # add a column of prefix labels
-
-            experiment_outputs.append(dftmp)
-            counter += 1
+        experiment_outputs.append(dftmp)
+        counter += 1
 
     experiment.model.to("cpu")
 
@@ -825,7 +614,8 @@ def runtime_code():
     output = pd.concat(experiment_outputs)
 
     # save output
-    print("Saving {}".format(outpath))
+    outpath = os.path.join(argins.output_dir, argins.output_filename)
+    print("Saving {}".format(os.path.join(outpath)))
     output.to_csv(outpath, sep=",")
 
 # ===== RUN ===== #
