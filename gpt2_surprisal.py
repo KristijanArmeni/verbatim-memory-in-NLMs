@@ -17,8 +17,8 @@ import argparse
 import numpy as np
 import pandas as pd
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config, \
-                         BertForMaskedLM, top_k_top_p_filtering, \
-                         AutoModel, AutoTokenizer 
+                         BertForMaskedLM, TransfoXLLMHeadModel,  TransfoXLTokenizer, \
+                         AutoTokenizer, top_k_top_p_filtering
 import torch
 from torch.nn import functional as F
 from tqdm import trange
@@ -39,29 +39,6 @@ elif "linux" in sys.platform:
 
 
 # ===== WRAPPERS FOR DATASET CONSTRUCTION ===== #
-
-def mark_subtoken_splits(tokens):
-    """
-    function to keep track of whether or not a token was subplit into
-    """
-    ids = []
-    count = 0
-    for i in range(len(tokens)):
-
-        # if the token is split, it does not gave the symbol for whitespace
-        # if the word is at position 0, it also has to start a new token, so
-        # count it
-        if "Ġ" in tokens[i]:
-            count += 1
-
-        if tokens[i] in punctuation:
-            ids.append(-1)
-        elif tokens[i] == "<|endoftext|>":
-            ids.append(-2)
-        else:
-            ids.append(count)
-
-    return ids
 
 def assign_subtokens_to_groups(subtoken_splits, markers, ngram1_size, ngram2_size, n_repet):
 
@@ -206,9 +183,10 @@ class Experiment(object):
     Exp() class contains wrapper methods to run experiments with transformer models.
     """
 
-    def __init__(self, model, tokenizer, context_len, device):
+    def __init__(self, model, ismlm, tokenizer, context_len, device):
 
         self.model = model
+        self.ismlm = ismlm
         self.device = device
         self.tokenizer = tokenizer
         self.context_len = context_len
@@ -244,7 +222,7 @@ class Experiment(object):
         return token_prob, token_ids
 
     # loop over input list
-    def ppl(self, input_ids, input_ids_unmasked, context_len, stride):
+    def ppl(self, input_ids, context_len, stride):
         """
         method for computing token-by-token negative log likelihood on input_ids
         taken from: https://huggingface.co/transformers/perplexity.html
@@ -262,21 +240,21 @@ class Experiment(object):
             trg_len = end_loc - i  # may be different from stride on last loop
 
             # select the current input index span
-            sel_input_ids = input_ids[:, begin_loc: end_loc].to(self.device)
+            sel_input_ids = input_ids[:, begin_loc: end_loc].clone().to(self.device)
+
+            # mask the final token in sequence if we're testing bert, so that we get prediction only for that token
+            if self.ismlm:
+                sel_input_ids[0, -1] = self.tokenizer.convert_tokens_to_ids("[MASK]")
 
             # use unmasked tokens as targets for loss if provided
-            if input_ids_unmasked is not None:
-                sel_target_ids = input_ids_unmasked[:, begin_loc: end_loc].to(self.device)
-            # else none of the input ids are masked, so use input ids as targets
-            elif input_ids_unmasked is None:
-                sel_target_ids = input_ids[:, begin_loc: end_loc].to(self.device)
-
-            # define target labels, use input ids as target outputs
-            target_ids = sel_target_ids.clone()
+            target_ids = input_ids[:, begin_loc: end_loc].to(self.device).clone()
 
             # do not compute the loss on  tokens (-100) that are used for context
             target_ids[:, :-trg_len] = -100
 
+            if i in range(0, 5):
+                print(f"inputs: {sel_input_ids}")
+                print(f"targets: {target_ids}")
 
             # set model to evaluation mode
             self.model.eval()
@@ -287,8 +265,7 @@ class Experiment(object):
                # compute neg log likelihood over target ids (n+1 in our case)
                # indices are shifted under the hood by model.__call__()
                outputs = self.model(sel_input_ids, labels=target_ids)
-
-               # first element of the tuple contains the loss
+               
                log_likelihood = outputs.loss.item() * trg_len  # not sure about this multiplication here (undoing averaging?)
 
                llh.append(log_likelihood)
@@ -300,7 +277,7 @@ class Experiment(object):
         ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc).cpu()
         return ppl, llh, tokens
 
-    def start(self, input_sequences_ids=None, input_sequences_ids_unmasked=None) -> List:
+    def start(self, input_sequences_ids=None) -> List:
         """
         experiment.start() will loop over prefixes, prompts, and word_lists and run the .ppl() method on them
         It returns a dict:
@@ -324,7 +301,6 @@ class Experiment(object):
 
             # this returns surprisal (neg log ll)
             ppl, surp, toks = self.ppl(input_ids=input_ids.to(self.device),
-                                       input_ids_unmasked=input_sequences_ids_unmasked[i].to(self.device),
                                        context_len=self.context_len,
                                        stride=1)
 
@@ -453,7 +429,6 @@ def runtime_code():
     # ===== INITIATIONS ===== #
     from types import SimpleNamespace
 
-
     # collect input arguments
     parser = argparse.ArgumentParser(description="surprisal.py runs perplexity experiment")
 
@@ -463,7 +438,7 @@ def runtime_code():
                         help="str, which scenario to use")
     parser.add_argument("--condition", type=str)
     parser.add_argument("--inputs_file", type=str, help="json file with input sequence IDs which are converted to tensors")
-    parser.add_argument("--inputs_file_unmasked", type=str, help="json file with input sequence IDs which are not masked")
+    parser.add_argument("--inputs_file_unmasked", type=str, help="json file with input sequence IDs which are not masked", default="")
     parser.add_argument("--inputs_file_info", type=str, help="json file with information about input sequences")
     parser.add_argument("--tokenizer", type=str)
     parser.add_argument("--context_len", type=int, default=1024,
@@ -484,14 +459,14 @@ def runtime_code():
 
     argins = parser.parse_args()
 
-    #argins = SimpleNamespace(**get_argins_for_dev(inputs_file="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_5.json",
-    #                                              inputs_file_unmasked="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_5_unmasked.json",
-    #                                              inputs_file_info="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_5_info.json",
-    #                                              checkpoint="bert-base-uncased",
-    #                                              tokenizer="bert-base-uncased"))
+    argins = SimpleNamespace(**get_argins_for_dev(inputs_file="/home/ka2773/project/lm-mem/src/data/transformer_input_files/transfo-xl_repeat_sce1_5.json",
+                                                  inputs_file_unmasked="",
+                                                  inputs_file_info="/home/ka2773/project/lm-mem/src/data/transformer_input_files/transfo-xl_repeat_sce1_5_info.json",
+                                                  checkpoint="transfo-xl-wt103",
+                                                  tokenizer="transfo-xl-wt103"))
 
     if argins.setup:
-        return setup()
+        setup()
 
     sys.path.append("/home/ka2773/project/lm-mem/src/data/")
     
@@ -499,6 +474,7 @@ def runtime_code():
     with open(argins.inputs_file, "r") as fh:
         input_sequences = [torch.tensor(e) for e in json.load(fh)]
 
+    input_sequences_unmasked = None
     if argins.inputs_file_unmasked != "":
         with open(argins.inputs_file_unmasked, "r") as fh:
             input_sequences_unmasked = [torch.tensor(e) for e in json.load(fh)]
@@ -511,11 +487,23 @@ def runtime_code():
     # declare device and paths
     device = torch.device(argins.device if torch.cuda.is_available() else "cpu")
 
+    # pretrained models
     logging.info("Using {} model".format(argins.model_type))
     logging.info("Loading checkpoint {}".format(argins.checkpoint))
+
+    ismlm = False
     if argins.checkpoint == "bert-base-uncased":
         model = BertForMaskedLM.from_pretrained(argins.checkpoint)
         tokenizer = AutoTokenizer.from_pretrained(argins.tokenizer)
+        ismlm = True
+
+    elif argins.checkpoint == "gpt2":
+        model = GPT2LMHeadModel.from_pretrained("gpt2")
+        tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
+
+    elif argins.checkpoint == "transfo-xl-wt103":
+        model = TransfoXLLMHeadModel.from_pretrained(argins.checkpoint)
+        tokenizer = TransfoXLTokenizer.from_pretrained(argins.tokenizer)
 
     # or initialize a random model
     if argins.model_type == "random":
@@ -554,7 +542,7 @@ def runtime_code():
     model.eval()
 
     #initialize experiment class
-    experiment = Experiment(model=model,
+    experiment = Experiment(model=model, ismlm=ismlm,
                             tokenizer=tokenizer,
                             context_len=argins.context_len,
                             device=device)
@@ -567,8 +555,7 @@ def runtime_code():
 
     # ===== RUN EXPERIMENT LOOP ===== #
 
-    output_dict = experiment.start(input_sequences_ids = input_sequences[0:2], 
-                                   input_sequences_ids_unmasked = input_sequences_unmasked[0:2])
+    output_dict = experiment.start(input_sequences_ids = input_sequences)
 
 
     # ===== FORMAT AND SAVE OUTPUT ===== #
@@ -600,7 +587,7 @@ def runtime_code():
 
         # now add the constant values for the current sequence rows
         dftmp["stimid"] = input_sequences_info["stimid"][i]                # stimulus id
-        #dftmp['prompt'] = input_sequences_info["prompt"][i]                # add a column of prompt labels
+        dftmp['prompt'] = input_sequences_info["prompt"][i]                # add a column of prompt labels
         dftmp["list_len"] = input_sequences_info["list_len"][i]            # add list length
         dftmp['stimID'] = counter                               # track sequence id
         dftmp['second_list'] = argins.condition                 # log condition of the second list
