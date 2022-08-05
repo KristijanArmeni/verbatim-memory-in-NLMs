@@ -23,24 +23,39 @@ elif "linux" in sys.platform:
 
 # ===== WRAPPERS FOR DATASET CONSTRUCTION ===== #
 
-def mark_subtoken_splits(tokens):
+def mark_subtoken_splits(tokens, split_marker, marker_logic, eos_markers):
     """
-    function to keep track of whether or not a token was subplit into
+    function to keep track of whether or not a token was subplit into subwords or not
     """
     ids = []
     count = 0
+
+    # some tokenizers will mark a split by omitting the split_marker, in this case
+    # you have to stop counting when split_marker is missing
+    count_token = None
+    if marker_logic == "outside":
+        count_token = [split_marker in token for token in tokens]
+    # in other cases (e.g. for BERT), you have to stop counting when split_marker is present 
+    elif marker_logic == "within":
+        count_token = [(split_marker not in token) and (token not in list(punctuation)+eos_markers) for token in tokens]
+
+    # for tokenizers that do not do BPE tokenization we count each token and ignore punctuation plus eos markers
+    if split_marker is None:
+        count_token = [(True and (token not in list(punctuation)+eos_markers)) for token in tokens]
+
+    # loop over tokens and apply the counting logic
     for i in range(len(tokens)):
 
         # if the token is split, it does not gave the symbol for whitespace
         # if the word is at position 0, it also has to start a new token, so
         # count it
-        if "Ġ" in tokens[i]:
+        if count_token[i]:
             count += 1
 
         if tokens[i] in punctuation:
-            ids.append(-1)
-        elif tokens[i] == "<|endoftext|>":
-            ids.append(-2)
+            ids.append(-1)  # code punctuation with -1
+        elif tokens[i] in eos_markers:
+            ids.append(-2) # code eos strings with -2
         else:
             ids.append(count)
 
@@ -70,7 +85,7 @@ def assign_subtokens_to_groups(subtoken_splits, markers, ngram1_size, ngram2_siz
     return out
 
 def concat_and_tokenize_inputs(prefix=None, prompt=None, word_list1=None, word_list2=None,
-                               ngram_size=None, tokenizer=None, ismlm=False):
+                               ngram_size=None, tokenizer=None, bpe_split_marker=None, marker_logic=None, ismlm=False):
 
     """
     function that concatenates and tokenizes
@@ -91,10 +106,11 @@ def concat_and_tokenize_inputs(prefix=None, prompt=None, word_list1=None, word_l
         input_seqs2_ = [" " + ", ".join(tks) + "." for tks in word_list2]                           # unmasked tokens
         eos1 = "[CLS]"
         eos2 = "[SEP]"
+
     else:
         input_seqs2 = [" " + ", ".join(tks) + "." for tks in word_list2]
-        eos1 = "<|endoftext|>"
-        eos2 = "<|endoftext|>"
+        eos1 = tokenizer.eos_token
+        eos2 = tokenizer.eos_token
 
     logging.info(f"Using {eos1} and {eos2} as start and end eos tokens, respectively")
 
@@ -118,6 +134,7 @@ def concat_and_tokenize_inputs(prefix=None, prompt=None, word_list1=None, word_l
 
         # tokenize unmasked tokens to be able to compute loss later on
         if ismlm:
+            
             i4_ = tokenizer.encode(input_seqs2_[i] + eos2, add_special_tokens=False, return_tensors="pt")
             input_ids_unmasked = torch.cat((i1, i2, i3, i4_), dim=1)
             input_seqs_tokenized_unmasked.append(input_ids_unmasked)
@@ -129,12 +146,16 @@ def concat_and_tokenize_inputs(prefix=None, prompt=None, word_list1=None, word_l
         split_ids = []
 
         for j, ids in enumerate((i1, i2, i3, i4)):
+
             tmp = np.zeros(shape=ids.shape[1], dtype=int)  # code the trial structure
             tmp[:] = j
             tmp2 = np.arange(ids.shape[1])                 # create token position index
             trials.append(tmp)
             positions.append(tmp2)
-            split_ids.append(mark_subtoken_splits(tokenizer.convert_ids_to_tokens(ids[0])))
+            split_ids.append(mark_subtoken_splits(tokens=tokenizer.convert_ids_to_tokens(ids[0]),
+                                                  split_marker=bpe_split_marker,
+                                                  marker_logic=marker_logic,
+                                                  eos_markers=[eos1, eos2]))
 
         metadata["trialID"].append(np.concatenate(trials).tolist())
         metadata["stimid"].append(i)
@@ -270,16 +291,19 @@ def setup():
 
     return 0
 
-def get_args_for_dev(setup=False, scenario="sce1", condition="repeat", path_to_tokenizer="gpt2", 
+def get_args_for_dev(setup=False, scenario="sce1", prompt_key="1", list_len="n5", condition="repeat", path_to_tokenizer="gpt2", 
                      device="cuda", input_filename="random_lists.json", output_dir=None, output_filename=None ):
 
     args = {
-        "setup": False,
+
+        "setup": setup,
         "scenario": scenario,
+        "prompt_key": prompt_key,
+        "list_len": list_len,
         "condition": condition,
         "path_to_tokenizer": path_to_tokenizer,
         "device": device,
-        "input_filename": "random_lists.json",
+        "input_filename": input_filename,
         "output_dir": output_dir,
         "output_filename": output_filename
 
@@ -303,6 +327,8 @@ def main():
                         help="downloads and places nltk model and Tokenizer")
     parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3", "sce4", "sce5", "sce6", "sce7"],
                         help="str, which scenario to use")
+    parser.add_argument("--prompt_key", type=str, choices=["1", "2", "3", "4", "5"])
+    parser.add_argument("--list_len", type=str, choices=["n3", "n5", "n7", "n10"])
     parser.add_argument("--condition", type=str, choices=["repeat", "permute", "control"],
                         help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
     # To download a different model look at https://huggingface.co/models?filter=gpt2
@@ -320,21 +346,21 @@ def main():
     argins = parser.parse_args()
 
     # if needed for development create the argins namespace with some default values
-    # argins = SimpleNamespace(**get_args_for_dev(path_to_tokenizer="bert-base-uncased", 
+    #argins = SimpleNamespace(**get_args_for_dev(path_to_tokenizer="transfo-xl-wt103", 
     #                                            output_dir="data/transformer_input_files", 
-    #                                            output_filename="bert-base-uncased"))
+    #                                            output_filename="transfo-xl-wt103"))
 
     # construct output file name and check that it existst
-    savedir = os.path.join(".", argins.output_dir)
-    assert os.path.isdir(savedir)                                 # check that the folder exists
+    print(argins.output_dir)
+    assert os.path.isdir(argins.output_dir)                                 # check that the folder exists
     #outpath = os.path.join(savedir, argins.output_filename)
 
     # manage platform dependent stuff
-    # if "win" in sys.platform:
-    #     data_dir = os.path.join(os.environ["homepath"], "project", "lm-mem", "src", "data")
-    # elif "linux" in sys.platform:
-    #     data_dir = os.path.join(os.environ["HOME"], "code", "lm-mem", "data")
-    data_dir = "./data"
+    if "win" in sys.platform:
+         data_dir = os.path.join(os.environ["homepath"], "project", "lm-mem", "src", "data")
+    elif "linux" in sys.platform:
+         data_dir = os.path.join(os.environ["HOME"], "project", "lm-mem", "src", "data")
+    #data_dir = "./data"
 
     logging.info("condition == {}".format(argins.condition))
     logging.info("scenario == {}".format(argins.scenario))
@@ -409,18 +435,35 @@ def main():
     logging.info("Loading tokenizer {}".format(argins.path_to_tokenizer))
     tokenizer = AutoTokenizer.from_pretrained(argins.path_to_tokenizer)
 
+    # set the flag for function below
+    ismlm = False
+    if argins.path_to_tokenizer in ['bert-base-uncased']:
+        ismlm=True
+
     # ===== PREPARE INPUT SEQUENCES ===== #
+    bpe_split_marker_dict = {"gpt2": "Ġ",
+                             "bert-base-uncased": "##",
+                             "transfo-xl-wt103": None}
+
+    marker_logic_dict = {"gpt2": "outside",
+                         "bert-base-uncased": "within",
+                         "transfo-xl-wt103": None}
 
     # this routing loops over prompts and prefixes
     # it keeps track of that in meta_data
     logging.info("Tokenizing and concatenating sequences...")
-    input_sequences, input_sequences_unmasked, meta_data = concat_and_tokenize_inputs(prompt=prompts[argins.scenario]["1"],
-                                                                                      prefix=prefixes[argins.scenario]["1"],
-                                                                                      word_list1=word_lists1["n5"],
-                                                                                      word_list2=word_lists2["n5"],
-                                                                                      ngram_size="n5".strip("n"),
+    input_sequences, input_sequences_unmasked, meta_data = concat_and_tokenize_inputs(prompt=prompts[argins.scenario][argins.prompt_key],
+                                                                                      prefix=prefixes[argins.scenario][argins.prompt_key],
+                                                                                      word_list1=word_lists1[argins.list_len],
+                                                                                      word_list2=word_lists2[argins.list_len],
+                                                                                      ngram_size=argins.list_len.strip("n"),
                                                                                       tokenizer=tokenizer,
-                                                                                      ismlm=True)
+                                                                                      bpe_split_marker=bpe_split_marker_dict[argins.path_to_tokenizer],
+                                                                                      marker_logic=marker_logic_dict[argins.path_to_tokenizer],
+                                                                                      ismlm=ismlm)
+
+    # add information about prompt and list lengths for each sequence
+    meta_data["prompt"] = [argins.prompt_key for _ in meta_data["list_len"]]
 
     # save files
     savename = os.path.join(argins.output_dir, argins.output_filename + ".json")
