@@ -282,7 +282,8 @@ class WT103DataModule(pl.LightningDataModule):
 
 
     def print_sample(self, idx, numel):
-
+        """print_sample() prints a single sample from the .wiki_train training set.
+        """
         inputs, targets = self.wiki_train[idx]
         tokens1 = [self.dictionary.idx2word[id] for id in inputs]
         tokens2 = [self.dictionary.idx2word[id] for id in targets]
@@ -291,6 +292,27 @@ class WT103DataModule(pl.LightningDataModule):
                      f"First {numel} targets of sample sequence {idx} (train): {tokens2[0:numel]}")
 
         return tokens1, tokens2
+
+    def print_batch(self, numdim=None, numel=None):
+        """
+        print_batch() prints numdim batch entries and numel of per-batch samples from the training set.
+        """
+        inputs, targets = next(iter(self.train_dataloader())) # returns tensors (batch_size, sequence_len)
+        
+        if numdim is None:
+            numdim = inputs.shape[0]
+        
+        if numel is None:
+            numel = inputs.shape[-1]//10
+
+        for i in range(numdim):
+            print("Input train batch: ")
+            print(i+1, " ".join([self.dictionary.idx2word[inputs[i, k]] for k in range(numel)]))
+
+        for i in range(numdim):
+            print("Target train batch: ")
+            print(i+1, " ".join([self.dictionary.idx2word[targets[i, k]] for k in range(numel)]))
+
 
 
     def find_num_workers(self, num_workers_range, n_epochs):
