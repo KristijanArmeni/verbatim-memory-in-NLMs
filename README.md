@@ -8,49 +8,57 @@
 
 # Dependencies
 
-For our experiments, we used the following dependencies:
+For our experiments, we used the following dependencies (environment.yml):
 
-  - python=3.7
-  - matplotlib
-  - scipy
+channels:
+  - defaults
+dependencies:
   - numpy
-  - nltk=3.4.4
-  - plotly
-  - seaborn
-  - pytorch::pytorch=1.6=*cuda9.2*
-  - huggingface::transformers=4.2.2
+  - huggingface::transformers=4.6
   - nb_conda_kernels
+  - jupyterlab
+  - matplotlib
   - h5py
+  - seaborn
+  - pytorch==1.10.1
+  - scikit-learn
+  - scipy
+  - nltk=3.4.4
   - pip
+  - python=3.7
+  - cudatoolkit=11.3
+  - plotly
+  - conda-forge::wandb=0.10.31
+  - mne=0.22.0
+  - pytorch-lightning=1.5.10
+  - gensim=3.8
 
 ## Installing dependencies
 
-There are two separate sets of dependencies, defined in the requirements files:
-- [reqs_pytorch1.3.yaml](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/reqs_pytorch1.3.yaml) is for the rnn code
-- [reqs_pytorch1.6.yaml](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/reqs_pytorch1.6.yaml) is for the gpt-2 code.
+The dependencies are specified in the .yml file: [environement.yml](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/enviroment.yml)
 
-Pytorch 1.3 was used with RNN code base because the model objects that stored checkpoints contained attributes that were not compatible with pytorch 1.6.
 
 We used the conda management toolkit, so the easiest way to create the environment with dependencies is as follows:
 
-`conda env create -n env_name_gpt2 -f ./reqs_pytorch1.6.yaml`
-`conda env create -n env_name_lstm -f ./reqs_pytorch1.3.yaml`
+`conda env create -n your_env_name -f ./environment.yml`
 
-## Running [gpt2_surprisal.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/gpt2_surprisal.py)
+## Running [wm_test_suite.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/gpt2_surprisal.py)
 
-Activate the installed conda enviroment with dependencies:
-`conda activate env_name_gpt2`
+Activate the installed conda enviroment with dependencies:  
+```
+conda activate your_env_name
+```
 
-Navigate to root folger of github repository.
+Navigate to root folder of github repository.
 
 Now run with the setup flag to download the models:
 ```bash
-python gpt2_surprisal.py --setup
+python wm_test_suite.py --setup
 ```
 
-The job as follows:
+Run the job as follows:
 ```bash
-python ./gpt2_surprisal.py
+python ./wm_test_suite.py
 --condition control \
 --scenario sce1 \
 --paradigm with-context \
@@ -60,28 +68,28 @@ python ./gpt2_surprisal.py
 --device cuda
 ```
 
-Input arguments are documented in the [gpt2_surprisal.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/gpt2_surprisal.py) script itself:
+Input arguments are documented in the [wm_test_suite.py](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/wm_test_suite.py) script itself:
 
 ```python
-# collect input arguments
-parser = argparse.ArgumentParser(description="surprisal.py runs perplexity experiment")
-
-parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3"],
+parser.add_argument("--setup", action="store_true",
+                    help="downloads and places nltk model and Tokenizer")
+parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3", "sce4", "sce5", "sce6", "sce7"],
                     help="str, which scenario to use")
-parser.add_argument("--condition", type=str, choices=["repeat", "permute", "control"],
-                    help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
-parser.add_argument("--paradigm", type=str, choices=["with-context", "repeated-ngrams"],
-                    help="whether or not to permute the second word list")
+parser.add_argument("--condition", type=str)
+parser.add_argument("--inputs_file", type=str, help="json file with input sequence IDs which are converted to tensors")
+parser.add_argument("--inputs_file_info", type=str, help="json file with information about input sequences")
+parser.add_argument("--tokenizer", type=str)
 parser.add_argument("--context_len", type=int, default=1024,
                     help="length of context window in tokens for transformers")
-parser.add_argument("--model_type", type=str, default="pretrained", choices=["pretrained", "random", "random-att"],
-                    help="whether or not to load a pretrained model or initialize randomly")
+parser.add_argument("--model_type", type=str,
+                    help="model label controlling which checkpoint to load")
+# To download a different model look at https://huggingface.co/models?filter=gpt2
+parser.add_argument("--checkpoint", type=str, default="gpt2",
+                    help="the path to folder with pretrained models (expected to work with model.from_pretraiend() method)")
 parser.add_argument("--model_seed", type=int, default=12345,
                     help="seed value to be used in torch.manual_seed() prior to calling GPT2Model()")
 parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
                     help="whether to run on cpu or cuda")
-parser.add_argument("--input_filename", type=str,
-                    help="str, the name of the .json file containing word lists")
 parser.add_argument("--output_dir", type=str,
                     help="str, the name of folder to write the output_filename in")
 parser.add_argument("--output_filename", type=str,
@@ -90,7 +98,7 @@ parser.add_argument("--output_filename", type=str,
 
 ## Running an LSTM job
 
-In bash script, activate the conda environment with [LSTM dependencies](https://github.com/KristijanArmeni/neural-lm-mem/blob/main/reqs_pytorch1.3.yaml):
+In bash script, activate the conda environment with [dependencies]()
 `conda activate env_name_lstm`
 
 Download LSTM model into a folder `rnn_models` from here:
@@ -124,10 +132,3 @@ python ./rnn/experiment.py \
 --output_folder ./code/lm-mem/output \
 --output_filename output_test.csv
 ```
-
-## Inputs
-
-- TODO: explain inputs
-- What is sce1, sce2,...
-- What is condition? repeated, permuted, control?
-- What is categorized? arbitrary, categorized
