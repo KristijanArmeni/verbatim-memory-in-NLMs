@@ -484,8 +484,8 @@ class Experiment(object):
 
         # 3. go through sequences
         outputs = {
-            "sequence_ppls": [],
-            "surprisals": [],
+            "sequence_ppl": [],
+            "surp": [],
         }
 
         sequence_iterator = tqdm(sequence_loader, desc="Computing surprisal values", colour="blue")
@@ -499,8 +499,8 @@ class Experiment(object):
                                                 targets=targets)
 
             # store the outputs and
-            outputs["sequence_ppls"].extend(ppls)
-            outputs["surprisals"].extend(surprisals)
+            outputs["sequence_ppl"].extend(ppls)
+            outputs["surp"].extend(surprisals)
 
         return outputs
 
@@ -655,10 +655,10 @@ def runtime_code():
 
     argins = parser.parse_args()
 
-    argins = SimpleNamespace(**get_argins_for_dev(inputs_file="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_control_sce1_1_n5_random.json",
-                                                  inputs_file_info="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_control_sce1_1_n5_random.json",
-                                                  checkpoint="bert-base-uncased",
-                                                  tokenizer="bert-base-uncased"))
+    #argins = SimpleNamespace(**get_argins_for_dev(inputs_file="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_4_n5_random.json",
+    #                                              inputs_file_info="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_4_n5_random_info.json",
+    #                                              checkpoint="bert-base-uncased",
+    #                                              tokenizer="bert-base-uncased"))
 
     if argins.setup:
         setup()
@@ -739,9 +739,6 @@ def runtime_code():
                             use_cache=False,
                             device=device)
 
-    # run the experiment for all possible word lists
-    # construct input sequences
-
     # list storing output dataframes
     experiment_outputs = []
 
@@ -749,6 +746,8 @@ def runtime_code():
 
     output_dict = experiment.start(input_sequences = input_sequences)
 
+    # add token information to the output dictionary
+    output_dict["token"] = [experiment.tokenizer.convert_ids_to_tokens(e[0]) for e in input_sequences]
 
     # ===== FORMAT AND SAVE OUTPUT ===== #
 
@@ -768,14 +767,13 @@ def runtime_code():
     dfrows = {key_arr[0]: key_arr[1] for i, key_arr in enumerate(zip(colnames, arrays))}
 
     # loop over trials
-    for i in range(0, n_sequences):
+    for i in trange(0, n_sequences):
 
-        # a list of lists (row values) for this sequence
-        row_values = [dfrows[key][i] for key in dfrows.keys()]
+        # a dict of lists (row values) for this sequence
+        row_values = {key: np.array(dfrows[key][i]) for key in dfrows.keys()}
 
         # convert the last two elements of the tuple to an array
-        dftmp = pd.DataFrame(np.asarray(row_values).T,
-                                columns=colnames)
+        dftmp = pd.DataFrame(row_values)
 
         # now add the constant values for the current sequence rows
         dftmp["stimid"] = input_sequences_info["stimid"][i]                # stimulus id
