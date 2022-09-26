@@ -20,9 +20,10 @@ from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config, \
                          BertForMaskedLM, TransfoXLLMHeadModel,  TransfoXLTokenizer, \
                          AutoTokenizer, top_k_top_p_filtering
 import torch
+from torch.utils.data import Dataset, DataLoader
 from torch.nn import functional as F
 from tqdm import trange
-from typing import List
+from typing import List, Dict, Tuple, Any
 from string import punctuation
 from tqdm import tqdm
 import logging
@@ -175,6 +176,21 @@ def ensure_list2_notequal(list1, list2, start_seed, seed_increment):
     return list2_new
 
 
+# ===== DATSET CLASS ===== #
+
+class SimpleDataset(Dataset):
+    def __init__(self, _list: List) -> None:
+        super().__init__()
+        self.items = list(_list)
+
+    def __getitem__(self, index) -> Any:
+        return self.items[index]
+
+    def __len__(self) -> int:
+        return len(self.items)
+
+
+
 # ===== EXPERIMENT CLASS ===== #
 
 class Experiment(object):
@@ -183,14 +199,20 @@ class Experiment(object):
     Exp() class contains wrapper methods to run experiments with transformer models.
     """
 
-    def __init__(self, model, ismlm, tokenizer, context_len, device):
+    def __init__(self, model, ismlm, tokenizer, context_len, batch_size, use_cache, device):
 
         self.model = model
         self.ismlm = ismlm
         self.device = device
         self.tokenizer = tokenizer
         self.context_len = context_len
+        self.batch_size = batch_size
+        self.use_cache = use_cache
+
+        self.loss_fct_batched = torch.nn.CrossEntropyLoss(reduction="none")
+
         self.model.to(device)
+        
 
     def get_logits(self, input_string):
 
@@ -277,7 +299,125 @@ class Experiment(object):
         ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc).cpu()
         return ppl, llh, tokens
 
-    def start(self, input_sequences_ids=None) -> List:
+    def ppl_batched(self, 
+        input_ids: torch.Tensor, 
+        stride: int,
+        context_len: int,
+        seq_lens: List[int], 
+        targets: torch.Tensor) -> Tuple[float, List[float], List[float]]:
+
+        """Returns average ppl, list of suprisal values (llhs)
+        per token, and list of tokens for given input_ids.
+        taken from: https://huggingface.co/transformers/perplexity.html
+        """
+
+        batch_size = len(seq_lens)
+
+        # to match every token need to insert <eos> token artificially at beginning
+        llhs = [
+            [
+                np.nan,
+            ]
+            for _ in range(batch_size)
+        ]  # variable storing token-by-token neg log likelihoods
+
+        # set model to evaluation mode
+        self.model.eval()
+        self.model.to(self.device)
+
+        if self.use_cache:
+            end_loop_idx = (input_ids.size(1) -1)
+            past_key_values = None
+
+            # if we're (re)using cache, then we can only select current input slice
+            # in this case stride and context_len are ignored
+            beg_loc_fun = lambda i, stride=None, context_len=None: i
+            end_loc_fun = lambda i, stride=None, max_loc=None: i + 1
+            tgt_beg_loc_fun = lambda i, stride=None, context_len=None: i + 1
+            tgt_end_loc_fun = lambda i, stride=None, context_len=None: i + 2
+
+        else:
+            past_key_values = None
+            end_loop_idx = input_ids.size(1) - 1
+            beg_loc_fun = lambda i, stride, context_len: max(i + stride - context_len, 0)
+            end_loc_fun = lambda i, stride, max_loc: min(i + stride, max_loc)
+
+            # we have to shift targets for one time step forward
+            tgt_beg_loc_fun = lambda i, stride, context_len: max((i + stride - context_len), 0) + 1
+            tgt_end_loc_fun = lambda i, stride, max_loc: min(i + stride, max_loc) + 1
+
+
+        # loop over tokens in input sequence
+        for idx in range(0, end_loop_idx):
+
+            # compute begining and end indices for context tokens
+            beg_loc = beg_loc_fun(idx, stride, context_len)
+            end_loc = end_loc_fun(idx, stride, end_loop_idx)
+            tgt_beg_loc = tgt_beg_loc_fun(idx, stride, context_len)
+            tgt_end_loc = tgt_end_loc_fun(idx, stride, end_loop_idx)
+
+            trg_len = end_loc - idx  # may be different from stride on last loop
+
+            # select the current input index span
+            selected_input_ids = input_ids[:, beg_loc:end_loc].to(self.device)
+
+            # mask the final token in sequence if we're testing MLM, so that we get prediction only for that token
+            if self.ismlm:
+                selected_input_ids[:, -1] = self.tokenizer.convert_tokens_to_ids("[MASK]")
+
+            # targets are shifted by 1 token forward
+            target_ids = targets[:, tgt_beg_loc:tgt_end_loc].to(self.device)
+            target_ids[:, :-trg_len] = self.loss_fct_batched.ignore_index
+
+
+            #print(selected_input_ids)
+            #print(target_ids)
+
+            # get model output
+            with torch.no_grad():
+
+                # compute logits and use cache if provided
+                outputs = self.model(
+                    input_ids=selected_input_ids,
+                )
+
+                #print(outputs.logits.shape)
+                #print(outputs.logits[:, -1, 0:10])
+                #print(outputs.logits[:, 0, 0:10])
+
+                if self.use_cache:
+                    past_key_values = outputs.past_key_values
+                del selected_input_ids
+
+                # compute loss per every sequence in batch shape = (batch, sequence_len)
+                losses = self.loss_fct_batched(
+                    outputs.logits[:, -1, :].view(-1, outputs.logits.size(-1)), target_ids[:, -1].view(-1)
+                )
+                # del outputs
+                del target_ids
+
+                for batch_idx, nll_val in enumerate(losses):
+                    llhs[batch_idx].append(nll_val.item())
+
+                # Save past attention keys for speedup
+                # TODO: cannot handle if past_key_values becomes longer than context_length yet
+
+        # Handle padded sequences
+        final_llhs = []
+        for batch_idx, llh_vals in enumerate(llhs):
+            # Cut them off at appropriate length
+            final_llhs.append(llh_vals[: seq_lens[batch_idx]])
+
+        # compute perplexity, divide by the lenth of the sequence
+        # use np.nansum as token at position 0 will have -LL of nan
+        ppls = []
+        for batch_idx, llh_vals in enumerate(final_llhs):
+            ppls.append(
+                torch.exp(torch.tensor(np.nansum(llh_vals)) / (len(llh_vals) - 1)).cpu().item()
+            )
+        return ppls, final_llhs
+
+    def start_sequential(self, input_sequences_ids=None) -> List:
         """
         experiment.start() will loop over prefixes, prompts, and word_lists and run the .ppl() method on them
         It returns a dict:
@@ -311,6 +451,77 @@ class Experiment(object):
 
         return outputs
 
+
+    def start_batched(self, input_sequences: List[torch.Tensor]):
+
+                # 1. collate_fn
+        def get_batch(sequence_list: List[torch.Tensor]) -> Tuple[torch.Tensor]:
+            """Converts list of sequences into a padded torch Tensor and its lengths"""
+
+            # get lengths of all sequences
+            sequence_lengths = [len(sequence[0]) for sequence in sequence_list]
+
+            batched_sequence = torch.nn.utils.rnn.pad_sequence(
+                [sequence[0] for sequence in sequence_list],
+                batch_first=True,
+                padding_value=self.tokenizer.encode(self.tokenizer.unk_token)[0],
+            )
+            target_sequence = torch.nn.utils.rnn.pad_sequence(
+                [sequence[0] for sequence in sequence_list],
+                batch_first=True,
+                padding_value=self.loss_fct_batched.ignore_index,
+            )
+            return batched_sequence, sequence_lengths, target_sequence
+
+        # 2. make dataset and dataloader
+        sequence_dataset = SimpleDataset(input_sequences)
+
+        sequence_loader = DataLoader(sequence_dataset, 
+                                     batch_size=self.batch_size, 
+                                     shuffle=False, 
+                                     collate_fn=get_batch,
+        )
+
+        # 3. go through sequences
+        outputs = {
+            "sequence_ppls": [],
+            "surprisals": [],
+        }
+
+        sequence_iterator = tqdm(sequence_loader, desc="Computing surprisal values", colour="blue")
+
+        for input_ids, sequence_lengths, targets in sequence_iterator:
+
+            ppls, surprisals = self.ppl_batched(input_ids=input_ids,
+                                                context_len=self.context_len, 
+                                                stride=1,
+                                                seq_lens=sequence_lengths, 
+                                                targets=targets)
+
+            # store the outputs and
+            outputs["sequence_ppls"].extend(ppls)
+            outputs["surprisals"].extend(surprisals)
+
+        return outputs
+
+    def start(self, input_sequences: List[torch.Tensor]) -> Dict[str, List[any]]:
+        """
+        experiment.start() will loop over prefaces, prompts, and word_lists and run the .ppl() method on them
+        
+        Returns:
+        ========
+        outputs = {
+            "sequence_ppls": [],
+            "surprisals": [],
+        }
+        """
+
+        #if self.batch_size > 1:
+        logging.info(f"Batch size = {self.batch_size}, calling self.start_batched()")
+        return self.start_batched(input_sequences)
+
+        #logging.info(f"Batch size = {self.batch_size}, calling self.start_sequential()")
+        #return self.start_sequential(input_sequences)
 
 def permute_qk_weights(model=None, per_head=False, seed=None):
 
@@ -379,20 +590,6 @@ def permute_qk_weights(model=None, per_head=False, seed=None):
     return model
 
 
-# ===== Setup for gpt2 ====== #
-def setup():
-    logging.info("SETUP: nltk punkt")
-    import nltk
-    nltk.download("punkt")
-
-    logging.info("SETUP: GPT2 Tokenizer")
-    GPT2TokenizerFast.from_pretrained("gpt2")
-
-    logging.info("SETUP: Head Model")
-    GPT2LMHeadModel.from_pretrained("gpt2")
-
-    return 0
-
 # ===== helper function for development ===== #
 def get_argins_for_dev(setup=False, 
                        inputs_file=None, 
@@ -438,7 +635,6 @@ def runtime_code():
                         help="str, which scenario to use")
     parser.add_argument("--condition", type=str)
     parser.add_argument("--inputs_file", type=str, help="json file with input sequence IDs which are converted to tensors")
-    parser.add_argument("--inputs_file_unmasked", type=str, help="json file with input sequence IDs which are not masked", default="")
     parser.add_argument("--inputs_file_info", type=str, help="json file with information about input sequences")
     parser.add_argument("--tokenizer", type=str)
     parser.add_argument("--context_len", type=int, default=1024,
@@ -459,11 +655,10 @@ def runtime_code():
 
     argins = parser.parse_args()
 
-    argins = SimpleNamespace(**get_argins_for_dev(inputs_file="/home/ka2773/project/lm-mem/src/data/transformer_input_files/transfo-xl_repeat_sce1_5.json",
-                                                  inputs_file_unmasked="",
-                                                  inputs_file_info="/home/ka2773/project/lm-mem/src/data/transformer_input_files/transfo-xl_repeat_sce1_5_info.json",
-                                                  checkpoint="transfo-xl-wt103",
-                                                  tokenizer="transfo-xl-wt103"))
+    argins = SimpleNamespace(**get_argins_for_dev(inputs_file="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_control_sce1_1_n5_random.json",
+                                                  inputs_file_info="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_control_sce1_1_n5_random.json",
+                                                  checkpoint="bert-base-uncased",
+                                                  tokenizer="bert-base-uncased"))
 
     if argins.setup:
         setup()
@@ -473,11 +668,6 @@ def runtime_code():
     # ===== LOAD INPUTS ===== #
     with open(argins.inputs_file, "r") as fh:
         input_sequences = [torch.tensor(e) for e in json.load(fh)]
-
-    input_sequences_unmasked = None
-    if argins.inputs_file_unmasked != "":
-        with open(argins.inputs_file_unmasked, "r") as fh:
-            input_sequences_unmasked = [torch.tensor(e) for e in json.load(fh)]
 
     with open(argins.inputs_file_info, "r") as fh:
         input_sequences_info = json.load(fh)
@@ -545,6 +735,8 @@ def runtime_code():
     experiment = Experiment(model=model, ismlm=ismlm,
                             tokenizer=tokenizer,
                             context_len=argins.context_len,
+                            batch_size=10,
+                            use_cache=False,
                             device=device)
 
     # run the experiment for all possible word lists
@@ -555,7 +747,7 @@ def runtime_code():
 
     # ===== RUN EXPERIMENT LOOP ===== #
 
-    output_dict = experiment.start(input_sequences_ids = input_sequences)
+    output_dict = experiment.start(input_sequences = input_sequences)
 
 
     # ===== FORMAT AND SAVE OUTPUT ===== #
