@@ -7,6 +7,9 @@ import glob
 from tqdm import tqdm
 import argparse
 from string import punctuation
+import logging
+
+logging.basicConfig(format="[INFO] %(message)s", level=logging.INFO)
 
 def load_and_preproc_csv(output_folder, filenames):
 
@@ -22,24 +25,31 @@ def load_and_preproc_csv(output_folder, filenames):
 
         dftmp = pd.read_csv(os.path.join(output_folder, file), sep=sep, header=0)
 
+        logging.info(f"Inferring the following information from filename: \n" + \
+                     f"list_type = {file.split('_')[7].split('.')[0]}\n" + \
+                     f"second_list = {file.split('_')[6]}\n" + \
+                     f"scenario = {file.split('_')[3]}\n" + \
+                     f"model_id = {file.split('_')[2]}")
+
         # add information from filenames
-        list_type = file.split("_")[-1].split(".")[0]
+        list_type = file.split("_")[7].split(".")[0]
         dftmp["list"] = list_type  # add column on list composition
-        dftmp["second_list"] = file.split("_")[-2]  # store information on second list
-        dftmp["scenario"] = file.split("_")[-3]
-        dftmp["model_id"] = file.split("_")[-4]
+        dftmp["second_list"] = file.split("_")[6]  # store information on second list
+        dftmp["scenario"] = file.split("_")[3]
+        dftmp["model_id"] = file.split("_")[2]
 
         ngram_list_labels = ["ngram-random", "ngram-categorized"]
 
         # remove punctuation prior to creating token index
         # filter out punctuation
-        if arc == "gpt2":
+        if arc in ["gpt2", "bert"]:
 
             # rename some columns to avoid the need for if/else lower
             dftmp.rename(columns={"stimID": "sentid", "trialID" : "marker", "prompt": "prompt_len"}, inplace=True)
 
             # throw out punctuation and eos
-            dftmp = dftmp.loc[(~dftmp.token.isin(list(punctuation) + ['<|endoftext|>']))]
+            eos_symbols = ['<|endoftext|>', "[CLS]", '[SEP]']
+            dftmp = dftmp.loc[(~dftmp.token.isin(list(punctuation) + eos_symbols))]
 
             # we need these columns in the output after merging
             columns = ["subtok", "sentid", "stimid", "list_len", "prompt_len",
@@ -209,7 +219,7 @@ argins = parser.parse_args()
 files = glob.glob(os.path.join(argins.output_dir, "surprisal_{}_{}_{}_*.csv".format(argins.arch, argins.model_id, argins.scenario)))
 
 if not files:
-    raise Exception("Can find any files that match pattern: {}".format(os.path.join(argins.output_dir, "surprisal_{}_{}+{}*.csv".format(argins.arch, argins.model_id, argins.scenario))))
+    raise Exception("Can find any files that match pattern: {}".format(os.path.join(argins.output_dir, "surprisal_{}_{}_{}*.csv".format(argins.arch, argins.model_id, argins.scenario))))
 
 files.sort()
 
