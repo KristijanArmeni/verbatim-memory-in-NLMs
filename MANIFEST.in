@@ -1,0 +1,2 @@
+include ./data/*.json
+recursive-exclude __pycache__ *.py[cod]

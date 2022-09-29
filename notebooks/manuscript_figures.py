@@ -603,6 +603,46 @@ for dat, model_id, tag, title in zip((data_gpt, data_40m, data_rnn, data_rnn2), 
         f.savefig(os.path.join(savedir, "example_{}_{}-{}.png".format(scenario, tag, model_id)), dpi=300, bbox_inches="tight")
 
 # %% [markdown]
+# ## Bert: load data
+
+# %%
+data_bert = pd.read_csv(os.path.join(data_dir, "output_bert_b-10_sce1.csv"), sep="\t", index_col=0)
+data_bert["model"] = "bert"
+data_bert["model_id"] = "b-10"
+data_bert["context"] = "intact"
+
+
+# %%
+# show original and target lists for stimulus input 11
+for dat in (data_bert,):
+    
+    sel = (dat.list_len==10) & (dat.prompt_len==8) & (dat.context=="intact") & (dat.list=="random") & (dat.second_list=="permute") & (dat.marker.isin([1, 3]))
+    d = dat.loc[sel]
+    stimid=11
+    display("Original and target lists for stimulus {}:".format(stimid))
+    display(d.loc[d.stimid==stimid, ["token", "marker", "model", "second_list", "list_len"]])
+
+# %% [markdown]
+# ## Bert: make plots
+
+# %%
+ids = ("b-10",)
+tags = ("mlm",)
+titles = ("BERT (Devlin et al, 2018)",)
+scenario = "sce1"
+
+for dat, model_id, tag, title in zip((data_bert,), ids, tags, titles):
+
+    f, a = make_example_plot(data=dat, seed=45234232, model_id=model_id, context="intact", ylim=None, title=title)
+    
+    if savefigs:
+        
+        # common fig properties
+        print("Saving {}".format(os.path.join(savedir, "example_{}_{}-{}.".format(scenario, tag, model_id))))
+        f.savefig(os.path.join(savedir, "example_{}_{}-{}.pdf".format(scenario, tag, model_id)), transparent=True, dpi=300, bbox_inches="tight")
+        f.savefig(os.path.join(savedir, "example_{}_{}-{}.png".format(scenario, tag, model_id)), dpi=300, bbox_inches="tight")
+
+# %% [markdown]
 # # Timecourse plots 
 
 # %% [markdown]
@@ -2598,6 +2638,20 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
         print("Writing {}".format(fname))
         with open(fname, "w") as f:
             f.writelines(tex)
+
+# %% [markdown]
+# # Bert
+
+# %% [markdown]
+# ## Prepare data
+
+# %%
+variables = [{"list_len": [3, 5, 7, 10]},
+             {"prompt_len": [8]},
+             {"context": ["intact"]},
+             {"marker_pos_rel": list(range(1, 10))}]
+
+dat_bert_, _ = filter_and_aggregate(datain=data_bert, model="bert", model_id="b-10", groups=variables, aggregating_metric="mean")
 
 # %% [markdown]
 # # Additional transformer checkpoints
