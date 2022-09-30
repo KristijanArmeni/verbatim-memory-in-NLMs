@@ -1,0 +1,31 @@
+#!/bin/bash
+#SBATCH --job-name=script_surp_rnn-vs2019_a-10_sce5_control_random
+#SBATCH --time=6:00:00
+#SBATCH --mem=8G
+#SBATCH --gres=gpu:1
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=6
+#SBATCH --mail-type=end
+#SBATCH --mail-user=karmeni1@jhu.edu
+#SBATCH --output=/scratch/ka2773/project/lm-mem/logs/wm_eval/script_surp_rnn-vs2019_a-10_sce5_control_random.log
+#SBATCH --error=/scratch/ka2773/project/lm-mem/logs/wm_eval/script_surp_rnn-vs2019_a-10_sce5_control_random.err
+
+
+singularity exec --nv --overlay $SCRATCH/overlay-50G-10M.ext3:ro /scratch/work/public/singularity/cuda10.2-cudnn8-devel-ubuntu18.04.sif /bin/bash -c "
+source /ext3/env.sh
+conda activate core_env
+
+python /home/ka2773/project/lm-mem/src/rnn_/experiment.py --checkpoint_folder /scratch/ka2773/project/lm-mem/checkpoints/lstm/vs2019 \
+--model_weights /scratch/ka2773/project/lm-mem/checkpoints/lstm/vs2019/LSTM_400_40m_a_10-d0.2_statedict.pt \
+--vocab_file /scratch/ka2773/project/lm-mem/checkpoints/lstm/vs2019/vocab.txt \
+--config_file /scratch/ka2773/project/lm-mem/checkpoints/lstm/vs2019/LSTM_400_config.json \
+--input_file /home/ka2773/project/lm-mem/src/data/rnn_input_files/random_lists_sce5_control.txt \
+--marker_file /home/ka2773/project/lm-mem/src/data/rnn_input_files/random_lists_sce5_control_markers.txt \
+--scenario sce5 \
+--condition control \
+--list_type random \
+--output_folder /scratch/ka2773/project/lm-mem/output \
+--output_filename surprisal_rnn-vs2019_a-10_sce5_control_random.csv \
+"
+
