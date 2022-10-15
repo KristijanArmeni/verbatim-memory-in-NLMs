@@ -45,11 +45,8 @@ plt.style.use("gadfly")
 # scale font sizes
 sns.set_context('paper', font_scale=1.6)
 
-plt.rcParams.update({
-    "text.usetex": False,
-    "font.family": "serif",
-    "font.serif": ["Palatino"],
-})
+matplotlib.rcParams['font.family'] = 'sans-serif'
+matplotlib.rcParams['font.sans-serif'] = ['Segoe UI']
 
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
@@ -60,7 +57,7 @@ matplotlib.rcParams['ps.fonttype'] = 42
 # %%
 home_dir = os.path.join(os.environ['homepath'], "project", "lm-mem")
 data_dir = os.path.join(home_dir, "data", "outputs")
-savedir = os.path.join(home_dir, "fig", "raw")
+savedir = os.path.join(home_dir, "fig", "raw", "camera_ready")
 table_savedir = os.path.join(home_dir, "tables", "revised")
 savefigs = True
 
@@ -396,7 +393,7 @@ def make_timecourse_plot(datain, x, style, col, col_order, style_order, hue_orde
     n = len(datain.loc[one_group])  
     
     p = sns.relplot(kind="line", data=datain, x=x, y="surp", style=style, hue=style, col=col, 
-                    estimator=estimator, errorbar=("ci", 95.0), err_style=err_style, seed=12345,
+                    estimator=estimator, ci=95.0, err_style=err_style, seed=12345,
                     markers=True, style_order=style_order, hue_order=hue_order, col_order=col_order,
                     legend=True, linewidth=0.7)
     
@@ -560,8 +557,11 @@ data_40m = pd.read_csv(os.path.join(data_dir, "output_gpt2_w-12_sce1.csv"), sep=
 data_rnn = pd.read_csv(os.path.join(data_dir, "output_rnn_a-10_sce1.csv"), sep="\t", index_col=None)
 data_rnn2 = pd.read_csv(os.path.join(data_dir, "output_rnn-vs2019_a-70_sce1.csv"), sep="\t", index_col=None)
 
+data_awd = pd.read_csv(os.path.join(data_dir, "output_awd-lstm-3_a-10_sce1.csv"), sep="\t", index_col=None)
+
 data_rnn.rename(columns={"word": "token"}, inplace=True)
 data_rnn2.rename(columns={"word": "token"}, inplace=True)
+data_awd.rename(columns={"word": "token"}, inplace=True)
 data_rnn["model"] = "lstm"
 data_rnn2["model"] = "lstm"
 
@@ -586,7 +586,7 @@ for dat in (data_gpt, data_40m):
 
 # %%
 ids = ("a-10", "w-12", "a-10", "a-70")
-tags = ("trf", "trf", "lstm", "lstm")
+tags = ("trf", "trf", "awd-lstm", "lstm")
 titles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)", "LSTM (Wikitext-103)", "LSTM (80M tokens, 1600 hidden)")
 scenario = "sce1"
 
@@ -864,7 +864,7 @@ dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10
 
 # %%
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
-suptitles = ("Transformer (Wikitext-103)", "Transformer (Radford et al, 2019)", "LSTM (Wikitext-103)")
+suptitles = ("Transformer (12-layer, WT-103)", "Transformer (Radford et al, 2019)", "LSTM (Merity et al, 2017)")
 savetags = ("trf-w12", "trf-a10", "lstm-a10")
 ylims=((60, 115), (None, None), (80, 115))
 basename="set-size"
@@ -878,24 +878,26 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     
     grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="list_len", y="x_perc", hue="condition", style="condition", 
                                      col="list", ylim=ylim,
-                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
+                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(%)",
                                      suptitle=suptitle, scale=1, errwidth=1.5,
                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                      size_inches=plot_size)
     
     grid.fig.subplots_adjust(top=0.70)
     
-    ax[0].set_title("Arbitrary list\n")
-    ax[1].set_title("Semantically coherent\nlist")
+    ax[0].set_title("Arbitrary list\n", fontsize=13)
+    ax[1].set_title("Semantically coherent\nlist", fontsize=13)
     
-    tick_fs, label_fs = 18, 18
+    tick_fs, label_fs = 14, 14
     for a in ax:
         for label in (a.get_xticklabels() + a.get_yticklabels()): 
             label.set_fontsize(tick_fs)
         a.set_xlabel(a.get_xlabel(), color='#23a952', fontsize=label_fs)
 
-    ax[0].set_ylabel("Repeat surprisal\n(\%)", fontsize=18)
+    ax[0].set_ylabel("Repeat surprisal\n(%)", fontsize=label_fs)
     
+    plt.show()
+
     if savefigs:
         
         print("Saving {}".format(os.path.join(savedir, "{}_{}_{}.".format(basename, scenario, tag))))
@@ -964,7 +966,7 @@ dat_rnn_.prompt_len = dat_rnn_.prompt_len.map(prompt_len_map)
 
 # %%
 dfs = (dat_40m_, dat_gpt_, dat_rnn_)
-suptitles = ("Transformer (Wikitext-103)", "Transformer (Radford et al, 2019)", "LSTM (Wikitext-103)")
+suptitles = ("Transformer (12-layer, WT-103)", "Transformer (Radford et al, 2019)", "LSTM (Merity et al, 2017)")
 savetags = ("trf-w12", "trf-a10", "lstm-a10")
 ylims=((60, 115), (None, None), (80, 115))
 basename="inter-text-size"
@@ -976,23 +978,25 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     
     grid, ax, stat = make_point_plot(data_frame=df, estimator=np.median, x="prompt_len", y="x_perc", hue="condition", style="condition",
                                      col="list", ylim=ylim,
-                                     xlabel="Intervening text\nlen. (n. tokens)", ylabel="Repeat surprisal\n(\%)",
+                                     xlabel="Intervening text\nlen. (n. tokens)", ylabel="Repeat surprisal\n(%)",
                                      suptitle=suptitle, scale=1, errwidth=1.5,
                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                      size_inches=plot_size)
     
     grid.fig.subplots_adjust(top=0.70)
-    ax[0].set_title("Arbitrary list\n")
-    ax[1].set_title("Semantically coherent\nlist")
+    ax[0].set_title("Arbitrary list\n", fontsize=13)
+    ax[1].set_title("Semantically coherent\nlist", fontsize=13)
     
-    tick_fs, label_fs = 18, 18
+    tick_fs, label_fs = 14, 14
     for a in ax:
         for label in (a.get_xticklabels() + a.get_yticklabels()):
             label.set_fontsize(tick_fs)
         a.set_xlabel(a.get_xlabel(), color="#FF8000", fontsize=label_fs)
 
-    ax[0].set_ylabel("Repeat surprisal\n(\%)", fontsize=label_fs)
+    ax[0].set_ylabel("Repeat surprisal\n(%)", fontsize=label_fs)
     
+    plt.show()
+
     if savefigs:
         
         print("Saving {}".format(os.path.join(savedir, "{}_{}_{}.".format(basename, scenario, tag))))
@@ -1038,8 +1042,8 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
 gptlst, gptlst2, rnnlst = [], [], []
 for sce in ["sce1", "sce2", "sce1rnd"]:
     
-    logging.info("Loading {}".format(os.path.join(data_dir, "output_rnn_a-10_{}.csv".format(sce))))
-    rnn = pd.read_csv(os.path.join(data_dir, "output_rnn_a-10_{}.csv".format(sce)), sep="\t", index_col=None)
+    logging.info("Loading {}".format(os.path.join(data_dir, "output_awd-lstm-3_a-10_{}.csv".format(sce))))
+    rnn = pd.read_csv(os.path.join(data_dir, "output_awd-lstm-3_a-10_{}.csv".format(sce)), sep="\t", index_col=None)
     rnn.rename(columns={"word":"token"}, inplace=True)
     rnnlst.append(rnn)
     
@@ -1058,7 +1062,7 @@ data_rnn["model"] = "lstm"
 
 # %%
 variables = [{"context": ["intact", 'scrambled', 'incongruent']},
-             {"prompt_len": [400]},
+             {"prompt_len": [200]},
              {"list_len": [10]},
              {"marker_pos_rel": list(range(1, 10))}]
 
@@ -1072,7 +1076,7 @@ dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10
 
 # %%
 dfs = (dat_gpt_, dat_40m_, dat_rnn_)
-suptitles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)", "LSTM (Wikitext-103)")
+suptitles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)", "LSTM (Merity et al, 2017)")
 savetags = ("trf-a10", "trf-w12", "lstm-a10")
 ylims = ((None, None), (60, None), (60, None))
 basename = "filler-type"
@@ -1082,19 +1086,24 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
     plot_size=(6, 3)
     
     grid, ax, stat = make_bar_plot(data_frame=df, estimator=np.median, x="context", y="x_perc", hue="condition", col="list", ylim=ylim,
-                                 xlabel="Intervening text", ylabel="Repeat surprisal\n(\%)",
+                                 xlabel="Intervening text", ylabel="Repeat surprisal\n(%)",
                                  suptitle=suptitle,
                                  legend=False, legend_out=True, legend_title="Second list",
                                  size_inches=plot_size)
     
     grid.fig.subplots_adjust(top=0.70)
-    ax[0].set_title("Arbitrary list\n")
-    ax[1].set_title("Semantically coherent\nlist")
+    ax[0].set_title("Arbitrary list\n", fontsize=16)
+    ax[1].set_title("Semantically coherent\nlist", fontsize=16)
     
     xlabels_capitalized = [text.get_text().capitalize() for text in ax[0].get_xticklabels()]
     ax[0].set_xticklabels(labels=xlabels_capitalized, rotation=20)
     ax[1].set_xticklabels(labels=xlabels_capitalized, rotation=20)
+
+    for a in ax:
+        a.tick_params(labelsize=16)
     
+    plt.show()
+
     if savefigs:
         
         print("Saving {}".format(os.path.join(savedir, "{}_{}.".format(basename, tag))))
