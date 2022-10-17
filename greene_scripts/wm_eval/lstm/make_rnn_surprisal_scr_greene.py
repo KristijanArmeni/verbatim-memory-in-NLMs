@@ -8,7 +8,7 @@ import os
 root_dir=os.path.expanduser("~/project/lm-mem")
 scripts_dir = os.path.join(root_dir, "src", "greene_scripts", "wm_eval")
 log_dir = "/scratch/ka2773/project/lm-mem/logs/wm_eval"
-checkpoint_root = "/scratch/ka2773/project/lm-mem/checkpoints/lstm"
+checkpoint_root = "/scratch/ka2773/project/lm-mem/checkpoints/awd_lstm"
 
 master_bash = open(os.path.join(scripts_dir, 'run_rnn_surprisal_scripts.sh'), 'w')
 
@@ -29,12 +29,16 @@ modeldict = {
         "rnn-gd2018": {"dir": "gd2018",
                        "weights": "hidden650_batch128_dropout0.2_lr20.0_statedict.pt",
                        "config_file": "hidden650_config.json",
-                       "id": "a-10"}
+                       "id": "a-10"},
+        "awd-lstm-3": {"dir": "awd_lstm",
+                      "weigths": "LSTM_3-layer_adam.pt",
+                      "config_file": "AWD-LSTM_3-layer_config.json",
+                      "id": "a-10"}
             }
 
 
-for tag in modeldict.keys():
-    for scenario in ["sce4", "sce5", "sce6"]:
+for tag in modeldict.keys()[-1::]:
+    for scenario in ["sce1", "sce4"]:
         for condition in ["repeat", "permute", "control"]:
             for list_type in ["random", "categorized"]:
     
@@ -45,14 +49,14 @@ for tag in modeldict.keys():
                                                                 list_type)
                 
                 # create absolute paths
-                python_script = os.path.join(root_dir, "src", "rnn", "experiment.py")
+                python_script = os.path.join(root_dir, "src", "src", "wm_suite", "rnn", "experiment.py")
                 checkpoint_folder = os.path.join(checkpoint_root, modeldict[tag]["dir"])
                 model_weights = os.path.join(checkpoint_folder, modeldict[tag]["weights"]) 
                 config_file = os.path.join(checkpoint_folder, modeldict[tag]["config_file"])
                 vocab_file = os.path.join(checkpoint_folder, "vocab.txt")
                 test_input_file = os.path.join(root_dir, "src/data/rnn_input_files", "{}_lists_{}_{}.txt".format(list_type, scenario, condition))
                 markers_fname = test_input_file.replace(".txt", "_markers.txt")
-                output_dir = "/scratch/ka2773/project/lm-mem/output"
+                output_dir = "/scratch/ka2773/project/lm-mem/output/awd_lstm"
 
                 # create command string
                 command = "python {} " \
@@ -91,7 +95,7 @@ for tag in modeldict.keys():
     
                 f.write("#!/bin/bash\n")
                 f.write("#SBATCH --job-name=" + scr_filename + "\n")
-                f.write("#SBATCH --time=6:00:00\n")
+                f.write("#SBATCH --time=1:30:00\n")
                 f.write("#SBATCH --mem=8G\n")
                 f.write("#SBATCH --gres=gpu:1\n")
                 f.write("#SBATCH --nodes=1\n")
@@ -102,11 +106,14 @@ for tag in modeldict.keys():
                 f.write("#SBATCH --output=" + os.path.join(log_dir, scr_filename) + ".log\n")
                 f.write("#SBATCH --error=" + os.path.join(log_dir, scr_filename) + ".err\n\n\n")
                 
-                f.write("singularity exec --nv --overlay $SCRATCH/overlay-50G-10M.ext3:ro /scratch/work/public/singularity/cuda10.2-cudnn8-devel-ubuntu18.04.sif /bin/bash -c \"\n")
+                f.write("singularity exec --nv --overlay $SCRATCH/overlay-50G-10M.ext3:ro /scratch/work/public/singularity/cuda10.0-cudnn7-devel-ubuntu18.04.sif /bin/bash -c \"\n")
 
                 f.write("source /ext3/env.sh\n")
 
-                f.write("conda activate core_env\n\n")     # load environment with pytorch 1.6
+                f.write("conda activate awd_lstm\n\n")     # load environment with pytorch 0.4
+
+                f.write("cd /home/ka2773/project/lm-mem/src/src/wm_suite/\n")
+
                 f.write(command + "\"" + "\n\n")                  # write the python command to be executed
                 f.close()
 
