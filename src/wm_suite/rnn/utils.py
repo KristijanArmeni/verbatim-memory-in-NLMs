@@ -26,6 +26,10 @@ def get_configs_for_dev(config: str) -> Dict:
         "dropout": 0.1,
         "truncated_bptt_steps": 20, 
         "example_input_array": False,
+        "dropout" : 0.5,
+        "dropouth" : 0.5,
+        "dropoute" : 0.5,
+        "dropouti" : 0.1
 
     }
 
