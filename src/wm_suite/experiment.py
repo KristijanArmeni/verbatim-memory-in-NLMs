@@ -10,19 +10,19 @@ import numpy as np
 import logging
 import torch
 from torch.nn import CrossEntropyLoss
-from tqdm import tqdm
+from tqdm import tqdm, trange
 from nltk import word_tokenize, sent_tokenize
 from types import SimpleNamespace
-import pickle
-
-# plotting
-from matplotlib import pyplot as plt
-plt.ion()
-
-import matplotlib.colors as colors
+import sys
 
 # own modules
-from model import RNNModel
+sys.path.append("/home/ka2773/project/lm-mem/src/src/wm_suite/")
+sys.path.append("/home/ka2773/project/lm-mem/src/src/wm_suite/awd_lstm")
+from rnn.model import RNNModel
+from awd_lstm.model import RNNModel as AWD_RNNModel
+from awd_lstm.utils import repackage_hidden, batchify
+from awd_lstm.splitcross import SplitCrossEntropyLoss
+
 
 logging.basicConfig(format="[INFO: %(funcName)20s()] %(message)s", level=logging.INFO)
 
@@ -204,7 +204,19 @@ class ModelOutput(object):
 
     def to_numpy_arrays(self):
 
+        self.labels = np.asarray(self.labels)
+        self.log_probs = np.asarray(self.log_probs)
         self.step = np.asarray(self.step)
+
+        return self
+
+    def drop_eos_tokens(self):
+
+        sel = np.where(self.labels == '<eos>')[0]
+
+        self.labels = np.delete(self.labels, sel, axis=0)
+        self.log_probs = np.delete(self.log_probs, sel, axis=0)
+        self.step = np.delete(self.step, sel, axis=0)
 
         return self
 
@@ -220,10 +232,12 @@ class ModelOutput(object):
 
 class Experiment(object):
 
-    def __init__(self, model, dictionary, device):
+    def __init__(self, model, rnn_type, criterion, store_states, dictionary, device):
 
         self.model = model
-        self.model_with_states = hasattr(model.rnn, 'states')
+        self.rnn_type = model.rnn_type if rnn_type is None else rnn_type
+        self.criterion = criterion if criterion is not None else None
+        self.store_states = store_states
         self.dictionary = dictionary
         self.device = device
 
@@ -239,22 +253,29 @@ class Experiment(object):
 
         output = []
 
-        for j, sequence in enumerate(input_set):
+        for j, sequence in enumerate(tqdm(input_set, desc="sequence")):
 
-            if self.model_with_states and self.model.rnn.store_states:
+            if self.store_states:
                 self.model.rnn.init_state_logger()
                 states = self.model.rnn.states
                 store_states = self.model.rnn.store_states
 
             else:  # initiate empty lists otherwise
-                states = [[] for l in range(self.model.rnn.num_layers)]
+                states = [[] for l in range(self.model.nlayers)]
                 store_states = False
 
-            model_output = self.get_states(input_sequence=sequence.to(self.device))
+            if self.rnn_type in ["QRNN", "AWD_LSTM"]:
+                eval_bs = 1
+                sequence = batchify(sequence, bsz=eval_bs, cuda=True if self.device.type == 'cuda' else False)
+                model_output = self.evaluate_awd(data_source=sequence, 
+                                                  hidden_size=self.model.ninp,
+                                                  bptt=1,
+                                                  batch_size=eval_bs)
+            else:
+                model_output = self.get_states(input_sequence=sequence.to(self.device))
 
              # log trial id and append to experiment output
             model_output.trial = j
-
 
             model_output.states = [s.to_numpy_arrays()
                                    if store_states else s
@@ -262,9 +283,10 @@ class Experiment(object):
 
             model_output.meta = {key: metainfo[key][j] for key in metainfo.keys()}
 
+            # conver .step and .log_probs to arrays
             output.append(model_output
                           .to_numpy_arrays()
-                          .drop_first_last())
+                          .drop_eos_tokens())
 
         return output
 
@@ -292,10 +314,7 @@ class Experiment(object):
 
         """
         # initialize hidden state and cell state (h_0, c_0)
-        h_0, c_0 = self.model.init_hidden(bsz=1)
-
-        # .h_past and .c_past store states from the past step
-        hidden = (h_0, c_0)
+        hidden = self.model.init_hidden(bsz=1)
 
         # initialize the output class
         output = ModelOutput()
@@ -313,20 +332,21 @@ class Experiment(object):
         predictions = None
 
         # loop over this sequence
-        for i, x in enumerate(tqdm(input_sequence, desc="sequence: ")):
+        for i, x in enumerate(input_sequence):
 
             if predictions is None:
                 # on step 0, there is no loss, make it nan
                 output.log_probs[i] = np.nan
             else:
-                # compute loss for logits i and target i+1 ('targets' are shifted)
+                # compute loss for logits i-1 and target i ('targets' are thus shifted)
                 # predictions.shape = (batch, seq_len, classes)
                 # targets.shape = (seq_len, batch, N)
+
                 nll = loss(predictions[:, 0, :], target=targets[i, :, 0])
                 output.log_probs[i] = nll.detach().item()
 
             # get logits and hidden from the forward pass
-            predictions, next_hidden = self.model(observation=x, hidden=hidden)
+            predictions, next_hidden = self.model(x, hidden)
 
             # store the token strings for each corresponding time step
             output.labels.append(self.dictionary.idx2word[x.item()])
@@ -342,112 +362,92 @@ class Experiment(object):
 
         return output
 
+    def evaluate_awd(self, data_source, hidden_size, bptt, batch_size=10):
+        """
+        A manual copy of main.evaluate from the salesforce repo
+        """
+        # Turn on evaluation mode which disables dropout.
+        self.model.eval()
 
-def plot_trial(data, batch=0):
+        if self.rnn_type == "QRNN":
+            self.model.reset()
 
-    fig1 = plt.figure(constrained_layout=True,
-                     num="Loss and hidden (trial {})".format(data.trial))
+        total_loss = 0
 
-    widths = [8]
-    heights = [4, 6, 6, 6, 6]
-    grid = fig1.add_gridspec(ncols=1, nrows=5, width_ratios=widths,
-                            height_ratios=heights)
-    axes = []
-    for row in range(len(heights)):
-        for col in range(len(widths)):
-            axes.append(fig1.add_subplot(grid[row, col]))
+        out = ModelOutput()
+        out.log_probs = []
 
-    axes[0].plot(data.step, data.log_probs, '-o')
-    axes[0].set_title("surprisal (ppl = {})".format(np.round(data.ppl[0], 2)))
-    axes[0].set_xticks(data.step)
-    axes[0].set_ylabel('neg LL')
+        hidden = self.model.init_hidden(batch_size)
+        
+        for i in range(0, data_source.size(0) - 1, bptt):
 
-    im = axes[1].imshow(data.h1[:, batch, :].T,
-                        cmap = "coolwarm",
-                        norm=colors.CenteredNorm(),
-                        aspect="auto")
-    axes[1].set_title('hidden (L1)')
-    axes[1].set_xticks(data.step)
-    axes[1].set_ylabel('unit idx')
-    fig1.colorbar(im, ax=axes[1])
+            data, targets = get_batch_awd(data_source, i, bptt, seq_len=None, evaluation=True)
 
-    im = axes[2].imshow(data.c1[:, batch, :].T,
-                        cmap = "coolwarm",
-                        norm=colors.CenteredNorm(),
-                        aspect="auto")
-    axes[2].set_title('cell state (L1)')
-    axes[2].set_xticks(data.step)
-    axes[2].set_ylabel('unit idx')
-    fig1.colorbar(im, ax=axes[2])
+            output, hidden = self.model(data, hidden)
 
-    im = axes[3].imshow(data.h2[:, batch, :].T,
-                        cmap="coolwarm",
-                        norm=colors.CenteredNorm(),
-                        aspect="auto")
-    axes[3].set_title('hidden (L2)')
-    axes[3].set_xticks(data.step)
-    axes[3].set_ylabel('unit idx')
-    fig1.colorbar(im, ax=axes[3])
+            loss = self.criterion(self.model.decoder.weight, self.model.decoder.bias, output, targets).data
+            
+            #if need be for testing
+            #print(f"Input: {self.dictionary.idx2word[data.item()]} | target: {self.dictionary.idx2word[targets.item()]} | loss: {loss.detach().cpu().item()}")
 
-    im = axes[4].imshow(data.c2[:, batch, :].T,
-                        cmap = "coolwarm",
-                        norm=colors.CenteredNorm(),
-                        aspect="auto")
-    axes[4].set_title('cell state (L2)')
-    axes[4].set_xticks(data.step)
-    axes[4].set_ylabel('unit idx')
-    axes[4].set_xticks(data.step)
-    axes[4].set_xticklabels(data.token, rotation=35)
-    fig1.colorbar(im, ax=axes[4])
+            out.log_probs.append(loss.detach().cpu().item())
 
+            out.labels.append(self.dictionary.idx2word[targets.item()])
+            out.step.append(i)
 
-    # ===== LAYER 1 ===== #
-    figs = []
-    for k, layer in enumerate(data.states):
+            total_loss += len(data) * loss
+        
+            hidden = repackage_hidden(hidden)
+        
+        return out
 
-        figs2 = plt.figure(constrained_layout=True,
-                          num="gates L{} (trial {})".format(k+1, data.trial))
+def get_batch_awd(source, i, bptt, seq_len=None, evaluation=False):
 
-        widths = [8]
-        heights = [6, 6, 6]
-        grid = figs2.add_gridspec(ncols=1, nrows=3, width_ratios=widths,
-                                height_ratios=heights)
+    seq_len = min(seq_len if seq_len else bptt, len(source) - 1 - i)
+    data = source[i:i+seq_len]
+    target = source[i+1:i+1+seq_len].view(-1)
+    return data, target
 
-        axes2 = []
-        for row in range(len(heights)):
-            for col in range(len(widths)):
-                axes2.append(figs2.add_subplot(grid[row, col]))
+def evaluate_awd_standalone(model, data_source, criterion, bptt, batch_size=10):
+    # Turn on evaluation mode which disables dropout.
 
-        colormap = "Blues_r"
-        im = axes2[0].imshow(layer.i1[:, batch, :].T,
-                             cmap = colormap,
-                             aspect="auto")
-        axes2[0].set_title("input gate (L{})".format(k+1))
-        axes2[0].set_ylabel('unit idx')
-        axes2[0].set_xticks(data.step)
-        figs2.colorbar(im, ax=axes2[0])
+    total_loss = 0
 
-        im = axes2[1].imshow(layer.f1[:, batch, :].T,
-                             cmap = colormap,
-                             aspect="auto")
-        axes2[1].set_title('forget gate (L{})'.format(k+1))
-        axes2[1].set_xticks(data.step)
-        axes2[1].set_ylabel('unit idx')
-        figs2.colorbar(im, ax=axes2[1])
+    hidden = model.init_hidden(batch_size)
 
-        im = axes2[2].imshow(layer.o1[:, batch, :].T,
-                             cmap = colormap,
-                             aspect="auto")
-        axes2[2].set_title('output gate (L{})'.format(k+1))
-        axes2[2].set_ylabel('unit idx')
-        axes2[2].set_xticks(data.step)
-        figs2.colorbar(im, ax=axes2[2])
+    for i in trange(0, data_source.size(0) - 1, bptt):
 
-        figs.append(figs2)
+        data, targets = get_batch_awd(data_source, i, bptt, evaluation=True)
+        output, hidden = model(data, hidden)
+        total_loss += len(data) * criterion(model.decoder.weight, model.decoder.bias, output, targets).data
+        hidden = repackage_hidden(hidden)
 
+    return total_loss.item() / len(data_source)
 
-    return fig1, figs2
+def get_args_for_dev(checkpoint_folder, 
+                     model_weights, 
+                     vocab_file, 
+                     config_file, 
+                     input_file,
+                     marker_file,
+                     per_token_output,
+                     output_folder,
+                     output_filename):
 
+    args = {
+
+        "checkpoint_folder": checkpoint_folder,
+        "model_weights": model_weights,
+        "vocab_file": vocab_file,
+        "config_file": config_file,
+        "input_file": input_file,
+        "marker_file": marker_file,
+        "per_token_output": per_token_output,
+        "output_folder": output_folder,
+        "output_filename": output_filename
+    }
+
+    return args
 
 # ===== RUNTIME CODE ===== #
 if __name__ == "__main__":
@@ -478,10 +478,18 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    #args = SimpleNamespace(**get_args_for_dev(checkpoint_folder="/home/ka2773/project/lm-mem/src/src/wm_suite/awd_lstm",
+    #                        model_weights="/scratch/ka2773/project/lm-mem/checkpoints/awd_lstm/LSTM_3-layer_adam.pt",
+    #                        vocab_file="awd_lstm_corpus",
+    #                        config_file="/home/ka2773/project/lm-mem/src/src/wm_suite/awd_lstm/AWD-LSTM_3-layer_config.json",
+    #                        input_file="/home/ka2773/project/lm-mem/src/data/rnn_input_files/categorized_lists_sce1_control.txt",
+    #                        marker_file="/home/ka2773/project/lm-mem/src/data/rnn_input_files/categorized_lists_sce1_control_markers.txt",
+    #                        per_token_output=True,
+    #                        output_folder="/scratch/ka2773/project/lm-mem/output/awd_lstm",
+    #                        output_filename="awd-lstm_test.csv"))
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logging.info("device = {}".format(device))
-    if device == "cuda":
-        logging.info("device name = {}".format(torch.cuda.get_device_name()))
 
     # load json file, should be a list of strings where eash string
     # (can be multiple sentences) is a single input stream to the model
@@ -503,60 +511,84 @@ if __name__ == "__main__":
         markers = {}
 
     # initialize dataset class
-    ds = Dataset(metadict=markers)
-    ds.load_dict(path=args.vocab_file)
+    if args.vocab_file == "awd_lstm_corpus":
+        data = torch.load("/home/ka2773/project/lm-mem/src/src/wm_suite/awd_lstm/data/wikitext-103/corpus.844da84f12f45a4f741beb331daea986.data")
+        ds = Dataset(metadict=markers)
+        ds.dictionary = data.dictionary
+    else:
+        ds = Dataset(metadict=markers)
+        ds.load_dict(path=args.vocab_file)
 
+    # this is independent from the dictionary used
+    ds.tokenize_input_sequences(input_sequences=input_set, tokenizer_func=word_tokenize)
     # convert tokenized strings to torch.LongTensor, this will write to
     # .seq and .seq_ids attributes
-    ds.tokenize_input_sequences(input_sequences=input_set, tokenizer_func=word_tokenize)
     ds.tokens_to_ids()
 
     # read in the configuration file which contains values for model parameters
     with open(args.config_file, 'r') as f:
         config = json.load(f)
 
-    # initialize model class and use the custom LSTMWithStates class
-    model = RNNModel(rnn_type='LSTM',
-                     ntoken=config['n_vocab'],
-                     ninp=config['n_inp'],
-                     nhid=config['n_hid'],
-                     nlayers=config['n_layers'],
-                     store_states=False)
+    # instantiate the loss
+    splits = [2800, 20000, 76000]  # these are hard-coded
+    criterion = SplitCrossEntropyLoss(config["n_hid"], splits, verbose=False).to(device)
 
-    # initialize model class and use the custom LSTMWithStates class
-    #model2 = RNNModel(rnn_type='LSTMWithStates',
-    #                 ntoken=config['n_vocab'],
-    #                 ninp=config['n_inp'],
-    #                 nhid=config['n_hid'],
-    #                nlayers=config['n_layers'],
-    #                 store_states=False)
+    # initialize model class and use the appropriate RNNModel class
+    if config["name"] == "LSTM":
 
-    # make this input argument at some point
-    print(device)
-    model.load_state_dict(
-        torch.load(args.model_weights, map_location=torch.device(device)))
-    #model2.load_state_dict(torch.load(args.model_weights))
+        model = RNNModel(rnn_type='LSTM',
+                        ntoken=config['n_vocab'],
+                        ninp=config['n_inp'],
+                        nhid=config['n_hid'],
+                        nlayers=config['n_layers'],
+                        store_states=False)
 
+        
+        # make this input argument at some point
+        print(device)
+        model.load_state_dict(
+            torch.load(args.model_weights, map_location=torch.device(device)))
+
+    # if running AWD_LSTM, make sure we're running pytorch 0.4 :/
+    elif config["name"] == "AWD_LSTM":
+
+        model = AWD_RNNModel(rnn_type="LSTM",
+                              ntoken=config['n_vocab'],
+                              ninp=config['n_inp'],
+                              nhid=config['n_hid'],
+                              nlayers=config['n_layers'],
+                              dropout=config['dropout'],
+                              dropoute=config['dropoute'],
+                              dropouth=config['dropouth'],
+                              dropouti=config['dropouti'],
+                              wdrop=config['wdrop'],
+                              tie_weights=config['tie_weights'],
+                            )
+
+        model.rnn = None  #TEMP, add this dummy attribute to make code below run
+
+        model, criterion, _ = torch.load(args.model_weights)
+        
+    
+    # this is a QRNN-specific method
+    if config["name"] == "QRNN":
+        model.reset()
+    
     model.eval()
-    #model2.eval()
+
+    print(model)
+
+    # use a copy of evaluate from awd_lstm.main.py to get logprobs for QRNN/AWD_LSTM
+    eval_batch_size=1
 
     # ===== EXPERIMENT CLASS ===== #
     logging.info("Running experiment...")
     logging.info("Per token output == {}".format(args.per_token_output))
-    exp = Experiment(model=model.to(device), dictionary=ds.dictionary, device=device)
-#exp2 = Experiment(model=model2, dictionary=ds.dictionary)
+
+    exp = Experiment(model=model.to(device), criterion=criterion, rnn_type="AWD_LSTM", store_states=False, 
+                     dictionary=ds.dictionary, device=device)
 
     outputs = exp.run(input_set=ds.seq_ids, metainfo=ds.meta.__dict__)
-    #outputs2 = exp2.run(input_set=ds.seq_ids, metainfo=ds.meta.__dict__)
-
-    # way to test implementations
-    #sent1, sent2 = 3, 6
-    #d1 = np.stack((outputs[sent1].log_probs[:, :, 0], outputs2[sent1].log_probs[:, :, 0]))
-    #d2 = np.stack((outputs[sent2].log_probs[:, :, 0], outputs2[sent2].log_probs[:, :, 0]))
-
-    # test that all values are equal, except the first, which is nan
-    #assert (d1[1, 1::, 0] == d1[0, 1::, 0]).all()
-    #assert (d2[1, 1::, 0] == d2[0, 1::, 0]).all()
 
     # convert the list of ModelOuput() classes into a list of dicts
     # better serialize with built-in types
@@ -568,7 +600,7 @@ if __name__ == "__main__":
                  'list_len': o.meta['list_len'] if 'list_len' in o.meta.keys() else np.nan,
                  'prompt_len': o.meta['prompt_len'] if 'prompt_len' in o.meta.keys() else np.nan,
                  'ppl': o.ppl,
-                 'log_probs': o.log_probs,
+                 'log_probs': np.squeeze(o.log_probs) if o.log_probs.ndim > 1 else o.log_probs,
                  'states': [SimpleNamespace(**vars(s)) if s else [] for s in o.states],}
                   for o in outputs]
 
@@ -580,7 +612,7 @@ if __name__ == "__main__":
 
         dfs = []
 
-        for el in data:
+        for i, el in enumerate(tqdm(data, desc="sequence")):
             
             # if per token output is to be saved, create appropriate columns in data frame
             if args.per_token_output:
@@ -589,7 +621,7 @@ if __name__ == "__main__":
                 input_arrays = [np.array(el.token),
                                 el.step,
                                 el.markers,
-                                el.log_probs[:, 0, 0]]
+                                el.log_probs]
 
                 tmp = pd.DataFrame(data=np.array(input_arrays).T, columns=cols)
                 
@@ -605,16 +637,18 @@ if __name__ == "__main__":
 
             tmp['sentid'] = el.trial     # this counts over all input sequences in the experiment
 
-        dfs.append(tmp)
+            dfs.append(tmp)
 
         return pd.concat(dfs)
     
     # convert data struct to data frame
     df = datanamespace_to_df(data)
     
+    print(df.markers.unique())
+
     # save output as csv
     savename = os.path.join(args.output_folder, args.output_filename)
 
     logging.info('Saving {}'.format(savename))
-    df.to_csv(savename)
+    df.to_csv(savename, sep="\t")
 

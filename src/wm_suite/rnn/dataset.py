@@ -305,15 +305,13 @@ class WT103DataModule(pl.LightningDataModule):
         if numel is None:
             numel = inputs.shape[-1]//10
 
+        print(f"Input train batch ({numdim} batch elements and {numel} samples per batch): ")
         for i in range(numdim):
-            print("Input train batch: ")
             print(i+1, " ".join([self.dictionary.idx2word[inputs[i, k]] for k in range(numel)]))
 
+        print(f"Target train batch ({numdim} batch elements and {numel} samples per batch): ")
         for i in range(numdim):
-            print("Target train batch: ")
             print(i+1, " ".join([self.dictionary.idx2word[targets[i, k]] for k in range(numel)]))
-
-
 
     def find_num_workers(self, num_workers_range, n_epochs):
 
