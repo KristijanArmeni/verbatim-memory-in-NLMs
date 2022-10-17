@@ -1,0 +1,19 @@
+name: minimal
+channels:
+  - defaults
+  - huggingface
+  - pytorch
+dependencies:
+  - python
+  - ipython
+  - numpy
+  - cupy
+  - pandas
+  - transformers
+  - pytorch
+  - cudatoolkit
+  - scipy
+  - pip
+  - nltk
+  - pip:
+    - pynvrtc 

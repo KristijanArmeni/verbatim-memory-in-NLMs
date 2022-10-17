@@ -1,0 +1,33 @@
+#!/bin/bash
+#SBATCH --job-name=script_surp_bert_b-10_sce1_n10_3_permute_random
+#SBATCH --time=01:30:00
+#SBATCH --mem 4gb
+#SBATCH --gres=gpu:1
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=6
+#SBATCH --mail-type=end
+#SBATCH --mail-user=karmeni1@jhu.edu
+#SBATCH --output=/scratch/ka2773/project/lm-mem/logs/wm_eval/bert/script_surp_bert_b-10_sce1_n10_3_permute_random.log
+#SBATCH --error=/scratch/ka2773/project/lm-mem/logs/wm_eval/bert/script_surp_bert_b-10_sce1_n10_3_permute_random.err
+
+
+singularity exec --nv --overlay $SCRATCH/overlay-50G-10M.ext3:ro /scratch/work/public/singularity/cuda11.1-cudnn8-devel-ubuntu18.04.sif /bin/bash -c "
+source /ext3/env.sh
+conda activate core_env
+
+python /home/ka2773/project/lm-mem/src/wm_test_suite.py \
+--condition permute \
+--scenario sce1 \
+--model_type pretrained \
+--checkpoint bert-base-uncased \
+--tokenizer bert-base-uncased \
+--model_seed 12345 \
+--inputs_file /home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_permute_sce1_3_n10_random.json \
+--inputs_file_info /home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_permute_sce1_3_n10_random_info.json \
+--context_len 512 \
+--output_dir /scratch/ka2773/project/lm-mem/output/bert \
+--output_file surprisal_bert_b-10_sce1_3_n10_permute_random.csv \
+--device cuda \
+"
+

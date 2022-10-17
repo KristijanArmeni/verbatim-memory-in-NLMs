@@ -1,0 +1,12 @@
+sbatch script_surp_gpt2_w-12_sce7_repeat_random.scr
+sbatch script_surp_gpt2_w-12_sce7_repeat_categorized.scr
+sbatch script_surp_gpt2_w-12_sce7_permute_random.scr
+sbatch script_surp_gpt2_w-12_sce7_permute_categorized.scr
+sbatch script_surp_gpt2_w-12_sce7_control_random.scr
+sbatch script_surp_gpt2_w-12_sce7_control_categorized.scr
+sbatch script_surp_gpt2_a-10_sce7_repeat_random.scr
+sbatch script_surp_gpt2_a-10_sce7_repeat_categorized.scr
+sbatch script_surp_gpt2_a-10_sce7_permute_random.scr
+sbatch script_surp_gpt2_a-10_sce7_permute_categorized.scr
+sbatch script_surp_gpt2_a-10_sce7_control_random.scr
+sbatch script_surp_gpt2_a-10_sce7_control_categorized.scr
