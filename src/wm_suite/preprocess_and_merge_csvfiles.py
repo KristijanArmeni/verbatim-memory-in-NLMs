@@ -11,6 +11,23 @@ import logging
 
 logging.basicConfig(format="[INFO] %(message)s", level=logging.INFO)
 
+def infer_labels_from_filebasename(filename):
+
+    arc = filename.split("_")[1]
+    model_id = filename.split("_")[2]
+    scenario = filename.split('_')[3]
+    second_list = filename.split('_')[4]
+    list_type = filename.split('_')[5].split('.')[0]
+
+    logging.info(f"Inferring the following information from filename {filename}: \n" + \
+                f"list_type = {list_type}\n" + \
+                f"second_list = {second_list}\n" + \
+                f"scenario = {scenario}\n" + \
+                f"model_id = {model_id}\n" + \
+                f"architecture = {arc}")
+
+    return arc, model_id, list_type, second_list, scenario 
+
 def load_and_preproc_csv(output_folder, filenames):
 
     out = []
@@ -19,24 +36,18 @@ def load_and_preproc_csv(output_folder, filenames):
 
         print("Reading \n {}".format(file))
 
-        arc = file.split("_")[1]  # "rnn" or "gpt2"
+        labels = infer_labels_from_filebasename(os.path.basename(file))
+        arc, model_id, list_type, second_list, scenario = labels 
 
-        sep = ","
+        sep = "\t"
 
         dftmp = pd.read_csv(os.path.join(output_folder, file), sep=sep, header=0)
 
-        logging.info(f"Inferring the following information from filename: \n" + \
-                     f"list_type = {file.split('_')[7].split('.')[0]}\n" + \
-                     f"second_list = {file.split('_')[6]}\n" + \
-                     f"scenario = {file.split('_')[3]}\n" + \
-                     f"model_id = {file.split('_')[2]}")
-
         # add information from filenames
-        list_type = file.split("_")[7].split(".")[0]
         dftmp["list"] = list_type  # add column on list composition
-        dftmp["second_list"] = file.split("_")[6]  # store information on second list
-        dftmp["scenario"] = file.split("_")[3]
-        dftmp["model_id"] = file.split("_")[2]
+        dftmp["second_list"] = second_list  # store information on second list
+        dftmp["scenario"] = scenario
+        dftmp["model_id"] = model_id
 
         ngram_list_labels = ["ngram-random", "ngram-categorized"]
 
@@ -72,7 +83,7 @@ def load_and_preproc_csv(output_folder, filenames):
 
                 dftmp.rename(columns = {"prompt_len": "dist_len", "list_len": "ngram_len" }, inplace=True)
 
-        elif "rnn" in arc:
+        elif np.any([l in arc for l in ['rnn', 'awd-lstm']]):
 
             dftmp = dftmp.loc[~dftmp.word.isin([":", ".", ","])].copy()
 
@@ -192,7 +203,7 @@ def preprocess_rnn_dataframe(dfin, has_subtoks=None, keep_groups=None):
             # code marker position without negative indices
             marker_pos.append(np.arange(0, n_rows))
 
-    dfout = dfin
+    dfout = dfin.copy()
 
     dfout["marker_pos"] = np.concatenate(marker_pos)
     dfout["marker_pos_rel"] = np.concatenate(marker_pos_rel)
