@@ -132,7 +132,7 @@ if args.resume:
     if args.wdrop:
         from weight_drop import WeightDrop
         for rnn in model.rnns:
-            if type(rnn) == WeightDrop: rnn.dropout = args.wdrop
+            if rnn.__class__.__name__ == "WeightDrop": rnn.dropout = args.wdrop
             elif rnn.zoneout > 0: rnn.zoneout = args.wdrop
 ###
 if not criterion:
@@ -152,10 +152,22 @@ if args.cuda:
     model = model.cuda()
     criterion = criterion.cuda()
 ###
-params = list(model.parameters()) + list(criterion.parameters())
-total_params = sum(x.size()[0] * x.size()[1] if len(x.size()) > 1 else x.size()[0] for x in params if x.size())
+
+def print_n_params(model, criterion):
+
+    params = list(model.parameters()) + list(criterion.parameters())
+
+    total_params = sum(x.size()[0] * x.size()[1] if len(x.size()) > 1 else x.size()[0] for x in params if x.size())
+    total_params2 = sum(x.numel() for x in params)
+    learneable_params = sum(x.numel() for x in params if x.requires_grad)
+
+    print('Model total parameters (M):', total_params//1e6)
+    print('Model total parameters method2 (M):', total_params2//1e6)
+    print('Model total learneable parameters (M)\n:', learneable_params//1e6)
+
 print('Args:', args)
-print('Model total parameters (M):', total_params//1e6)
+print('Model:\n', model)
+print_n_params(model, criterion)
 
 ###############################################################################
 # Training code
@@ -184,6 +196,9 @@ def train():
     ntokens = len(corpus.dictionary)
     hidden = model.init_hidden(args.batch_size)
     batch, i = 0, 0
+
+    print_n_params(model, criterion)
+
     while i < train_data.size(0) - 1 - 1:
         bptt = args.bptt if np.random.random() < 0.95 else args.bptt / 2.
         # Prevent excessively small or negative sequence lengths

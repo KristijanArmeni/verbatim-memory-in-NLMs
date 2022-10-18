@@ -2,6 +2,7 @@
 
 import os, argparse, json
 from datetime import datetime
+from types import SimpleNamespace
 import numpy as np
 from sklearn import get_config
 import torch
@@ -10,21 +11,29 @@ import torch.nn.functional as F
 from torch import sigmoid, tanh
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import LearningRateMonitor
+from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.utilities.seed import seed_everything
-import wandb
+from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
-# own modules
-from layers import LSTMWithStates
-from data import WT103DataModule, Dictionary
-from utils import get_configs_for_dev, load_json_config
+import wandb
+from ray import tune
+from ray.tune.integration.wandb import WandbLoggerCallback
+
+# own/custom modules
+import sys
+sys.path.append("/home/ka2773/project/lm-mem/src/")
+
+from external.sha_rnn.model import SHARNN
+from rnn.layers import LSTMWithStates
+from src.src.wm_suite.rnn.dataset import WT103DataModule, Dictionary
+from rnn.utils import get_configs_for_dev, load_json_config
 
 # bookkeeping etc.
 import logging
 from typing import Union, Tuple
 
-logging.basicConfig(format="%(levelname)s %(message)s", level=logging.INFO)
+logging.basicConfig(format="%(message)s", level=logging.INFO)
 
 # ===== LSTM CLASS ===== #
 
@@ -55,9 +64,6 @@ class NeuralLM(pl.LightningModule):
         super(NeuralLM, self).__init__()
 
         # architecture params
-        nonlin = {"relu": nn.ReLU, "tanh": nn.Tanh}
-        self.act_fct = nonlin[nonlinearity]()
-        self.call_act_fct = self.apply_activation_function if rnn_type in ["LSTM", "LSTMWithStates"] else self.apply_activation_function_dummy
         self.weight_initrange = 0.1
 
         # Adam parameters
@@ -72,6 +78,9 @@ class NeuralLM(pl.LightningModule):
         self.device_type = device
 
         self.drop = nn.Dropout(dropout) # dropout layer
+
+        # save hyperparameters upon init
+        self.save_hyperparameters()
 
         # set self.encoder attr, input layer
         if embedding_file:
@@ -228,9 +237,11 @@ class NeuralLM(pl.LightningModule):
                                      lr=self.lr,
                                      betas=(self.beta1, self.beta2))
 
-        lr_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1/3, end_factor=1.0, total_iters=5)
+        # optimizer = torch.optim.SGD(self.parameters(), lr=self.lr)
 
-        return [optimizer], [lr_scheduler]
+        #lr_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1/3, end_factor=1.0, total_iters=5)
+
+        return [optimizer] #, [lr_scheduler]
 
     def apply_activation_function(self, input_tuple):
         """
@@ -263,6 +274,10 @@ class NeuralLM(pl.LightningModule):
         # inputs.shape = (batch, sequence_len_bptt, n_features)
         inputs, targets = batch
 
+        #if batch_idx in [0, 1, 2]:
+        #    print(f"inputs shape = {targets.shape}")
+        #    print(f"targets shape = {targets.shape}")
+
         # initialize hiddens at the start of the epoch
         if batch_idx == 0:
             hiddens = self.init_hidden(bsz=inputs.shape[0])  # assuming batch_first = True, so dim 0 is batch size
@@ -270,10 +285,15 @@ class NeuralLM(pl.LightningModule):
         # does the forward pass for all tokens in the sequence
         lm_logits, hiddens = self.forward(observation=inputs, hidden=hiddens)
 
+        #if batch_idx in [0, 1, 2]:
+        #    print(f"Logits shape = {lm_logits.shape}")
+        #    print(f"LSTM hiddens shape = {hiddens[0].shape}")
+        #    print(f"LSTM memory shape = {hiddens[0].shape}")
+
         # targets are shifted inside WT103Dataset() class upon .setup()
         loss = self.loss_fct(lm_logits, targets)
 
-        self.log("train_loss", loss, prog_bar=True, on_step=True, logger=True)
+        self.log("train_loss_step", loss, prog_bar=True, on_step=True, logger=True)
 
         # detach hidden state (.detach_hidden() unpacks tuple under the hood)
         hiddens_detached = self.detach_hidden(hiddens)
@@ -316,6 +336,162 @@ class NeuralLM(pl.LightningModule):
         return {"loss": loss, "hiddens": hiddens}
 
 
+def train_and_validate_loop(config, dataset):
+
+    """Wrapper"""
+
+    if True:
+        # initialize main model class
+        model = NeuralLM(rnn_type='LSTM',
+                        ntoken=config['n_vocab'],
+                        ninp=config['n_inp'],
+                        nhid=config['n_hid'],
+                        nlayers=config['n_layers'],
+                        nonlinearity=config["nonlinearity"],
+                        truncated_bptt_steps=config['truncated_bptt_steps'],
+                        batch_first=True,
+                        store_states=False,
+                        lr=config['lr'],
+                        beta1=config['beta1'],
+                        beta2=config['beta2'],
+                        dropout=config["dropout"],
+                        loss_fct=nn.CrossEntropyLoss(reduction='mean'),
+                        example_input_array=config["example_input_array"],
+                        device=device)
+    else:
+        model = SHARNN(rnn_type=None,
+                    ntoken = model_config['n_vocab'],
+                    ninp = model_config['n_inp'],
+                    nhid = model_config['n_hid'],
+                    nlayers = model_config['n_layers'],
+                    dropout = model_config["dropout"],
+                    dropouth = model_config["dropouth"],
+                    dropoute = model_config["dropoute"],
+                    dropouti = model_config["dropouti"])
+
+    experiment_config_str = f"model config:\n {json.dumps(config, indent=4)}"
+    #data_config_str = f"data config:\n {json.dumps(data_config, indent=4)}"
+    logging.info(experiment_config_str)
+    #logging.info(data_config_str)
+
+    print(model)
+
+    params = model.count_params()
+
+    #dataset.find_num_workers(num_workers_range = range(0, 6, 1), n_epochs=5)
+
+    # prepare training and validation datasets
+    dataset.setup(stage="fit")
+
+    # print batch just to make sure all is good
+    sequence_id = np.random.randint(len(dataset.wiki_train))
+    _, _ = dataset.print_sample(idx=sequence_id, numel=7)
+
+    dataset.print_batch(numdim=config["train_bs"], numel=7)
+
+    ###########################
+    # initialize wandb logger #
+    ###########################
+
+    now = datetime.now().strftime("%H-%M-%S")
+    today = datetime.today().strftime("%Y-%m-%d")
+    idstr = today + "_" + now
+
+    if config["wandb_project"] == "":
+        config["wandb_project"] = "lm-mem"
+    if config["wandb_id"] == "":
+        config["wandb_id"] = f"test-id-{idstr}"
+
+    wandb.finish()  # clear any runs that might be hanging in there
+    mode = "offline"
+    logger = WandbLogger(project=config["wandb_project"],
+                         name=config["wandb_name"] + f"_{idstr}",
+                         group=config['wandb_group'],
+                         notes=None,
+                         save_dir=None,
+                         id=config["wandb_id"],
+                         mode=mode,
+                         )
+
+
+    #############################
+    # initialize trainer module #
+    #############################
+
+    accelerator = "gpu" if torch.cuda.is_available() else "cpu"
+    gpus = None if accelerator == "cpu" else [0]
+
+    # save model params
+    # params_fname = os.path.join(trainer_config["root_dir"],
+    #                            trainer_config["wandb_name"])
+
+    # just a test forward pass
+    #inputs, targets = next(iter(dataset.train_dataloader()))
+    #model.to("cuda")
+    #model(inputs.to("cuda"))
+
+    # early stopping and learning rate monitor
+    callbacks = [EarlyStopping(monitor="val_loss", 
+                               mode="min", 
+                               min_delta=0.02, 
+                               patience=4),
+                 LearningRateMonitor(logging_interval='step', 
+                                     log_momentum=True),
+                 ModelCheckpoint(dirpath=config["root_dir"], 
+                                 monitor="val_loss",
+                                 mode="min"),
+                 #TuneReportCallback(metrics="val_loss",
+                 #                 on="validation_end")
+                ]
+
+    trainer = pl.Trainer(default_root_dir=config["root_dir"],
+                         accelerator=accelerator,
+                         gpus=gpus,
+                         fast_dev_run=False,
+                         log_every_n_steps=50,
+                         accumulate_grad_batches=1,
+                         #num_sanity_val_steps=2,
+                         check_val_every_n_epoch=1,  # check validation loss during an epoch
+                         val_check_interval=50,      # do validation check
+                         callbacks=callbacks,
+                         enable_model_summary=False,
+                         auto_lr_find=True,
+                         weights_save_path=None,
+                         logger=logger)
+
+    #trainer.logger.log_hyperparams(config)
+ 
+    #trainer.logger.watch(model, log_graph=False, log_freq=500)
+
+
+
+    # find the initial learning rate
+    logging.info("Doing learning rate search...")
+    trainer.tune(model=model,
+                train_dataloaders=dataset.train_dataloader())
+
+    ################
+    # run training #
+    ################
+    trainer.fit(model=model, 
+                train_dataloaders=dataset.train_dataloader(),
+                val_dataloaders=dataset.val_dataloader())
+
+    return trainer, model
+
+def get_argins_for_dev(model_config=None, data_config=None, trainer_config=None, global_seed=None, wandb_key=None):
+    """
+    get_argins_for_dev() is a utility function returning a SimpleNamespace that contains the same fields as the args
+    after parsed with ArgumentParser(). Useful for interacting debugging when train.py is not called as a script.
+    """
+    argins = {"model_config": model_config,
+            "data_config": data_config,
+            "trainer_config": trainer_config,
+            "global_seed": global_seed,
+            "wandb_key": wandb_key}
+
+    return SimpleNamespace(**argins)
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -324,8 +500,18 @@ if __name__ == "__main__":
     parser.add_argument("--data_config", type=str, default="")
     parser.add_argument("--trainer_config", type=str, default="")
     parser.add_argument("--global_seed", type=int, default=9876543)
+    parser.add_argument("--wandb_key", type=str, default="")
 
     args = parser.parse_args()
+
+    dev_session = True  # use this flag to set dummy argins values for interactive development
+    if dev_session:
+        logging.warning("Setting arguments for DEVELOPMENT SESSION.")
+        args = get_argins_for_dev(model_config="/home/ka2773/project/lm-mem/src/greene_scripts/lstm/model_config.json",
+                                  data_config="/home/ka2773/project/lm-mem/src/greene_scripts/lstm/data_config.json",
+                                  trainer_config="/home/ka2773/project/lm-mem/src/greene_scripts/lstm/trainer_config.json",
+                                  global_seed=9876543,
+                                  wandb_key="d8b913bbe52746e27b67249e76bbedb6c49ea85b")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -344,40 +530,21 @@ if __name__ == "__main__":
     else: 
         data_config = load_json_config(args.data_config)
 
-    # set up dictionary and load up vocabulary from file
-    dictionary = Dictionary()
-    dictionary.load_dict(path=data_config["vocab_path"])
-
-    # initialize main model class
-    model = NeuralLM(rnn_type='LSTM',
-                     ntoken=model_config['n_vocab'],
-                     ninp=model_config['n_inp'],
-                     nhid=model_config['n_hid'],
-                     nlayers=model_config['n_layers'],
-                     nonlinearity=model_config["nonlinearity"],
-                     truncated_bptt_steps=model_config['truncated_bptt_steps'],
-                     batch_first=True,
-                     store_states=False,
-                     lr=5e-5,
-                     beta1=0.7,
-                     beta2=0.1,
-                     dropout=model_config["dropout"],
-                     loss_fct=nn.CrossEntropyLoss(reduction='mean'),
-                     example_input_array=model_config["example_input_array"],
-                     device=device)
-
-    model_config_str = f"model config:\n {json.dumps(model_config, indent=4)}"
-    data_config_str = f"data config:\n {json.dumps(data_config, indent=4)}"
-    logging.info(model_config_str)
-    logging.info(data_config_str)
-
-    print(model)
-
-    params = model.count_params()
+    if args.trainer_config == "":
+        trainer_config = get_configs_for_dev("trainer_config")
+    else:
+        trainer_config = load_json_config(args.trainer_config)
 
     #############################
     # initialize dataset module #
     #############################
+
+    # for debug, log this manually, don't version this code snippet
+    os.environ["WANDB_API_KEY"] = args.wandb_key
+
+    # set up dictionary and load up vocabulary from file
+    dictionary = Dictionary()
+    dictionary.load_dict(path=data_config["vocab_path"])
 
     dataset = WT103DataModule(data_dir = data_config["datadir"],
                               train_fname = "wiki.train.tokens",
@@ -386,94 +553,63 @@ if __name__ == "__main__":
                               dictionary = dictionary,
                               config = data_config)
 
+    # create a single config file for ray-tune
+    config = {**model_config, **data_config, **trainer_config}
 
-    #dataset.find_num_workers(num_workers_range = range(0, 6, 1), n_epochs=5)
+    # check if we need to do a hyperparameter search
+    do_hyper_search = False
+    search_vars = np.array([config["train_bs"], config["lr"], config["n_layers"], config["n_hid"]])
+    needs_search = np.array([type(e) is list for e in search_vars])
+        
+    # if any of the fields contains multiple values (i.e. = list), run hypersearch over those values
+    if needs_search.any():
 
-    # prepare training and validation datasets
-    dataset.setup(stage="fit")
+        do_hyper_search = True
+        logging.info("Found hyperparameters with multiple values in config file. Running hyperparameter search.")
 
-    # print batch just to make sure all is good
-    sequence_id = np.random.randint(len(dataset.wiki_train))
-    _, _ = dataset.print_sample(idx=sequence_id, numel=7)
+        # set ray-tune object properties
+        config["train_bs"] = tune.grid_search([config["train_bs"]] if type(config["train_bs"]) is not list else config["train_bs"])
+        if type(config["lr"]) is list:
+            config["lr"] = tune.loguniform(config["lr"][0], config["lr"][1])
+        n_layers = [config["n_layers"]] if type(config["n_layers"]) is not list else config["n_layers"].copy()
+        config["n_layers"] = tune.grid_search(n_layers)
+        config["n_hid"] = tune.grid_search([config["n_hid"]] if type(config["n_hid"]) is not list else config["n_hid"])
 
-    ###########################
-    # initialize wandb logger #
-    ###########################
-    if args.trainer_config == "":
-        trainer_config = get_configs_for_dev("trainer_config")
+        # define runnable experiment
+        experiment = tune.with_parameters(
+            train_and_validate_loop,
+            dataset=dataset
+        )
+
+        # run hyperparameter search
+        hyper_search = tune.run(
+            run_or_experiment=experiment,
+            config=config,
+            metric="val_loss",
+            mode="min",
+            resources_per_trial={"gpu": 1},
+            name=f'lstm-{model_config["n_layers"]}-layer',
+            local_dir=trainer_config['ray_dir'],
+            callbacks=[WandbLoggerCallback(project=config["wandb_project"],
+                                           group=config["wandb_group"],
+                                           api_key=args.wandb_key)]
+        )
+
+        config = hyper_search.best_config
+        logging.info("Best")
+
     else:
-        trainer_config = load_json_config(args.trainer_config)
+        logging.info("Not doing any hyperparameter search. Using values in config files.")
 
-    # for debug, log this manually, don't version this code snippet
-    os.environ["WANDB_API_KEY"] = "d8b913bbe52746e27b67249e76bbedb6c49ea85b"
+    trainer, model = train_and_validate_loop(config, dataset)
 
-    now = datetime.now().strftime("%H-%M-%S")
-    today = datetime.today().strftime("%Y-%m-%d")
-    idstr = today + "_" + now
-
-    if trainer_config["wandb_project"] == "":
-        trainer_config["wandb_project"] = "lm-mem"
-    if trainer_config["wandb_id"] == "":
-        trainer_config["wandb_id"] = f"test-id-{idstr}"
-
-    wandb.finish()  # clear any runs that might be hanging in there
-    mode = "run"
-    logger = WandbLogger(project=trainer_config["wandb_project"],
-                         name=trainer_config["wandb_name"] + f"_{idstr}",
-                         group=trainer_config['wandb_group'],
-                         notes=None,
-                         save_dir=None,
-                         id=trainer_config["wandb_id"],
-                         mode=mode,
-                         )
-
-    #############################
-    # initialize trainer module #
-    #############################
-
-    accelerator = "gpu" if torch.cuda.is_available() else "cpu"
-    gpus = None if accelerator == "cpu" else [0]
-
-    # save model params
-    # params_fname = os.path.join(trainer_config["root_dir"],
-    #                            trainer_config["wandb_name"])
-
-    # early stopping and learning rate monitor
-    callbacks = [EarlyStopping(monitor="val_loss", mode="min", min_delta=0.02, patience=4),
-                 LearningRateMonitor(logging_interval='step', log_momentum=True)]
-
-    trainer = pl.Trainer(default_root_dir=trainer_config["root_dir"],
-                         accelerator=accelerator,
-                         gpus=gpus,
-                         fast_dev_run=False,
-                         log_every_n_steps=50,
-                         accumulate_grad_batches=1,
-                         num_sanity_val_steps=2,
-                         check_val_every_n_epoch=1,  # check validation loss during an epoch
-                         val_check_interval=50,     # do validation check
-                         callbacks=callbacks,
-                         enable_model_summary=False,
-                         auto_lr_find=True,
-                         weights_save_path=None,
-                         logger=logger)
-
-    # print trainer config
-    trainer_config_str = f"trainer config:\n {json.dumps(trainer_config, indent=4)}"
-    logging.info(trainer_config_str)
-
-    ################
-    # run training #
-    ################
-    trainer.fit(model=model, 
-                train_dataloaders=dataset.train_dataloader(),
-                val_dataloaders=dataset.val_dataloader())
-
-    trainer.validate(model=model, dataloaders=dataset.val_dataloader())
+    # run trainging here
 
     #########################
     # test-time performance #
     #########################
-    dataset.setup(stage="test")
-    trainer.test(dataloaders=dataset.test_dataloader(), ckpt_path="best")
+    #dataset.setup(stage="test")
+    #model.eval()
+    #trainer.test(dataloaders=dataset.test_dataloader(), ckpt_path="best")
 
-    logger.close()
+    #logger.finalize("success")

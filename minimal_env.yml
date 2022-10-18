@@ -1,8 +1,9 @@
 name: minimal
 channels:
   - defaults
-  - huggingface
   - pytorch
+  - nvidia
+  - huggingface
 dependencies:
   - python
   - ipython
@@ -10,8 +11,8 @@ dependencies:
   - cupy
   - pandas
   - transformers
-  - pytorch
-  - cudatoolkit
+  - pytorch::pytorch
+  - nvidia::cudatoolkit=10.0
   - scipy
   - pip
   - nltk
