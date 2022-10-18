@@ -1,0 +1,48 @@
+#!/bin/bash
+#SBATCH --job-name=4-layer_resume
+#SBATCH --open-mode=append
+#SBATCH --output=/scratch/ka2773/project/lm-mem/logs/%j_%x.out
+#SBATCH --error=/scratch/ka2773/project/lm-mem/logs/%j_%x.err
+#SBATCH --export=ALL
+#SBATCH --time=13:00:00
+#SBATCH --gres=gpu:1
+#SBATCH --mem=14G
+#SBATCH --partition=rtx8000
+#SBATCH -c 4
+#SBATCH --mail-type=end
+#SBATCH --mail-user=karmeni1@jhu.edu
+
+# set up singularity image
+singularity exec --nv --overlay $SCRATCH/overlay-50G-10M.ext3:ro /scratch/work/public/singularity/cuda10.0-cudnn7-devel-ubuntu18.04.sif /bin/bash -c "
+
+# source conda shell comands
+source /ext3/env.sh
+
+# activate environment with pytorch 0.4
+conda activate awd_lstm
+
+cd $HOME/project/lm-mem/src/src/wm_suite/awd_lstm
+
+# resume model that stopped at epoch 33, train for another 11 epochs
+python -u main.py --epochs 11 \
+                  --nlayers 4 \
+                  --emsize 400 \
+                  --nhid 1840 \
+                  --alpha 0 \
+                  --beta 0 \
+                  --dropoute 0 \
+                  --dropouth 0.2 \
+                  --dropouti 0.01 \
+                  --dropout 0.4 \
+                  --wdrop 0.2 \
+                  --wdecay 1.2e-6 \
+                  --bptt 200 \
+                  --batch_size 128 \
+                  --optimizer adam \
+                  --lr 1e-4 \
+                  --data data/wikitext-103 \
+                  --resume LSTM_4-layer_adam.pt \
+                  --save LSTM_4-layer_adam_resumed.pt \
+                  --when 3 \
+                  --model LSTM
+"
