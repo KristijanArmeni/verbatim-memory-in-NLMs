@@ -1,0 +1,11 @@
+{
+    "n_vocab": 267735,
+    "n_layers": 4,
+    "n_inp": 400,
+    "n_hid": 2500,
+    "dropout": 0.1,
+    "dropoute": 0.0, 
+    "dropouth": 0.1,
+    "dropouti": 0.1
+
+}
