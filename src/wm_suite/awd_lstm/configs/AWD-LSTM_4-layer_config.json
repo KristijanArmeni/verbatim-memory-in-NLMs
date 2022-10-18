@@ -1,0 +1,16 @@
+{
+
+    "name": "AWD_LSTM",
+    "n_vocab": 267735,
+    "n_layers": 4,
+    "n_inp": 400,
+    "n_hid": 1840,
+    "dropout": 0.4,
+    "dropoute": 0,
+    "dropouth": 0.2,
+    "dropouti": 0.01,
+    "wdrop": 0.2,
+    "wdecay": 1.2e-6,
+    "tie_weights": true
+
+}
