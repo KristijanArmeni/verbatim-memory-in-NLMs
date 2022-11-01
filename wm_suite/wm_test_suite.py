@@ -176,7 +176,7 @@ def ensure_list2_notequal(list1, list2, start_seed, seed_increment):
     return list2_new
 
 
-# ===== DATSET CLASS ===== #
+# ===== DATASET CLASS ===== #
 
 class SimpleDataset(Dataset):
     def __init__(self, _list: List) -> None:
@@ -590,7 +590,7 @@ def permute_qk_weights(model=None, per_head=False, seed=None):
     return model
 
 
-# ===== helper function for development ===== #
+# ===== helper function for code development ===== #
 def get_argins_for_dev(setup=False, 
                        inputs_file=None, 
                        inputs_file_unmasked=None,
@@ -677,9 +677,14 @@ def runtime_code():
     # declare device and paths
     device = torch.device(argins.device if torch.cuda.is_available() else "cpu")
 
+    # setup the model
+    logging.info("Loading tokenizer {}".format(argins.path_to_tokenizer))
+    tokenizer = GPT2TokenizerFast.from_pretrained(argins.path_to_tokenizer)
+
     # pretrained models
     logging.info("Using {} model".format(argins.model_type))
     logging.info("Loading checkpoint {}".format(argins.checkpoint))
+    model = GPT2LMHeadModel.from_pretrained(argins.checkpoint)
 
     ismlm = False
     if argins.checkpoint == "bert-base-uncased":
