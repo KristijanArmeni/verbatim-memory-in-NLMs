@@ -39,143 +39,6 @@ elif "linux" in sys.platform:
     sys.path.append(os.path.join(os.environ['HOME'], 'project', 'lm-mem', 'src'))
 
 
-# ===== WRAPPERS FOR DATASET CONSTRUCTION ===== #
-
-def assign_subtokens_to_groups(subtoken_splits, markers, ngram1_size, ngram2_size, n_repet):
-
-    # this assumes both targets and interleaved groups are repated 5 times
-    # we correct for this below
-    codes = list(np.tile(np.repeat(markers, [ngram1_size, ngram2_size]), n_repet))
-
-    # drop the last ngram as ngram2 is only repeated 5-1 times
-    if ngram2_size != 0:
-        del codes[-ngram2_size:]
-
-    n_toks_no_punct = np.unique(subtoken_splits)[np.unique(subtoken_splits)>0]
-    assert len(n_toks_no_punct) == len(codes)
-
-    out = subtoken_splits.copy()
-
-    punct_and_eos_codes = [-1, -2] # we leave these as they are
-    for i, el in enumerate(subtoken_splits):
-
-        if el not in punct_and_eos_codes:
-            out[i] = codes[subtoken_splits[i]-1]
-
-    return out
-
-def interleave(items1, items2):
-
-    items2.append("") # add a dummy element at the end
-    return [val for pair in zip(items1, items2) for val in pair]
-
-
-def interleave_targets_and_distractors(word_list, distractors):
-
-    # conde the non-interleaved condition as well
-    distractor_sizes = ["n0"] + list(distractors.keys())
-
-    out = {key: [] for key in distractor_sizes}
-
-    for dst_size in distractor_sizes:
-
-        distractor_list = [None]
-
-        if dst_size != "n0":
-            distractor_list = distractors[dst_size]
-
-        # loop over ngram chunks for each a trial
-        for targets in word_list:
-
-            for dst in distractor_list:
-
-                nouns = targets
-
-                # if there are distractors, interleave them
-                if dst is not None:
-                    nouns = interleave(items1=targets, items2=dst)
-
-                trial = ", ".join([", ".join(e) for e in filter(None, nouns)]) + "."
-
-                out[dst_size].append(" " + trial)
-
-    return out
-
-
-def sample_indices_by_group(groups, seed):
-
-    """
-    randomized_indices = sample_indices_by_group(groups, seed)
-
-    input args:
-        groups = np.array, array defining group membership (e.g. [0, 0, 0, 1, 1, 1])
-        seed   = int, argument for np.random.RandomState
-    output args:
-        randomized_indices = np.array, randomly sampled indices of groups.size
-
-    Helper function that creates randomized indices form np.arange(groups.size)
-    by following the structure of group elements in group. It ensures that every
-    element groups is paired with an element outside its own group.
-    """
-
-    out_ids = np.zeros(groups.shape, dtype=int)
-    indices = np.arange(groups.size)
-    rng = np.random.RandomState(seed)
-    ignore_id = -1
-
-    # number of selected samples must mach size of one group
-    sample_size = np.sum(groups == 0)
-
-    for group in np.unique(groups):
-
-        # choose indices not from current group and not the ones already sampled
-        candidate_pool = indices[(groups != group) & (indices != ignore_id)]
-
-        sel_ids = rng.choice(a=candidate_pool, size = sample_size)
-        out_ids[groups == group] = sel_ids
-
-        # mark already selected indices
-        indices[sel_ids] = ignore_id
-
-    return out_ids
-
-def ensure_list2_notequal(list1, list2, start_seed, seed_increment):
-
-    """
-    new_list2 = ensure_list2_notequal(list1, list2, start_seed, seed_increment)
-
-    Helper function that ensures that all elements in list2 are not
-    equal to elements in list1 by iteratively applying new perumtations
-    with a new start_seed, incremented by seed_increment.
-    """
-
-    are_equal = [[t1 == t2] for t1, t2 in zip(list1, list2)]
-
-    seed = start_seed
-
-    # if lists are already disjoint, just return list2
-    if ~np.any(are_equal):
-        list2_new = list2
-
-    else:
-        # do this until elements of list1 and list2 are not equal
-        while np.any(are_equal):
-
-            rng = np.random.RandomState(seed)
-
-            # create new permutations for l2 that are still equal
-            list2_new = [rng.permutation(l2).tolist() if l1 == l2 else l2
-                         for l1, l2 in zip(list1, list2)]
-
-            # update the criterion condition (none should be equal)
-            are_equal = [[l1 == l2] for l1, l2 in zip(list1, list2_new)]
-
-            # update seed for a new try
-            seed += seed_increment
-
-    return list2_new
-
-
 # ===== DATASET CLASS ===== #
 
 class SimpleDataset(Dataset):
@@ -197,6 +60,29 @@ class Experiment(object):
 
     """
     Exp() class contains wrapper methods to run experiments with transformer models.
+
+    Attributes:
+    ----------
+    model (required) : nn.Module
+        pytorch module representing the model
+    ismlm (optional) : boolean
+        whether the model is a masked language model or not (default = False)
+    device : str
+        'cuda' or 'cpu' what compute device to use for running the models
+    tokenizer (required) : PreTrainedTokenizer()
+        tokenizer class from HuggingFace (https://huggingface.co/transformers/v4.6.0/main_classes/tokenizer.html#transformers.PreTrainedTokenizer) 
+    context_len : int
+        the length of context window for computing transformer surprisal (default = 1024)
+    batch_size : int
+        the number of sequences evaluated in parallel
+    use_cache : bool
+        whether or not to reuse key-value matrices from previous time-steps in transformers
+
+
+    Methods:
+    -------
+
+
     """
 
     def __init__(self, model, ismlm, tokenizer, context_len, batch_size, use_cache, device):
@@ -244,10 +130,30 @@ class Experiment(object):
         return token_prob, token_ids
 
     # loop over input list
-    def ppl(self, input_ids, context_len, stride):
+    def ppl(self, 
+            input_ids: torch.Tensor, 
+            context_len: int, 
+            stride: int) -> Tuple[List[float], List[float], List[str]]:
+
         """
         method for computing token-by-token negative log likelihood on input_ids
         taken from: https://huggingface.co/transformers/perplexity.html
+
+        Parameters:
+        ----------
+        input_ids (required) : torch.tensor
+            indices representing tokens to be fed as input to model
+        context_len (required) : int
+            the length (in number of tokens) of past tokens used for computing negative log likelihood
+        stride (required) : int
+            the step (in number of tokens) in between two subsequent loops for computing perplexity
+
+        Returns:
+        ------
+        ppl : 
+        llh :
+        tokens : 
+
         """
 
         llh = []  # variable storing token-by-token neg ll
@@ -420,12 +326,17 @@ class Experiment(object):
     def start_sequential(self, input_sequences_ids=None) -> List:
         """
         experiment.start() will loop over prefixes, prompts, and word_lists and run the .ppl() method on them
-        It returns a dict:
-        outputs = {
-            "sequence_ppl": [],
-            "surp": [],
-            "token": [],
-            }
+        
+        Parameters:
+        ---------
+        
+        Returns:
+        -------
+        outputs : dict
+            with fields: 
+                "sequence_ppl": List,
+                "surp": List
+                "token" List: 
 
         """
 
