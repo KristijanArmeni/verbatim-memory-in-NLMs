@@ -102,8 +102,8 @@ def concat_and_tokenize_inputs(prefix=None, prompt=None, word_list1=None, word_l
     # join list elements into strings for tokenizer below
     input_seqs = [" " + ", ".join(tks) + "." for tks in word_list1]
     if ismlm:
-        input_seqs2 = [" " + ", ".join(np.repeat("[MASK]", len(tks))) + "." for tks in word_list2]  # masked tokens
-        input_seqs2_ = [" " + ", ".join(tks) + "." for tks in word_list2]                           # unmasked tokens
+        #input_seqs2 = [" " + ", ".join(np.repeat("[MASK]", len(tks))) + "." for tks in word_list2]  # masked tokens
+        input_seqs2 = [" " + ", ".join(tks) + "." for tks in word_list2]                           # unmasked tokens
         eos1 = "[CLS]"
         eos2 = "[SEP]"
 
@@ -116,7 +116,6 @@ def concat_and_tokenize_inputs(prefix=None, prompt=None, word_list1=None, word_l
 
     # list storing outputs
     input_seqs_tokenized = []
-    input_seqs_tokenized_unmasked = []
 
     # loop over trials
     for i in trange(len(input_seqs), desc="sequence: "):
@@ -133,11 +132,11 @@ def concat_and_tokenize_inputs(prefix=None, prompt=None, word_list1=None, word_l
         input_seqs_tokenized.append(input_ids)
 
         # tokenize unmasked tokens to be able to compute loss later on
-        if ismlm:
-            
-            i4_ = tokenizer.encode(input_seqs2_[i] + eos2, add_special_tokens=False, return_tensors="pt")
-            input_ids_unmasked = torch.cat((i1, i2, i3, i4_), dim=1)
-            input_seqs_tokenized_unmasked.append(input_ids_unmasked)
+        #if ismlm:
+        #    
+        #    i4_ = tokenizer.encode(input_seqs2_[i] + eos2, add_special_tokens=False, return_tensors="pt")
+        #    input_ids_unmasked = torch.cat((i1, i2, i3, i4_), dim=1)
+        #    input_seqs_tokenized_unmasked.append(input_ids_unmasked)
 
         # construct IDs for prefix, word lists and individual tokens
         # useful for data vizualization etc.
@@ -163,7 +162,7 @@ def concat_and_tokenize_inputs(prefix=None, prompt=None, word_list1=None, word_l
         metadata["subtok"].append(np.concatenate(split_ids).tolist())
         metadata["list_len"].append(ngram_size)
 
-    return input_seqs_tokenized, input_seqs_tokenized_unmasked, metadata
+    return input_seqs_tokenized, metadata
 
 
 def interleave(items1, items2):
@@ -278,18 +277,6 @@ def ensure_list2_notequal(list1, list2, start_seed, seed_increment):
     return list2_new
 
 # ===== Setup for gpt2 ====== #
-def setup():
-    logging.info("SETUP: nltk punkt")
-    import nltk
-    nltk.download("punkt")
-
-    logging.info("SETUP: GPT2 Tokenizer")
-    GPT2TokenizerFast.from_pretrained("gpt2")
-
-    logging.info("SETUP: Head Model")
-    GPT2LMHeadModel.from_pretrained("gpt2")
-
-    return 0
 
 def get_args_for_dev(setup=False, scenario="sce1", prompt_key="1", list_len="n5", condition="repeat", path_to_tokenizer="gpt2", 
                      device="cuda", input_filename="random_lists.json", output_dir=None, output_filename=None ):
@@ -441,10 +428,13 @@ def main():
         ismlm=True
 
     # ===== PREPARE INPUT SEQUENCES ===== #
+
+    # this tells the bpe split counter what symbol to look for
     bpe_split_marker_dict = {"gpt2": "Ġ",
                              "bert-base-uncased": "##",
                              "transfo-xl-wt103": None}
 
+    # this tells the bpe split counter how these symbols are used
     marker_logic_dict = {"gpt2": "outside",
                          "bert-base-uncased": "within",
                          "transfo-xl-wt103": None}
@@ -452,15 +442,15 @@ def main():
     # this routing loops over prompts and prefixes
     # it keeps track of that in meta_data
     logging.info("Tokenizing and concatenating sequences...")
-    input_sequences, input_sequences_unmasked, meta_data = concat_and_tokenize_inputs(prompt=prompts[argins.scenario][argins.prompt_key],
-                                                                                      prefix=prefixes[argins.scenario][argins.prompt_key],
-                                                                                      word_list1=word_lists1[argins.list_len],
-                                                                                      word_list2=word_lists2[argins.list_len],
-                                                                                      ngram_size=argins.list_len.strip("n"),
-                                                                                      tokenizer=tokenizer,
-                                                                                      bpe_split_marker=bpe_split_marker_dict[argins.path_to_tokenizer],
-                                                                                      marker_logic=marker_logic_dict[argins.path_to_tokenizer],
-                                                                                      ismlm=ismlm)
+    input_sequences, meta_data = concat_and_tokenize_inputs(prompt=prompts[argins.scenario][argins.prompt_key],
+                                                            prefix=prefixes[argins.scenario]["1"],
+                                                            word_list1=word_lists1[argins.list_len],
+                                                            word_list2=word_lists2[argins.list_len],
+                                                            ngram_size=argins.list_len.strip("n"),
+                                                            tokenizer=tokenizer,
+                                                            bpe_split_marker=bpe_split_marker_dict[argins.path_to_tokenizer],
+                                                            marker_logic=marker_logic_dict[argins.path_to_tokenizer],
+                                                            ismlm=ismlm)
 
     # add information about prompt and list lengths for each sequence
     meta_data["prompt"] = [argins.prompt_key for _ in meta_data["list_len"]]
@@ -470,13 +460,6 @@ def main():
     logging.info(f"Saving {savename}")
     with open(savename, "w") as fh:
         json.dump([e.tolist() for e in input_sequences], fh, indent=4)
-
-    # if we have these, save them
-    if input_sequences_unmasked:
-        savename = os.path.join(argins.output_dir, argins.output_filename + "_unmasked" + ".json")
-        logging.info(f"Saving {savename}")
-        with open(savename, "w") as fh:
-            json.dump([e.tolist() for e in input_sequences_unmasked], fh, indent=4)
 
     savename = os.path.join(argins.output_dir, argins.output_filename + "_info.json")
     logging.info(f"Saving {savename}")
