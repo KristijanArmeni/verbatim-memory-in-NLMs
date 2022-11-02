@@ -18,3 +18,7 @@ where = ["wm_suite"]
 
 [project.scripts]
 test_wm_suite = "test_package:check"
+
+[tool.pytest.ini_options]
+pythonpath = ["wm_suite", "data"]
+testpaths = "tests"
