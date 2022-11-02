@@ -28,8 +28,6 @@ from string import punctuation
 from tqdm import tqdm
 import logging
 
-from transformers.utils.dummy_tokenizers_objects import HerbertTokenizerFast
-
 logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
 
 # own modules
@@ -348,7 +346,7 @@ class Experiment(object):
             }
 
         # loop over trials (input sequences)
-        for i, input_ids in enumerate(input_sequences_ids):
+        for _, input_ids in enumerate(input_sequences_ids):
 
             # this returns surprisal (neg log ll)
             ppl, surp, toks = self.ppl(input_ids=input_ids.to(self.device),
@@ -499,6 +497,20 @@ def permute_qk_weights(model=None, per_head=False, seed=None):
         i += 1
 
     return model
+
+# ===== Setup for gpt2 ====== #
+def setup():
+    logging.info("SETUP: nltk punkt")
+    import nltk
+    nltk.download("punkt")
+
+    logging.info("SETUP: GPT2 Tokenizer")
+    GPT2TokenizerFast.from_pretrained("gpt2")
+
+    logging.info("SETUP: Head Model")
+    GPT2LMHeadModel.from_pretrained("gpt2")
+
+    return 0
 
 
 # ===== helper function for code development ===== #
