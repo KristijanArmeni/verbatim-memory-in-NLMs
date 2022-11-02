@@ -63,7 +63,7 @@ def load_and_sample_noun_pool(path, which, model_vocab, n_items=None, n_lists=20
     
     if which == "random":
 
-        full_path = os.path.join(path, "toronto_freq.txt")
+        full_path = os.path.join(path, "nouns_arbitrary.txt")
         
         # load in the toronto pool and rename columns to avoid blank spaces
         print("Reading {} ...".format(full_path))
@@ -142,104 +142,106 @@ def load_and_sample_noun_pool(path, which, model_vocab, n_items=None, n_lists=20
 
 # ===== RUN CODE ===== #
 
-vocab_file=os.path.join(home_dir, 'project', 'lm-mem', 'src', 'rnn', "vocab.txt")
+if __name__ == "__main__":
 
-# read rnn vocab
-with open(vocab_file, 'r', encoding='utf-8') as f:
-    lines = f.readlines()
-    f.close()
+    vocab_file=os.path.join(home_dir, 'project', 'lm-mem', 'src', 'rnn', "vocab.txt")
 
-rnn_vocab = [line.strip("\n") for line in lines]
+    # read rnn vocab
+    with open(vocab_file, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+        f.close()
 
-# datadir with noun pool .txt files
-path = os.path.join(home_dir, "project", "lm-mem", "src", "data")
+    rnn_vocab = [line.strip("\n") for line in lines]
 
-# call load_and_sample_noun_pool repeatedly for each list size and
-# store output list in a dict
-which = argins.which
-    
-# construct distractors from random noun pools
-if argins.which == "ngram-distractors" or argins.which == "ngram-random":
-    which = "random"
-elif argins.which == "ngram-categorized":
-    which = "categorized"
+    # datadir with noun pool .txt files
+    path = os.path.join(home_dir, "project", "lm-mem", "src", "data")
 
-# ===== CREATE WORD LISTS AND N-GRAM SUBSETS ===== #
-lists_of_tokens = load_and_sample_noun_pool(path=path, 
-                                            n_items=10, 
-                                            n_lists=23,
-                                            which=which, 
-                                            model_vocab=rnn_vocab, 
-                                            seed=12345)
-
-# create circular shifts of the lists
-cshifts = list(np.arange(0, 10))
-
-lists_of_tokens_shifted = [np.roll(np.asarray(alist), s).tolist() for alist in lists_of_tokens
-                           for s in cshifts]
-
-# generate lists of length 3, 5, 7 and 10
-# now create subsets of the original list
-subsets = [3, 5, 7, 10]
-
-# first sample angain the random noun pool
-out_dict = {"n{}".format(n_items): [alist[0:n_items] for alist in lists_of_tokens_shifted]
-            for n_items in subsets}
-
-n_grams = [2, 3, 5, 7, 10]
-n_reps = 5
-
-# for ngram lists sample the created lists repeatedly
-if argins.which in ["ngram-random", "ngram-categorized"] or argins.which=="ngram-distractors":
+    # call load_and_sample_noun_pool repeatedly for each list size and
+    # store output list in a dict
+    which = argins.which
         
-    # sample repeated ngram sequences from the lists of 10 items
-    tmp = {"n{}".format(n_gram): [list(chunk(np.tile(alist[0:n_gram], reps=n_reps).tolist(), n_gram, n_gram)) 
-                                      for alist in out_dict["n10"]]
-                                      for n_gram in n_grams}
+    # construct distractors from random noun pools
+    if argins.which == "ngram-distractors" or argins.which == "ngram-random":
+        which = "random"
+    elif argins.which == "ngram-categorized":
+        which = "categorized"
 
-# for ngram lists sample the created lists repeatedly
-elif argins.which == "ngram-control":
-    
-    
-    
-    # sample repeated ngram sequences from the lists of 10 items
-    tmp = {"n{}".format(n_gram): [list(chunk(np.tile(alist[0:n_gram], reps=n_reps).tolist(), n_gram, n_gram)) 
-                                      for alist in out_dict["n10"]]
-                                      for n_gram in n_grams}
-
-    
-    out_dict = tmp
-
-elif argins.which == "ngram-distractors":
-    
-    # create extra 4 lists which will be used for the
-    # interleaved items
+    # ===== CREATE WORD LISTS AND N-GRAM SUBSETS ===== #
     lists_of_tokens = load_and_sample_noun_pool(path=path, 
                                                 n_items=10, 
-                                                n_lists=26,
-                                                which="random", 
+                                                n_lists=23,
+                                                which=which, 
                                                 model_vocab=rnn_vocab, 
                                                 seed=12345)
-    
-    # store the pool of distractor nouns
-    # (not used for the regular lists)
-    distractor_set = [el for lst in lists_of_tokens[23::] for el in lst]
-    
-    # there needs to be n-1 interleaved items
-    ngram_reps = 5
-    n_reps_distractors = ngram_reps - 1
 
-    max_size = 7
-    
-    # sample repeated ngram sequences from the lists of 10 items
-    out_dict = {"n{}".format(size): [list(chunk(thelist[0:(n_reps_distractors*7)], size, 7)) 
-                                               for thelist in [distractor_set]]
-                                               for size in [2, 3, 5, 7]}
-    
+    # create circular shifts of the lists
+    cshifts = list(np.arange(0, 10))
 
-# ===== SAVE .JSON OUTPUT ===== #
+    lists_of_tokens_shifted = [np.roll(np.asarray(alist), s).tolist() for alist in lists_of_tokens
+                            for s in cshifts]
 
-# now save the lists to .json files
-with open(argins.output_filename, "w") as f:
-    print("Writing {}".format(argins.output_filename))
-    json.dump(out_dict, f)
+    # generate lists of length 3, 5, 7 and 10
+    # now create subsets of the original list
+    subsets = [3, 5, 7, 10]
+
+    # first sample angain the random noun pool
+    out_dict = {"n{}".format(n_items): [alist[0:n_items] for alist in lists_of_tokens_shifted]
+                for n_items in subsets}
+
+    n_grams = [2, 3, 5, 7, 10]
+    n_reps = 5
+
+    # for ngram lists sample the created lists repeatedly
+    if argins.which in ["ngram-random", "ngram-categorized"] or argins.which=="ngram-distractors":
+            
+        # sample repeated ngram sequences from the lists of 10 items
+        tmp = {"n{}".format(n_gram): [list(chunk(np.tile(alist[0:n_gram], reps=n_reps).tolist(), n_gram, n_gram)) 
+                                        for alist in out_dict["n10"]]
+                                        for n_gram in n_grams}
+
+    # for ngram lists sample the created lists repeatedly
+    elif argins.which == "ngram-control":
+        
+        
+        
+        # sample repeated ngram sequences from the lists of 10 items
+        tmp = {"n{}".format(n_gram): [list(chunk(np.tile(alist[0:n_gram], reps=n_reps).tolist(), n_gram, n_gram)) 
+                                        for alist in out_dict["n10"]]
+                                        for n_gram in n_grams}
+
+        
+        out_dict = tmp
+
+    elif argins.which == "ngram-distractors":
+        
+        # create extra 4 lists which will be used for the
+        # interleaved items
+        lists_of_tokens = load_and_sample_noun_pool(path=path, 
+                                                    n_items=10, 
+                                                    n_lists=26,
+                                                    which="random", 
+                                                    model_vocab=rnn_vocab, 
+                                                    seed=12345)
+        
+        # store the pool of distractor nouns
+        # (not used for the regular lists)
+        distractor_set = [el for lst in lists_of_tokens[23::] for el in lst]
+        
+        # there needs to be n-1 interleaved items
+        ngram_reps = 5
+        n_reps_distractors = ngram_reps - 1
+
+        max_size = 7
+        
+        # sample repeated ngram sequences from the lists of 10 items
+        out_dict = {"n{}".format(size): [list(chunk(thelist[0:(n_reps_distractors*7)], size, 7)) 
+                                                for thelist in [distractor_set]]
+                                                for size in [2, 3, 5, 7]}
+        
+
+    # ===== SAVE .JSON OUTPUT ===== #
+
+    # now save the lists to .json files
+    with open(argins.output_filename, "w") as f:
+        print("Writing {}".format(argins.output_filename))
+        json.dump(out_dict, f)
