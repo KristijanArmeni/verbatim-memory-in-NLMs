@@ -3,13 +3,12 @@ import sys, os
 import argparse
 import numpy as np
 import pandas as pd
-from transformers import GPT2TokenizerFast, AutoTokenizer
+from transformers import AutoTokenizer
 import torch
 from torch.nn import functional as F
 from tqdm import trange
-from typing import List
+from typing import List, Tuple, Dict
 from string import punctuation
-from tqdm import tqdm
 import logging
 
 logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
@@ -84,11 +83,46 @@ def assign_subtokens_to_groups(subtoken_splits, markers, ngram1_size, ngram2_siz
 
     return out
 
-def concat_and_tokenize_inputs(prefix=None, prompt=None, word_list1=None, word_list2=None,
-                               ngram_size=None, tokenizer=None, bpe_split_marker=None, marker_logic=None, ismlm=False):
+
+def concat_and_tokenize_inputs(prefix:str,
+                               prompt:str, 
+                               word_list1:List[str], 
+                               word_list2:List[str],
+                               ngram_size:str, 
+                               bpe_split_marker:str, 
+                               marker_logic:str, 
+                               ismlm:bool,
+                               tokenizer=None) -> Tuple[List[torch.Tensor], Dict]:
 
     """
-    function that concatenates and tokenizes
+    concat_and_tokenize_inputs() concatenates and tokenizes strings as inputs for wm_suite.Experiment() class
+
+    Parameters:
+    ----------
+    prefix : str
+        a string that preceeds the first noun list
+    prompt : str
+        a string that follows the second noun list
+    word_list1 : list of lists
+        a list of lists, each element in the list is a list of nouns, these lists are first lists in the sequence
+    word_list2 : list
+        a list of lists, each element in the list is alist of nouns, these lists are second lists in the sequence
+    ngram_size : str
+        a string indicating number of elements in entries of word_list1 and word_list2
+    bpe_split_marker : str
+        a string that is used by HuggingFace tokenizer classes to mark tokens that were split into BPEs
+    marker_logic : str ("outside", "within")
+        string indicating whether bpe_split_marker indicates outer BPE tokens in split tokens (like GPT2) or inner (like BERT)
+    ismlm : boolean
+        inicates whether or not the current model is a masked language model or not
+
+    Returns:
+    -------
+    input_seqs_tokenized : list of tensors
+        input sequences to be fed to the models
+    metadata : dict
+        dict containing information about stimuli, it contains fields 'stimid', 'trialID', 'positionID', 'subtok', 'list_len'
+
     """
 
     metadata = {
@@ -101,12 +135,11 @@ def concat_and_tokenize_inputs(prefix=None, prompt=None, word_list1=None, word_l
 
     # join list elements into strings for tokenizer below
     input_seqs = [" " + ", ".join(tks) + "." for tks in word_list1]
+
     if ismlm:
-        #input_seqs2 = [" " + ", ".join(np.repeat("[MASK]", len(tks))) + "." for tks in word_list2]  # masked tokens
-        input_seqs2 = [" " + ", ".join(tks) + "." for tks in word_list2]                           # unmasked tokens
+        input_seqs2 = [" " + ", ".join(tks) + "." for tks in word_list2]
         eos1 = "[CLS]"
         eos2 = "[SEP]"
-
     else:
         input_seqs2 = [" " + ", ".join(tks) + "." for tks in word_list2]
         eos1 = tokenizer.eos_token
