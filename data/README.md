@@ -8,20 +8,17 @@ This folder contains the scripts for creating the word list and stimuli.
 
 These are the files that contain nouns which were sampled to create noun lists
 
-scripts: 
-- `get_word_pools.py`
-
 Downloaded noun pools are available in:
 
-- `toronto_freq.txt` (used for sampling arbitrary lists)  
+- `nouns_arbitrary.txt` (used for sampling arbitrary lists)  
 - `nouns_categorized.txt` (used for sampling semantically coherent lists)  
-    
+
+The data are downloaded by this script: 
+- `get_word_pools.py`
+
 ## Noun lists (.json)
 
-scripts:
-- `make_wordlists.py`
-
-The .json files contain circularly shifted lists that are used in `surprisal_gpt2.py` and `rnn/main.py` to construct LM inputs:
+The .json files in `noun_lists` folder contain circularly shifted lists that are used to construct LM inputs:
 
 - `categorized_lists.json`    
 - `random_lists.json`
@@ -32,10 +29,14 @@ Each .json file contains 4 fields, each field containing 230 lists of specific l
 { "n3": [["window", "door", "roof"], ["hall", "window", "door"], ["hearth", "hall", "window"],
 ```
 
+These files are created by the script:
+- `sample_noun_lists.py`
+
+
 ## Intervening texts
 
 Intervening texts for each scenario are available in `intervening_texts.json`.  
-The corresponding python dicts are defined under the `prompts` varibale in `stimuli.py`  
+The corresponding python dicts are defined under the `prompts` variable in `stimuli.py`  
 
 The .json contains a dict of dicts where each level 1 dict contains texts of different lengths (1, 2, 3, 4, 5) for a specific scenario.
 
@@ -52,6 +53,9 @@ Different scenario keys are:
 - sce2 : incongruent scenario
 - sce1rnd : scrambled scenario
 - sce3 : short context scenario
+- sce4 : vignette with permuted prefix
+- sce5 : replacing ":" --> ","
+- sce6 : replace "Mary" --> "John"
 
 For each scenario dict, the keys 1, 2, 3, 4, 5 map onto intervening text lengths (in n tokens) are as follos:
 - "1": 26
@@ -66,8 +70,7 @@ For each scenario dict, the keys 1, 2, 3, 4, 5 map onto intervening text lengths
 
 ## LM input strings
 
-The above materials are concatenated to create LM input strings in `make_rnn_inputfiles.py` and `gpt2_surprisal` for the LSTM and GPT-2 pipelines, respectively.
+The above materials are concatenated to create LM input strings in `make_rnn_inputfiles.py` and `prepare_transformer_inputs.py`, for AWD_LSTM and transformers, respectively.
 
--  `make_rnn_inputfiles.py` creates *.txt and *_markers.txt files in `/rnn_input_files` and will be readin in by `rnn/main.py`  
-- `make_stimuli.sh` is a script looping around `make_rnn_inputfiles.py` for creating
-outputs in `/rnn_input_files`  
+-  `make_rnn_inputfiles.py` creates `*.txt` and `*_markers.txt` files in `/rnn_input_files` and will be readin in by `wm_suite/experiment.py`  
+- `make_rnn_inputfiles_script.sh` is a script looping around `make_rnn_inputfiles.py` for creating outputs in `/rnn_input_files`  

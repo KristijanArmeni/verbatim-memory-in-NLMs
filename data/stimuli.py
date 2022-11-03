@@ -77,8 +77,10 @@ prefixes = {
     "sce3": {"1": "Before the meeting, Mary wrote down the following lists of words. One was:"},
     "sce4": {"1": permute_tokens("Before the meeting, Mary wrote down the following list of words:")},
     "sce5": {"1": "Before the meeting, Mary wrote down the following list of words,"},
-    "sce6": {"1": "Before the meeting, John wrote down the following list of words:"}
+    "sce6": {"1": "Before the meeting, John wrote down the following list of words:"},
+    "sce7": {"1": "Before the meeting, Mary wrote down the following list of words:"},
 }
+
 
 # define prefixes for the n-gram experiment
 prefixes_repeated_ngrams = {
