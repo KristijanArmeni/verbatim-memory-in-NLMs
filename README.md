@@ -2,9 +2,8 @@
 
 - `./`         |  main scripts
 - `/data`      |  scripts and .txt files for creating inputs
-- `/rnn` |  rnn code by Van Schijndel et al https://github.com/vansky/neural-complexity
-- `/output`    |  LM script outputs (.txt files)
-- `/notebooks` |  .ipynb notebooks with EDA analyses and prototyping
+- `/models` |  code with subfolders that contain pytorch model classes and training scripts for awd_lstm and transformer
+- `/viz` |  .py script containing plotting subroutines (.ipynb notebook is not versioned)
 
 # Dependencies
 
@@ -27,10 +26,7 @@ dependencies:
   - pip
   - python=3.7
   - cudatoolkit=11.3
-  - plotly
   - conda-forge::wandb=0.10.31
-  - mne=0.22.0
-  - pytorch-lightning=1.5.10
   - gensim=3.8
 
 ## Installing dependencies
@@ -51,19 +47,16 @@ conda activate your_env_name
 
 Navigate to root folder of github repository.
 
-Now run with the setup flag to download the models:
-```bash
-python wm_test_suite.py --setup
-```
-
 Run the job as follows:
 ```bash
 python ./wm_test_suite.py
 --condition control \
 --scenario sce1 \
---paradigm with-context \
---input_filename ./data/categorized_lists.json \
---output_dir ./output \
+--checkpoint gpt2
+--inputs_file path_to_transformer_input_files \
+--inputs_file_info path_to_transformer_input_files_info \
+--context_len 1024 \
+--output_dir path_to_where_outputs_are_stored \
 --output_file name_of_the_output_file.csv \
 --device cuda
 ```
@@ -96,39 +89,48 @@ parser.add_argument("--output_filename", type=str,
                     help="str, the name of the output file saving the dataframe")
 ```
 
-## Running an LSTM job
+## Running an AWD LSTM job
 
-In bash script, activate the conda environment with [dependencies]()
-`conda activate env_name_lstm`
+### Dependencies
 
-Download LSTM model into a folder `rnn_models` from here:
-https://doi.org/10.5281/zenodo.3559340 and convert them with
-[rnn/model2statedict.py](./rnn/model2statedict.py) to statedicts.
+If you are using conda, you can create the enviroment with `conda env create -f path_to_your_yaml_file` where yaml file can look like:
 
-You can use these commands
-```bash
-mkdir rnn_models
-cd rnn_models
-wget https://zenodo.org/record/3559340/files/LSTM_40m.tar.gz?download=1 -O LSTM_40m.tar.gz
-tar -xvzf LSTM_40.tar.gz
-cd ../
-python rnn/model2statedict.py rnn_models/LSTM_400_40m_a_10-d0.2.pt
-# or
-python rnn/model2statedict.py rnn_models
+```yaml
+name: awd_lstm
+channels:
+  - defaults
+  - pytorch
+dependencies:
+  - python
+  - ipython
+  - pytorch=1.0.1
+  - cudatoolkit=10.0
+  - cupy
+  - numpy
+  - scipy
+  - pandas
+  - nltk
+  - pip
+  - pip:
+    - pynvrtc
 ```
 
-Now you need to convert the models to statedicts.
-
-Navigate to your root folder and use following command:
+Navigate to your root folder and use the following commands:
 
 ```bash
-python ./rnn/experiment.py \
---checkpoint_folder checkpoints/ \
---model_weights rnn_models/LSTM_400_40m_a_10-d0.2_statedict.pt \
---vocab_file ./rnn/vocab.txt \
---config_file ./rnn/config.json \
---input_file ./data/rnn_input_files/categorized_lists_sce1_control.txt \
---marker_file ./data/rnn_input_files/categorized_lists_sce1_control_markers.txt \
---output_folder ./code/lm-mem/output \
---output_filename output_test.csv
+conda activate awd_lstm  # activate the conda environment with dependencies
+
+cd /home/ka2773/project/lm-mem/src/src/wm_suite/awd_lstm  # make sure we're in the awd_lstm folder for module imports
+
+python ./wm_suite/experiment.py \
+--checkpoint_folder path/to/folder/with/awd_lstm/checkpoint/folder \
+--model_weights path/to/folder/with/awd_lstm/checkpoints/weights.pt \
+--vocab_file awd_lstm_corpus \
+--config_file /scratch/ka2773/project/lm-mem/checkpoints/awd_lstm/AWD-LSTM_3-layer_config.json \
+--input_file /home/ka2773/project/lm-mem/src/data/rnn_input_files/random_lists_sce1_permute.txt \
+--marker_file /home/ka2773/project/lm-mem/src/data/rnn_input_files/random_lists_sce1_permute_markers.txt \
+--per_token_output \
+--output_folder /scratch/ka2773/project/lm-mem/output/awd_lstm \
+--output_filename surprisal_awd-lstm-3_a-10_sce1_permute_random.csv \
+"
 ```
