@@ -20,6 +20,21 @@ We used the conda management toolkit, so the easiest way to create the environme
 
 `conda env create -n your_env_name -f ./main_env.yml`
 
-
+# Citation
 
 ```
+@misc{https://doi.org/10.48550/arxiv.2210.13569,
+      doi = {10.48550/ARXIV.2210.13569},
+      url = {https://arxiv.org/abs/2210.13569},
+      author = {Armeni, Kristijan and Honey, Christopher and Linzen, Tal},
+      keywords = {Computation and Language (cs.CL), FOS: Computer and information sciences, FOS: Computer and information sciences},  
+      title = {Characterizing Verbatim Short-Term Memory in Neural Language Models},
+      publisher = {arXiv},
+      year = {2022},
+      copyright = {Creative Commons Attribution 4.0 International}
+}
+
+```
+
+# Licence
+
