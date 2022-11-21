@@ -1,0 +1,22 @@
+channels:
+  - defaults
+dependencies:
+  - numpy
+  - huggingface::transformers=4.6
+  - nb_conda_kernels
+  - jupyterlab
+  - matplotlib
+  - h5py
+  - seaborn
+  - pytorch==1.10.1
+  - scikit-learn
+  - scipy
+  - nltk=3.4.4
+  - pip
+  - python=3.7
+  - cudatoolkit=11.3
+  - plotly
+  - conda-forge::wandb=0.10.31
+  - mne=0.22.0
+  - pytorch-lightning=1.5.10
+  - gensim=3.8
