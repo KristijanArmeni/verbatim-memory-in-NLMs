@@ -22,9 +22,36 @@ elif "linux" in sys.platform:
 
 # ===== WRAPPERS FOR DATASET CONSTRUCTION ===== #
 
-def mark_subtoken_splits(tokens, split_marker, marker_logic, eos_markers):
+def mark_subtoken_splits(tokens: List[str], 
+                         split_marker: str, 
+                         marker_logic: str, 
+                         eos_markers: List[str]) -> List:
     """
-    function to keep track of whether or not a token was subplit into subwords or not
+    mark_subtoken_splits() keeps track of whether or not a token was subplit into subwords or not.
+    Each token is counted and if it was split, the subtokens are counted as a single token.
+    E.g. the tokens ["I", "saw", "a", "sp", "Ġarrow", "yesterday"] would be coded as [0, 1, 2, 3, 3, 4]
+    indicating that there are 4 unique tokens and that token nr 3 (sparrow) was split into two subtokens 
+    (sp + arrow).
+
+    Parameters:
+    ----------
+    tokens : list
+        list of strings, containing the split tokens
+    split_markers : string
+        string denoting
+
+    Returns : 
+    -------
+    ids : list
+        list containing indices that mark groups (prefix, list1, prompt, list2) withing each list
+    
+    Example:
+    -------
+    ids = mark_subtoken_splits(tokens=["I", "saw", "a", "sp", "Ġarrow"], 
+                               split_marker="Ġ",
+                               marker_logic="outside",
+                               eos_markers: ["<|endoftext|>", "<|endoftext|>"])
+
     """
     ids = []
     count = 0
@@ -59,29 +86,6 @@ def mark_subtoken_splits(tokens, split_marker, marker_logic, eos_markers):
             ids.append(count)
 
     return ids
-
-def assign_subtokens_to_groups(subtoken_splits, markers, ngram1_size, ngram2_size, n_repet):
-
-    # this assumes both targets and interleaved groups are repated 5 times
-    # we correct for this below
-    codes = list(np.tile(np.repeat(markers, [ngram1_size, ngram2_size]), n_repet))
-
-    # drop the last ngram as ngram2 is only repeated 5-1 times
-    if ngram2_size != 0:
-        del codes[-ngram2_size:]
-
-    n_toks_no_punct = np.unique(subtoken_splits)[np.unique(subtoken_splits)>0]
-    assert len(n_toks_no_punct) == len(codes)
-
-    out = subtoken_splits.copy()
-
-    punct_and_eos_codes = [-1, -2] # we leave these as they are
-    for i, el in enumerate(subtoken_splits):
-
-        if el not in punct_and_eos_codes:
-            out[i] = codes[subtoken_splits[i]-1]
-
-    return out
 
 
 def concat_and_tokenize_inputs(prefix:str,
@@ -198,57 +202,25 @@ def concat_and_tokenize_inputs(prefix:str,
     return input_seqs_tokenized, metadata
 
 
-def interleave(items1, items2):
-
-    items2.append("") # add a dummy element at the end
-    return [val for pair in zip(items1, items2) for val in pair]
-
-
-def interleave_targets_and_distractors(word_list, distractors):
-
-    # conde the non-interleaved condition as well
-    distractor_sizes = ["n0"] + list(distractors.keys())
-
-    out = {key: [] for key in distractor_sizes}
-
-    for dst_size in distractor_sizes:
-
-        distractor_list = [None]
-
-        if dst_size != "n0":
-            distractor_list = distractors[dst_size]
-
-        # loop over ngram chunks for each a trial
-        for targets in word_list:
-
-            for dst in distractor_list:
-
-                nouns = targets
-
-                # if there are distractors, interleave them
-                if dst is not None:
-                    nouns = interleave(items1=targets, items2=dst)
-
-                trial = ", ".join([", ".join(e) for e in filter(None, nouns)]) + "."
-
-                out[dst_size].append(" " + trial)
-
-    return out
-
-
 def sample_indices_by_group(groups, seed):
 
     """
     randomized_indices = sample_indices_by_group(groups, seed)
 
-    input args:
-        groups = np.array, array defining group membership (e.g. [0, 0, 0, 1, 1, 1])
-        seed   = int, argument for np.random.RandomState
-    output args:
-        randomized_indices = np.array, randomly sampled indices of groups.size
+    Parameters:
+    ----------
+        groups : np.array, 
+            array defining group membership (e.g. [0, 0, 0, 1, 1, 1])
+        seed : 
+            int, argument for np.random.RandomState
+    
+    Returns:
+    -------
+        randomized_indices : np.array
+            randomly sampled indices of groups.size
 
-    Helper function that creates randomized indices form np.arange(groups.size)
-    by following the structure of group elements in group. It ensures that every
+    Helper function that creates randomized indices form np.arange(groups.size) by following 
+    the structure of group elements in group. It ensures that every
     element groups is paired with an element outside its own group.
     """
 
@@ -273,13 +245,22 @@ def sample_indices_by_group(groups, seed):
 
     return out_ids
 
-def ensure_list2_notequal(list1, list2, start_seed, seed_increment):
+
+def ensure_list2_notequal(list1: List, 
+                          list2: List, 
+                          start_seed: int, 
+                          seed_increment: int) -> List:
 
     """
+    Parameters:
+    ----------
+
+    Returns:
+    -------
     new_list2 = ensure_list2_notequal(list1, list2, start_seed, seed_increment)
 
     Helper function that ensures that all elements in list2 are not
-    equal to elements in list1 by iteratively applying new perumtations
+    equal to elements in list1 by iteratively applying new permutations
     with a new start_seed, incremented by seed_increment.
     """
 
