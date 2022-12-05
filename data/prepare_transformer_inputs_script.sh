@@ -1,14 +1,10 @@
 #! /bin/bash
 
 scenario="sce1"
-condition="repeat"
-list_len="n5"
-model_id="bert-base-uncased"
-prompt_key="1"
-list_type="random"
+model_id="trf-wt103"
 
 # bert stimuli
-for list_type in "categorized";
+for list_type in "categorized" "random";
 do
 
     for condition in "repeat" "permute" "control";
@@ -26,10 +22,10 @@ do
                                                     --condition $condition \
                                                     --prompt_key $prompt_key \
                                                     --list_len $list_len \
-                                                    --path_to_tokenizer "bert-base-uncased" \
+                                                    --path_to_tokenizer "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer" \
                                                     --device "cuda" \
                                                     --input_filename $list_type"_lists.json" \
-                                                    --output_dir "./data/transformer_input_files" \
+                                                    --output_dir "./transformer_input_files/transformer_wt103" \
                                                     --output_filename $output_name
 
             done

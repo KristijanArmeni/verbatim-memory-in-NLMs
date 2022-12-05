@@ -3,7 +3,7 @@ import sys, os
 import argparse
 import numpy as np
 import pandas as pd
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, GPT2TokenizerFast
 import torch
 from torch.nn import functional as F
 from tqdm import trange
@@ -377,9 +377,9 @@ def main():
 
     # manage platform dependent stuff
     if "win" in sys.platform:
-         data_dir = os.path.join(os.environ["homepath"], "project", "lm-mem", "src", "data")
+         data_dir = os.path.join(os.environ["homepath"], "project", "lm-mem", "src", "data", "noun_lists")
     elif "linux" in sys.platform:
-         data_dir = os.path.join(os.environ["HOME"], "project", "lm-mem", "src", "data")
+         data_dir = os.path.join(os.environ["HOME"], "project", "lm-mem", "src", "data", "noun_lists")
     #data_dir = "./data"
 
     logging.info("condition == {}".format(argins.condition))
@@ -453,7 +453,7 @@ def main():
 
     # setup the model
     logging.info("Loading tokenizer {}".format(argins.path_to_tokenizer))
-    tokenizer = AutoTokenizer.from_pretrained(argins.path_to_tokenizer)
+    tokenizer = GPT2TokenizerFast.from_pretrained(argins.path_to_tokenizer)
 
     # set the flag for function below
     ismlm = False
@@ -464,11 +464,13 @@ def main():
 
     # this tells the bpe split counter what symbol to look for
     bpe_split_marker_dict = {"gpt2": "Ġ",
+                             "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
                              "bert-base-uncased": "##",
                              "transfo-xl-wt103": None}
 
     # this tells the bpe split counter how these symbols are used
     marker_logic_dict = {"gpt2": "outside",
+                         "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
                          "bert-base-uncased": "within",
                          "transfo-xl-wt103": None}
 
