@@ -68,9 +68,27 @@ For each scenario dict, the keys 1, 2, 3, 4, 5 map onto intervening text lengths
 
 - `stimuli.py` contains python dicts with with preface strings (`prefixes` variable)
 
-## LM input strings
+## Creating LM input strings
 
 The above materials are concatenated to create LM input strings in `make_rnn_inputfiles.py` and `prepare_transformer_inputs.py`, for AWD_LSTM and transformers, respectively.
+
+### Transformer
+
+A call to `preparere_transformer_inputs.py` could look like this
+
+```python
+python prepare_transformer_inputs.py --scenario "sce1" \          # intact condition
+                                     --condition "repeat" \       # repeated second list
+                                     --prompt_key "1" \           # intact prompt
+                                     --list_len "n5" \            # list with 5 tokens
+                                     --path_to_tokenizer "gpt2" \ # use gpt2 bpe tokenizer
+                                     --device "cuda" \            # use cuda if available
+                                     --input_filename "random_lists.json" \
+                                     --output_dir "./transformer_input_files/gpt2" \
+                                     --output_filename "./transformer_input_files/gpt2/gpt2_control_sce1_5_n10_random.json"
+```
+
+### RNN
 
 -  `make_rnn_inputfiles.py` creates `*.txt` and `*_markers.txt` files in `/rnn_input_files` and will be readin in by `wm_suite/experiment.py`  
 - `make_rnn_inputfiles_script.sh` is a script looping around `make_rnn_inputfiles.py` for creating outputs in `/rnn_input_files`  
