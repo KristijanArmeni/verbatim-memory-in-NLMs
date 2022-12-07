@@ -17,7 +17,7 @@ import argparse
 import numpy as np
 import pandas as pd
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config, \
-                         BertForMaskedLM, TransfoXLLMHeadModel,  TransfoXLTokenizer, \
+                         BertForMaskedLM, TransfoXLLMHeadModel, TransfoXLTokenizer, \
                          AutoTokenizer, top_k_top_p_filtering
 import torch
 from torch.utils.data import Dataset, DataLoader
