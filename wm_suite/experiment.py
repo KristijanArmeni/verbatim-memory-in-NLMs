@@ -18,10 +18,10 @@ import sys
 # own modules
 sys.path.append("/home/ka2773/project/lm-mem/src/src/wm_suite/")
 sys.path.append("/home/ka2773/project/lm-mem/src/src/wm_suite/awd_lstm")
-from rnn.model import RNNModel
-from awd_lstm.model import RNNModel as AWD_RNNModel
-from awd_lstm.utils import repackage_hidden, batchify
-from awd_lstm.splitcross import SplitCrossEntropyLoss
+from models.rnn.model import RNNModel
+from models.awd_lstm.model import RNNModel as AWD_RNNModel
+from models.awd_lstm.utils import repackage_hidden, batchify
+from models.awd_lstm.splitcross import SplitCrossEntropyLoss
 
 
 logging.basicConfig(format="[INFO: %(funcName)20s()] %(message)s", level=logging.INFO)
