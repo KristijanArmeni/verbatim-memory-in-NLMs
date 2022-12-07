@@ -11,8 +11,29 @@ import logging
 
 logging.basicConfig(format="[INFO] %(message)s", level=logging.INFO)
 
-def infer_labels_from_filebasename(filename):
 
+def infer_labels_from_filebasename(filename):
+    """
+    infer_labels_from_filebasename(filename)
+
+    Parameters:
+    ----------
+    filename : str
+        filename to surprisal_<arc>_<model-id>_<scenario>_<second_list>_<list_type>.csv (output of wm_test_suite.py) files
+    
+    Returns:
+    -------
+    arc : str
+        string denoting architecture (e.g. 'gpt2')
+    model_id : str
+        string denoting rather arbitrary model_id (e.g. "a-10")
+    scenario : str
+        string denoting which scenario was used (e.g. "sce1")
+    second_list : str
+        string denoting the type of second list (e.g. "repeat")
+    list_type : str
+        string denoting whether the list is random or categorized
+    """
     arc = filename.split("_")[1]
     model_id = filename.split("_")[2]
     scenario = filename.split('_')[3]
@@ -26,7 +47,7 @@ def infer_labels_from_filebasename(filename):
                 f"model_id = {model_id}\n" + \
                 f"architecture = {arc}")
 
-    return arc, model_id, list_type, second_list, scenario 
+    return arc, model_id, scenario, second_list, list_type
 
 def load_and_preproc_csv(output_folder, filenames):
 
@@ -37,7 +58,7 @@ def load_and_preproc_csv(output_folder, filenames):
         print("Reading \n {}".format(file))
 
         labels = infer_labels_from_filebasename(os.path.basename(file))
-        arc, model_id, list_type, second_list, scenario = labels 
+        arc, model_id, scenario, second_list, list_type = labels 
 
         sep = "\t"
 
@@ -211,56 +232,56 @@ def preprocess_rnn_dataframe(dfin, has_subtoks=None, keep_groups=None):
     return dfout
 
 #===== LOAD CSV FILES =====#
+if __name__ == "__main__":
+    # input arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_id", type=str,
+                        help="model_id string to be placed in the filename string")
+    parser.add_argument("--arch", type=str,
+                        help="architecture to preprocess")
+    parser.add_argument("--scenario", type=str,
+                        help="which scenario data to load")
+    parser.add_argument("--output_dir", type=str,
+                        help="path for storing post-processed files")
 
-# input arguments
-parser = argparse.ArgumentParser()
-parser.add_argument("--model_id", type=str,
-                    help="model_id string to be placed in the filename string")
-parser.add_argument("--arch", type=str,
-                    help="architecture to preprocess")
-parser.add_argument("--scenario", type=str,
-                    help="which scenario data to load")
-parser.add_argument("--output_dir", type=str,
-                    help="path for storing post-processed files")
+    argins = parser.parse_args()
 
-argins = parser.parse_args()
+    # file naming syntax:
+    # metric_model_scenario_condition_list-type
+    files = glob.glob(os.path.join(argins.output_dir, "surprisal_{}_{}_{}_*.csv".format(argins.arch, argins.model_id, argins.scenario)))
 
-# file naming syntax:
-# metric_model_scenario_condition_list-type
-files = glob.glob(os.path.join(argins.output_dir, "surprisal_{}_{}_{}_*.csv".format(argins.arch, argins.model_id, argins.scenario)))
+    if not files:
+        raise Exception("Can find any files that match pattern: {}".format(os.path.join(argins.output_dir, "surprisal_{}_{}_{}*.csv".format(argins.arch, argins.model_id, argins.scenario))))
 
-if not files:
-    raise Exception("Can find any files that match pattern: {}".format(os.path.join(argins.output_dir, "surprisal_{}_{}_{}*.csv".format(argins.arch, argins.model_id, argins.scenario))))
+    files.sort()
 
-files.sort()
+    print("Preprocessing {}_{}_{} output...".format(argins.arch, argins.model_id, argins.scenario))
+    df = load_and_preproc_csv(output_folder=argins.output_dir, filenames=files)
 
-print("Preprocessing {}_{}_{} output...".format(argins.arch, argins.model_id, argins.scenario))
-df = load_and_preproc_csv(output_folder=argins.output_dir, filenames=files)
+    # rename prompt length values to more meaningful ones
+    prompt_len_map = {
+        1: 8,
+        2: 30,
+        3: 100,
+        4: 200,
+        5: 400,
+    }
+    df.prompt_len = df.prompt_len.map(prompt_len_map)
 
-# rename prompt length values to more meaningful ones
-prompt_len_map = {
-    1: 8,
-    2: 30,
-    3: 100,
-    4: 200,
-    5: 400,
-}
-df.prompt_len = df.prompt_len.map(prompt_len_map)
+    # rename scenario values to more meaningful ones
+    scenario_map = {
+        "sce1": "intact",
+        "sce1rnd": "scrambled",
+        "sce2": "incongruent",
+        "sce3": "short"
+    }
 
-# rename scenario values to more meaningful ones
-scenario_map = {
-    "sce1": "intact",
-    "sce1rnd": "scrambled",
-    "sce2": "incongruent",
-    "sce3": "short"
-}
+    df.scenario = df.scenario.map(scenario_map)
 
-df.scenario = df.scenario.map(scenario_map)
+    # rename the "scenario" column to "context"
+    df.rename(columns={"scenario": "context"}, inplace=True)
 
-# rename the "scenario" column to "context"
-df.rename(columns={"scenario": "context"}, inplace=True)
-
-# save back to csv (waste of memory but let's stick to this for now)
-fname = os.path.join(argins.output_dir, "output_{}_{}_{}.csv".format(argins.arch, argins.model_id, argins.scenario))
-print("Saving {}".format(fname))
-df.to_csv(fname, sep="\t")
+    # save back to csv (waste of memory but let's stick to this for now)
+    fname = os.path.join(argins.output_dir, "output_{}_{}_{}.csv".format(argins.arch, argins.model_id, argins.scenario))
+    print("Saving {}".format(fname))
+    df.to_csv(fname, sep="\t")
