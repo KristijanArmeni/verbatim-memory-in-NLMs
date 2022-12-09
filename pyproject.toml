@@ -13,12 +13,13 @@ dependencies = [
     "tqdm == 4.59.0",
     ]
 
-[tool.setuptools.packages.find]
-where = ["wm_suite"]
-
 [project.scripts]
-test_wm_suite = "test_package:check"
+wms_test_install = "wm_suite.test:test_install"
+
+# this will build wheel as part of installation
+[tool.universal.bdist_wheel]
+universal = true
 
 [tool.pytest.ini_options]
-pythonpath = ["wm_suite", "data"]
+pythonpath = ["wm_suite", "data", "models"]
 testpaths = "tests"
