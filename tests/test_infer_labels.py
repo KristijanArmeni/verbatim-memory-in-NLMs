@@ -1,5 +1,5 @@
 
-from preprocess_and_merge_csvfiles import infer_labels_from_filebasename
+from src.wm_suite.preprocess_and_merge_csvfiles import infer_labels_from_filebasename
 
 def test_infer_labels():
 

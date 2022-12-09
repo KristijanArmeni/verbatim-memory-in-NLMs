@@ -1,8 +1,8 @@
 import json
 import pytest
 import torch
-from stimuli import prompts, prefixes
-from prepare_transformer_inputs import concat_and_tokenize_inputs
+from wm_suite.io.stimuli import prompts, prefixes
+from wm_suite.io.prepare_transformer_inputs import concat_and_tokenize_inputs
 from wm_suite.experiment import Dataset, read_marker_file
 
 from models.awd_lstm.model import RNNModel as AWD_RNNModel

@@ -4,7 +4,7 @@ import torch
 import numpy as np
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel
 from test_data import transformer_test_data
-from wm_suite.wm_test_suite import Experiment
+from src.wm_suite.wm_test_suite import Experiment
 
 def test_transformer_experiment(transformer_test_data):
 

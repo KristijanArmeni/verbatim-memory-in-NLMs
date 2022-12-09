@@ -1,5 +1,5 @@
 import numpy as np
-from prepare_transformer_inputs import mark_subtoken_splits
+from src.wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits
 
 def test_mark_subtoken_splits():
 
