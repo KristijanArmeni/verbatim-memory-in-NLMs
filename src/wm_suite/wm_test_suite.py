@@ -323,7 +323,7 @@ class Experiment(object):
 
     def start_sequential(self, input_sequences_ids=None) -> List:
         """
-        experiment.start() will loop over prefixes, prompts, and word_lists and run the .ppl() method on them
+        Experiment.start_sequential() will loop over prefixes, prompts, and word_lists and run the .ppl() method on them
         
         Parameters:
         ---------
@@ -544,7 +544,7 @@ def get_argins_for_dev(setup=False,
     return argins
 
 # ===== RUNTIME CODE WRAPPER ===== #
-def runtime_code():
+def runtime_code(input_args: List):
 
     # ===== INITIATIONS ===== #
     from types import SimpleNamespace
@@ -562,13 +562,14 @@ def runtime_code():
     parser.add_argument("--tokenizer", type=str)
     parser.add_argument("--context_len", type=int, default=1024,
                         help="length of context window in tokens for transformers")
-    parser.add_argument("--model_type", type=str,
+    parser.add_argument("--model_type", type=str, default="pretrained",
                         help="model label controlling which checkpoint to load")
     # To download a different model look at https://huggingface.co/models?filter=gpt2
     parser.add_argument("--checkpoint", type=str, default="gpt2",
                         help="the path to folder with pretrained models (expected to work with model.from_pretraiend() method)")
     parser.add_argument("--model_seed", type=int, default=12345,
                         help="seed value to be used in torch.manual_seed() prior to calling GPT2Model()")
+    parser.add_argument("--batch_size", type=int, default=1)
     parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
                         help="whether to run on cpu or cuda")
     parser.add_argument("--output_dir", type=str,
@@ -576,7 +577,10 @@ def runtime_code():
     parser.add_argument("--output_filename", type=str,
                         help="str, the name of the output file saving the dataframe")
 
-    argins = parser.parse_args()
+    if input_args:
+        argins = parser.parse_args(input_args)
+    else:
+        argins = parser.parse_args()
 
     #argins = SimpleNamespace(**get_argins_for_dev(inputs_file="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_4_n5_random.json",
     #                                              inputs_file_info="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_4_n5_random_info.json",
@@ -601,8 +605,8 @@ def runtime_code():
     device = torch.device(argins.device if torch.cuda.is_available() else "cpu")
 
     # setup the model
-    logging.info("Loading tokenizer {}".format(argins.path_to_tokenizer))
-    tokenizer = GPT2TokenizerFast.from_pretrained(argins.path_to_tokenizer)
+    logging.info("Loading tokenizer {}".format(argins.tokenizer))
+    tokenizer = GPT2TokenizerFast.from_pretrained(argins.tokenizer)
 
     # pretrained models
     logging.info("Using {} model".format(argins.model_type))
@@ -663,7 +667,7 @@ def runtime_code():
     experiment = Experiment(model=model, ismlm=ismlm,
                             tokenizer=tokenizer,
                             context_len=argins.context_len,
-                            batch_size=10,
+                            batch_size=argins.batch_size,
                             use_cache=False,
                             device=device)
 
