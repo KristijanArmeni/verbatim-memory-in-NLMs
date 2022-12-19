@@ -50,7 +50,14 @@ class SimpleDataset(Dataset):
     def __len__(self) -> int:
         return len(self.items)
 
+def make_filename_from_config(model:str, vignette: str, condition: str, prompt:str, list_len:str, list_type:str) -> Tuple[str, str]:
+    """make_filename_from_config() is a simple utility function that compuses a filename string
+    from input configurations"""
 
+    inputs_file = f"{model}_{condition}_{vignette}_{prompt}_n{list_len}_{list_type}.json"
+    inputs_file_info = f"{model}_{condition}_{vignette}_{prompt}_n{list_len}_{list_type}_info.json"
+
+    return inputs_file, inputs_file_info
 
 # ===== EXPERIMENT CLASS ===== #
 
@@ -512,37 +519,6 @@ def setup():
 
     return 0
 
-
-# ===== helper function for code development ===== #
-def get_argins_for_dev(setup=False, 
-                       inputs_file=None, 
-                       inputs_file_unmasked=None,
-                       inputs_file_info=None,
-                       context_len=1024, 
-                       checkpoint="gpt2",
-                       tokenizer=None,
-                       model_type=None,
-                       model_seed=12345,
-                       device="cuda",
-                       ):
-
-    argins = {
-
-        "setup": setup,
-        "inputs_file": inputs_file,
-        "inputs_file_info": inputs_file_info,
-        "inputs_file_unmasked": inputs_file_unmasked,
-        "context_len": context_len,
-        "checkpoint": checkpoint,
-        "tokenizer": tokenizer,
-        "model_type": model_type,
-        "model_seed": model_seed,
-        "device": device
-
-    }
-
-    return argins
-
 # ===== RUNTIME CODE WRAPPER ===== #
 def runtime_code(input_args: List):
 
@@ -581,11 +557,6 @@ def runtime_code(input_args: List):
         argins = parser.parse_args(input_args)
     else:
         argins = parser.parse_args()
-
-    #argins = SimpleNamespace(**get_argins_for_dev(inputs_file="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_4_n5_random.json",
-    #                                              inputs_file_info="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_4_n5_random_info.json",
-    #                                              checkpoint="bert-base-uncased",
-    #                                              tokenizer="bert-base-uncased"))
 
     if argins.setup:
         setup()
@@ -725,7 +696,7 @@ def runtime_code(input_args: List):
     # save output
     outpath = os.path.join(argins.output_dir, argins.output_filename)
     print("Saving {}".format(os.path.join(outpath)))
-    output.to_csv(outpath, sep=",")
+    output.to_csv(outpath, sep="\t")
 
 # ===== RUN ===== #
 if __name__ == "__main__":
