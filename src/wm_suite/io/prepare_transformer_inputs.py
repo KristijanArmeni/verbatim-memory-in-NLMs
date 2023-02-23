@@ -317,7 +317,7 @@ def main():
     from types import SimpleNamespace
 
     sys.path.append("/home/ka2773/project/lm-mem/src/data/")
-    from stimuli import prefixes, prompts
+    from src.wm_suite.io.stimuli import prefixes, prompts
 
     # ===== INITIATIONS ===== #
 

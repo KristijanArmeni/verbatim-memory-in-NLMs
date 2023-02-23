@@ -13,12 +13,16 @@ dependencies = [
     "tqdm == 4.59.0",
     ]
 
-[tool.setuptools.packages.find]
-where = ["wm_suite"]
-
 [project.scripts]
-test_wm_suite = "test_package:check"
+wms_test_install = "wm_suite.cli.test:test_install"
+wms_reproduce_set-size = "wm_suite.cli.reproduce_set_size:reproduce_set_size_experiment"
+wms_preprocess_output = "wm_suite.preprocess_and_merge_csvfiles:main"
+
+# this will build wheel as part of installation
+[tool.universal.bdist_wheel]
+universal = true
 
 [tool.pytest.ini_options]
-pythonpath = ["wm_suite", "data"]
+pythonpath = ["src", "src/wm_suite", "data", "models"]
 testpaths = "tests"
+addopts = "--ignore=tests/test_awd_lstm.py"

@@ -14,8 +14,10 @@ or from an ipython console:
 import json
 import sys, os
 import argparse
+from itertools import product
 import numpy as np
 import pandas as pd
+import transformers
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config, \
                          BertForMaskedLM, TransfoXLLMHeadModel, TransfoXLTokenizer, \
                          AutoTokenizer, top_k_top_p_filtering
@@ -50,7 +52,14 @@ class SimpleDataset(Dataset):
     def __len__(self) -> int:
         return len(self.items)
 
+def make_filename_from_config(model:str, vignette: str, condition: str, prompt:str, list_len:str, list_type:str) -> Tuple[str, str]:
+    """make_filename_from_config() is a simple utility function that compuses a filename string
+    from input configurations"""
 
+    inputs_file = f"{model}_{condition}_{vignette}_{prompt}_n{list_len}_{list_type}.json"
+    inputs_file_info = f"{model}_{condition}_{vignette}_{prompt}_n{list_len}_{list_type}_info.json"
+
+    return inputs_file, inputs_file_info
 
 # ===== EXPERIMENT CLASS ===== #
 
@@ -323,7 +332,7 @@ class Experiment(object):
 
     def start_sequential(self, input_sequences_ids=None) -> List:
         """
-        experiment.start() will loop over prefixes, prompts, and word_lists and run the .ppl() method on them
+        Experiment.start_sequential() will loop over prefixes, prompts, and word_lists and run the .ppl() method on them
         
         Parameters:
         ---------
@@ -432,6 +441,40 @@ class Experiment(object):
         #logging.info(f"Batch size = {self.batch_size}, calling self.start_sequential()")
         #return self.start_sequential(input_sequences)
 
+def ablate_attn_head(model: transformers.PreTrainedModel, 
+                     layers: Tuple, 
+                     heads: Tuple, 
+                     head_dim: int) -> transformers.PreTrainedModel:
+
+    for layer_idx in layers:
+
+        layer = model.transformer.h[layer_idx]
+
+        # split attention params into three equal sized matrices (Q, K, V)
+        attn_size = layer.attn.c_attn.weight.shape[0]
+        Q, K, V = layer.attn.c_attn.weight.detach().split(attn_size, dim=1)  # matrices of (model_dim, model_dim)
+
+        # set the Q, K, and V for the specified head to 0
+        q_heads = Q.split(head_dim, dim=1)   # split along the column dimension
+        k_heads = K.split(head_dim, dim=1)
+        v_heads = V.split(head_dim, dim=1)
+
+        for head_idx in heads:
+            q_heads[head_idx][:] = 0
+            k_heads[head_idx][:] = 0
+            v_heads[head_idx][:] = 0
+
+        # assign ablated weights back to the param
+        Q_new = torch.cat(q_heads, dim=1)
+        K_new = torch.cat(k_heads, dim=1)
+        V_new = torch.cat(v_heads, dim=1)
+
+        model.transformer.h[layer_idx].attn.c_attn.weight = torch.nn.parameter.Parameter(
+                                                            torch.cat((Q_new, K_new, V_new), dim=1),
+                                                            requires_grad=False)
+
+    return model
+
 def permute_qk_weights(model=None, per_head=False, seed=None):
 
     i=0
@@ -498,6 +541,49 @@ def permute_qk_weights(model=None, per_head=False, seed=None):
 
     return model
 
+
+def output2dataframe(output_dict: Dict, input_sequences_info: Dict, condition: str) -> Dict:
+
+    experiment_outputs = []
+
+    meta_cols = ["trialID", "positionID", "subtok"]
+    colnames = ["token"] + meta_cols + ["surp"]
+    arrays = [output_dict["token"],
+                input_sequences_info["trialID"],
+                input_sequences_info["positionID"],
+                input_sequences_info["subtok"],
+                output_dict["surp"]]
+
+    counter = 1  # counter for trials
+    n_sequences = len(output_dict["surp"])
+
+    # make a new single dict with all rows for the df below
+    dfrows = {key_arr[0]: key_arr[1] for i, key_arr in enumerate(zip(colnames, arrays))}
+
+    # loop over trials
+    for i in trange(0, n_sequences):
+
+        # a dict of lists (row values) for this sequence
+        row_values = {key: np.array(dfrows[key][i]) for key in dfrows.keys()}
+
+        # convert the last two elements of the tuple to an array
+        dftmp = pd.DataFrame(row_values)
+
+        # now add the constant values for the current sequence rows
+        dftmp["stimid"] = input_sequences_info["stimid"][i]                # stimulus id
+        dftmp['prompt'] = input_sequences_info["prompt"][i]                # add a column of prompt labels
+        dftmp["list_len"] = input_sequences_info["list_len"][i]            # add list length
+        dftmp['stimID'] = counter                               # track sequence id
+        dftmp['second_list'] = condition                 # log condition of the second list
+
+        experiment_outputs.append(dftmp)
+        counter += 1
+
+    # put into a single df and save
+    output = pd.concat(experiment_outputs)
+
+    return output
+
 # ===== Setup for gpt2 ====== #
 def setup():
     logging.info("SETUP: nltk punkt")
@@ -512,43 +598,12 @@ def setup():
 
     return 0
 
-
-# ===== helper function for code development ===== #
-def get_argins_for_dev(setup=False, 
-                       inputs_file=None, 
-                       inputs_file_unmasked=None,
-                       inputs_file_info=None,
-                       context_len=1024, 
-                       checkpoint="gpt2",
-                       tokenizer=None,
-                       model_type=None,
-                       model_seed=12345,
-                       device="cuda",
-                       ):
-
-    argins = {
-
-        "setup": setup,
-        "inputs_file": inputs_file,
-        "inputs_file_info": inputs_file_info,
-        "inputs_file_unmasked": inputs_file_unmasked,
-        "context_len": context_len,
-        "checkpoint": checkpoint,
-        "tokenizer": tokenizer,
-        "model_type": model_type,
-        "model_seed": model_seed,
-        "device": device
-
-    }
-
-    return argins
-
 # ===== RUNTIME CODE WRAPPER ===== #
-def runtime_code():
+def runtime_code(input_args: List = None):
+
+    from ast import literal_eval
 
     # ===== INITIATIONS ===== #
-    from types import SimpleNamespace
-
     # collect input arguments
     parser = argparse.ArgumentParser(description="surprisal.py runs perplexity experiment")
 
@@ -562,13 +617,16 @@ def runtime_code():
     parser.add_argument("--tokenizer", type=str)
     parser.add_argument("--context_len", type=int, default=1024,
                         help="length of context window in tokens for transformers")
-    parser.add_argument("--model_type", type=str,
+    parser.add_argument("--model_type", type=str, default="pretrained",
                         help="model label controlling which checkpoint to load")
+    parser.add_argument("--ablate_layers", type=str, default="none")
+    parser.add_argument("--ablate_heads", type=str, default="none")
     # To download a different model look at https://huggingface.co/models?filter=gpt2
     parser.add_argument("--checkpoint", type=str, default="gpt2",
                         help="the path to folder with pretrained models (expected to work with model.from_pretraiend() method)")
     parser.add_argument("--model_seed", type=int, default=12345,
                         help="seed value to be used in torch.manual_seed() prior to calling GPT2Model()")
+    parser.add_argument("--batch_size", type=int, default=1)
     parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
                         help="whether to run on cpu or cuda")
     parser.add_argument("--output_dir", type=str,
@@ -576,12 +634,28 @@ def runtime_code():
     parser.add_argument("--output_filename", type=str,
                         help="str, the name of the output file saving the dataframe")
 
-    argins = parser.parse_args()
 
-    #argins = SimpleNamespace(**get_argins_for_dev(inputs_file="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_4_n5_random.json",
-    #                                              inputs_file_info="/home/ka2773/project/lm-mem/src/data/transformer_input_files/bert-base-uncased_repeat_sce1_4_n5_random_info.json",
-    #                                              checkpoint="bert-base-uncased",
-    #                                              tokenizer="bert-base-uncased"))
+    #input_args = [
+    #    "--scenario", "sce1",
+    #    "--condition", "repeat",
+    #    "--model_type", "ablate",
+    #    "--ablate_layer", "(0,)",
+    #    "--ablate_head", "(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)",
+    #    "--checkpoint", "gpt2",
+    #    "--tokenizer", "gpt2",
+    #    "--model_seed", "12345",
+    #    "--inputs_file", f"/home/ka2773/project/lm-mem/src/data/transformer_input_files/gpt2/gpt2_repeat_sce1_1_n3_random.json",
+    #    "--inputs_file_info", f"/home/ka2773/project/lm-mem/src/data/transformer_input_files/gpt2/gpt2_repeat_sce1_1_n3_random_info.json",
+    #    "--output_dir", "/scratch/ka2773/project/lm-mem/output/ablation",
+    #    "--output_file", "surprisal_gpt2_ablate-3-3_sce1_repeat_random.csv",
+    #    "--device", "cuda",
+    #]
+
+    if input_args:
+        logging.info("")
+        argins = parser.parse_args(input_args)
+    else:
+        argins = parser.parse_args()
 
     if argins.setup:
         setup()
@@ -601,8 +675,8 @@ def runtime_code():
     device = torch.device(argins.device if torch.cuda.is_available() else "cpu")
 
     # setup the model
-    logging.info("Loading tokenizer {}".format(argins.path_to_tokenizer))
-    tokenizer = GPT2TokenizerFast.from_pretrained(argins.path_to_tokenizer)
+    logging.info("Loading tokenizer {}".format(argins.tokenizer))
+    tokenizer = GPT2TokenizerFast.from_pretrained(argins.tokenizer)
 
     # pretrained models
     logging.info("Using {} model".format(argins.model_type))
@@ -656,72 +730,46 @@ def runtime_code():
         model.transformer.wpe.weight = torch.nn.Parameter(data=wpe_shuf,
                                                           requires_grad=False)
 
+    elif "ablation" in argins.model_type:
+
+        logging.info(f"Running ablation experiment")
+        logging.info(f"Setting attention heads {argins.ablate_heads} in layers {argins.ablate_layers} to 0.")
+
+        # now set the selected head in selected layer to 0
+        model = ablate_attn_head(model, 
+                                 layers=literal_eval(argins.ablate_layers),
+                                 heads=literal_eval(argins.ablate_heads),
+                                 head_dim=64)
+
     # set to evaluation mode
     model.eval()
+
+    # ===== EXPERIMENT ===== #
 
     #initialize experiment class
     experiment = Experiment(model=model, ismlm=ismlm,
                             tokenizer=tokenizer,
                             context_len=argins.context_len,
-                            batch_size=10,
+                            batch_size=argins.batch_size,
                             use_cache=False,
                             device=device)
-
-    # list storing output dataframes
-    experiment_outputs = []
-
-    # ===== RUN EXPERIMENT LOOP ===== #
 
     output_dict = experiment.start(input_sequences = input_sequences)
 
     # add token information to the output dictionary
     output_dict["token"] = [experiment.tokenizer.convert_ids_to_tokens(e[0]) for e in input_sequences]
 
-    # ===== FORMAT AND SAVE OUTPUT ===== #
-
-    meta_cols = ["trialID", "positionID", "subtok"]
-    colnames = ["token"] + meta_cols + ["surp"]
-    arrays = [output_dict["token"],
-                input_sequences_info["trialID"],
-                input_sequences_info["positionID"],
-                input_sequences_info["subtok"],
-                output_dict["surp"]]
-
-
-    counter = 1  # counter for trials
-    n_sequences = len(output_dict["surp"])
-
-    # make a new single dict with all rows for the df below
-    dfrows = {key_arr[0]: key_arr[1] for i, key_arr in enumerate(zip(colnames, arrays))}
-
-    # loop over trials
-    for i in trange(0, n_sequences):
-
-        # a dict of lists (row values) for this sequence
-        row_values = {key: np.array(dfrows[key][i]) for key in dfrows.keys()}
-
-        # convert the last two elements of the tuple to an array
-        dftmp = pd.DataFrame(row_values)
-
-        # now add the constant values for the current sequence rows
-        dftmp["stimid"] = input_sequences_info["stimid"][i]                # stimulus id
-        dftmp['prompt'] = input_sequences_info["prompt"][i]                # add a column of prompt labels
-        dftmp["list_len"] = input_sequences_info["list_len"][i]            # add list length
-        dftmp['stimID'] = counter                               # track sequence id
-        dftmp['second_list'] = argins.condition                 # log condition of the second list
-
-        experiment_outputs.append(dftmp)
-        counter += 1
-
     experiment.model.to("cpu")
 
-    # put into a single df and save
-    output = pd.concat(experiment_outputs)
+    # ===== FORMAT AND SAVE OUTPUT ===== #
+    output_dict = output2dataframe(output_dict=output_dict, 
+                                   input_sequences_info=input_sequences_info, 
+                                   condition=argins.condition)
 
     # save output
     outpath = os.path.join(argins.output_dir, argins.output_filename)
     print("Saving {}".format(os.path.join(outpath)))
-    output.to_csv(outpath, sep=",")
+    output_dict.to_csv(outpath, sep="\t")
 
 # ===== RUN ===== #
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 
 import os
-import sys
 import pandas as pd
 import numpy as np
 import glob
@@ -19,7 +18,7 @@ def infer_labels_from_filebasename(filename):
     Parameters:
     ----------
     filename : str
-        filename to surprisal_<arc>_<model-id>_<scenario>_<second_list>_<list_type>.csv (output of wm_test_suite.py) files
+        filename to surprisal_<arc>_<model-id>_<scenario>_<list_len>_<prompt_len>_<second_list>_<list_type>.csv (output of wm_test_suite.py) files
     
     Returns:
     -------
@@ -34,20 +33,19 @@ def infer_labels_from_filebasename(filename):
     list_type : str
         string denoting whether the list is random or categorized
     """
-    arc = filename.split("_")[1]
-    model_id = filename.split("_")[2]
-    scenario = filename.split('_')[3]
-    second_list = filename.split('_')[4]
-    list_type = filename.split('_')[5].split('.')[0]
+    arc, model_id, scenario, prompt_len, list_len, list_type, condition = filename.split("_")[1::]
+    condition = condition.split(".csv")[0]  # cut the filename suffix
 
     logging.info(f"Inferring the following information from filename {filename}: \n" + \
+                f"list length = {list_len}\n" + \
+                f"prompt length = {prompt_len}\n" + \
                 f"list_type = {list_type}\n" + \
-                f"second_list = {second_list}\n" + \
+                f"condition = {condition}\n" + \
                 f"scenario = {scenario}\n" + \
                 f"model_id = {model_id}\n" + \
                 f"architecture = {arc}")
 
-    return arc, model_id, scenario, second_list, list_type
+    return arc, model_id, scenario, list_len, prompt_len, list_type, condition
 
 def load_and_preproc_csv(output_folder, filenames):
 
@@ -58,11 +56,11 @@ def load_and_preproc_csv(output_folder, filenames):
         print("Reading \n {}".format(file))
 
         labels = infer_labels_from_filebasename(os.path.basename(file))
-        arc, model_id, scenario, second_list, list_type = labels 
+        arc, model_id, scenario, list_len, prompt_len, list_type, second_list = labels 
 
         sep = "\t"
 
-        dftmp = pd.read_csv(os.path.join(output_folder, file), sep=sep, header=0)
+        dftmp = pd.read_csv(os.path.join(output_folder, file), sep=sep)
 
         # add information from filenames
         dftmp["list"] = list_type  # add column on list composition
@@ -231,27 +229,37 @@ def preprocess_rnn_dataframe(dfin, has_subtoks=None, keep_groups=None):
 
     return dfout
 
-#===== LOAD CSV FILES =====#
-if __name__ == "__main__":
+def main(input_arguments=None):
+
     # input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_id", type=str,
+    parser.add_argument("--model_id", type=str, default="",
                         help="model_id string to be placed in the filename string")
-    parser.add_argument("--arch", type=str,
+    parser.add_argument("--arch", type=str, default="",
                         help="architecture to preprocess")
-    parser.add_argument("--scenario", type=str,
+    parser.add_argument("--scenario", type=str, default="",
                         help="which scenario data to load")
+    parser.add_argument("--filename_pattern", type=str, default="*")
+    parser.add_argument("--suffix", type=str, default=".csv")
     parser.add_argument("--output_dir", type=str,
                         help="path for storing post-processed files")
+    parser.add_argument("--output_filename", type=str, default="output_merged.csv")
 
-    argins = parser.parse_args()
 
-    # file naming syntax:
-    # metric_model_scenario_condition_list-type
-    files = glob.glob(os.path.join(argins.output_dir, "surprisal_{}_{}_{}_*.csv".format(argins.arch, argins.model_id, argins.scenario)))
+    # uncomment this for testing
+    #input_arguments = ["--output_dir", "/home/ka2773/project/lm-mem/test", "--output_filename", "test_merge.csv"]
+
+    if input_arguments is None:
+        argins = parser.parse_args()
+    else:
+        argins = parser.parse_args(input_arguments)
+
+    # read in files
+    filename = argins.filename_pattern + argins.suffix
+    files = glob.glob(os.path.join(argins.output_dir, filename))
 
     if not files:
-        raise Exception("Can find any files that match pattern: {}".format(os.path.join(argins.output_dir, "surprisal_{}_{}_{}*.csv".format(argins.arch, argins.model_id, argins.scenario))))
+        raise Exception("Can find any files that match pattern: {}".format(os.path.join(argins.output_dir, filename)))
 
     files.sort()
 
@@ -266,6 +274,7 @@ if __name__ == "__main__":
         4: 200,
         5: 400,
     }
+
     df.prompt_len = df.prompt_len.map(prompt_len_map)
 
     # rename scenario values to more meaningful ones
@@ -282,6 +291,11 @@ if __name__ == "__main__":
     df.rename(columns={"scenario": "context"}, inplace=True)
 
     # save back to csv (waste of memory but let's stick to this for now)
-    fname = os.path.join(argins.output_dir, "output_{}_{}_{}.csv".format(argins.arch, argins.model_id, argins.scenario))
+    fname = os.path.join(argins.output_dir, argins.output_filename)
     print("Saving {}".format(fname))
     df.to_csv(fname, sep="\t")
+
+#===== LOAD CSV FILES =====#
+if __name__ == "__main__":
+
+    main()
