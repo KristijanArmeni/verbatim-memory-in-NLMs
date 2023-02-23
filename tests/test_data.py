@@ -53,7 +53,7 @@ def awd_lstm_dataset():
     markers = {key: markers_tmp[key][0:10] for key in markers_tmp.keys()}
 
     ds = Dataset(metadict=markers)
-    ds.dictionary = torch.load("models/awd_lstm/data/wikitext-103/dictionary")
+    ds.dictionary = torch.load("/home/ka2773/project/lm-mem/src/models/awd_lstm/data/wikitext-103/dictionary")
 
     ds.tokenize_input_sequences(input_sequences=input_set, tokenizer_func=word_tokenize)
     ds.tokens_to_ids()
@@ -86,6 +86,9 @@ def awd_lstm_weights_and_criterion():
     splits = [2800, 20000, 76000]  # these are hard-coded
     criterion = SplitCrossEntropyLoss(config["n_hid"], splits, verbose=False)
 
-    model, criterion, _ = torch.load("/scratch/ka2773/project/lm-mem/checkpoints/awd_lstm/LSTM_3-layer_adam.pt", map_location='cpu') 
+    _, criterion, _ = torch.load("/scratch/ka2773/project/lm-mem/checkpoints/awd_lstm/LSTM_3-layer_adam.pt", map_location='cpu') 
+
+    model.load_state_dict(torch.load("/scratch/ka2773/project/lm-mem/checkpoints/awd_lstm/LSTM_3-layer_adam_statedict.pt", map_location='cpu'))
+
 
     return model, criterion
