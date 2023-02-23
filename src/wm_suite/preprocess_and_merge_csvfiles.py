@@ -1,6 +1,5 @@
 
 import os
-import sys
 import pandas as pd
 import numpy as np
 import glob
@@ -19,7 +18,7 @@ def infer_labels_from_filebasename(filename):
     Parameters:
     ----------
     filename : str
-        filename to surprisal_<arc>_<model-id>_<scenario>_<second_list>_<list_type>.csv (output of wm_test_suite.py) files
+        filename to surprisal_<arc>_<model-id>_<scenario>_<list_len>_<prompt_len>_<second_list>_<list_type>.csv (output of wm_test_suite.py) files
     
     Returns:
     -------
@@ -34,8 +33,8 @@ def infer_labels_from_filebasename(filename):
     list_type : str
         string denoting whether the list is random or categorized
     """
-    arc, model_id, scenario, prompt_len, list_len, condition, list_type = filename.split("_")[1::]
-    list_type = list_type.split(".csv")[0]  # cut the filename suffix
+    arc, model_id, scenario, prompt_len, list_len, list_type, condition = filename.split("_")[1::]
+    condition = condition.split(".csv")[0]  # cut the filename suffix
 
     logging.info(f"Inferring the following information from filename {filename}: \n" + \
                 f"list length = {list_len}\n" + \
@@ -57,11 +56,11 @@ def load_and_preproc_csv(output_folder, filenames):
         print("Reading \n {}".format(file))
 
         labels = infer_labels_from_filebasename(os.path.basename(file))
-        arc, model_id, scenario, list_len, prompt_len, second_list, list_type = labels 
+        arc, model_id, scenario, list_len, prompt_len, list_type, second_list = labels 
 
-        sep = ","
+        sep = "\t"
 
-        dftmp = pd.read_csv(os.path.join(output_folder, file), sep=sep, header=0)
+        dftmp = pd.read_csv(os.path.join(output_folder, file), sep=sep)
 
         # add information from filenames
         dftmp["list"] = list_type  # add column on list composition
@@ -248,7 +247,7 @@ def main(input_arguments=None):
 
 
     # uncomment this for testing
-    input_arguments = ["--output_dir", "/home/ka2773/project/lm-mem/test", "--output_filename", "test_merge.csv"]
+    #input_arguments = ["--output_dir", "/home/ka2773/project/lm-mem/test", "--output_filename", "test_merge.csv"]
 
     if input_arguments is None:
         argins = parser.parse_args()
