@@ -30,6 +30,8 @@ from string import punctuation
 from tqdm import tqdm
 import logging
 
+from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits
+
 logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
 
 # own modules
@@ -60,6 +62,65 @@ def make_filename_from_config(model:str, vignette: str, condition: str, prompt:s
     inputs_file_info = f"{model}_{condition}_{vignette}_{prompt}_n{list_len}_{list_type}_info.json"
 
     return inputs_file, inputs_file_info
+
+# ===== HELPER FUNCTION FOR MERGING BPE SPLIT TOKENS ===== #
+
+def code_relative_markers(markers: np.array) -> Tuple[np.array, np.array]:
+    
+    marker_pos, marker_pos_rel = [], []
+
+    codes = np.unique(markers)
+    for c in codes:
+
+        sel = markers[markers == c]
+
+        if c in [0, 2]:
+            # start with 1, reverse and make it negative
+            marker_pos_rel.append(-1*(np.arange(0, len(sel))+1)[::-1])
+        else:
+            marker_pos_rel.append(np.arange(0, len(sel)))
+
+        # code marker position without negative indices
+        marker_pos.append(np.arange(0, len(sel)))
+
+    return np.hstack(marker_pos), np.hstack(marker_pos_rel)
+
+def merge_states(x:np.array, bpe_split_indices:np.array, tokens:np.array, mergefun=np.mean):
+    """
+    finds repeated indices marked by bpe_split_indices() then loops
+    and merges over these indices by applying <mergefun> to axis 0
+    """
+
+    # find which tokens where split by looking at indices that occur more than once (i.e. for each BPE subword)
+    # example: [0, 1, 2, 3, 3, 4] --> token 3 was split into two subwords
+    u, c = np.unique(bpe_split_indices, return_counts=True)
+
+    tokens_orig = np.array(tokens)
+    new_tokens = np.array(tokens)
+
+    # loop over tokens with count > 1 (these are subword tokens)
+    is_repeated = c > 1
+    is_not_punct = u > 0
+    for wassplit in u[is_repeated & is_not_punct] :
+
+        sel = np.where(bpe_split_indices == wassplit)[0]
+
+        # safety check, merged sub-words must be adjacent, else don't merge
+        if (np.diff(sel) == 1).all():
+
+            logging.info(f"Merging tokens {new_tokens[sel]} at positions {sel}")
+
+            # replace first subword token by the mean of all subwords and delete the rest
+            x[sel[0], ...] = mergefun(x[sel, ...], axis=0)    # shape = (tokens, ...)
+            x[sel[1::], ...] = np.nan                         # 
+
+            # update the strings
+            merged_token = "_".join(new_tokens[sel].tolist())
+
+            new_tokens[sel[0]] = merged_token
+            new_tokens[sel[1::]] = ''
+
+    return x, new_tokens, tokens_orig
 
 # ===== EXPERIMENT CLASS ===== #
 
@@ -420,6 +481,9 @@ class Experiment(object):
             outputs["sequence_ppl"].extend(ppls)
             outputs["surp"].extend(surprisals)
 
+        # store tokens
+        outputs["token"] = [self.tokenizer.convert_ids_to_tokens(e[0]) for e in input_sequences]
+
         return outputs
 
     def start(self, input_sequences: List[torch.Tensor]) -> Dict[str, List[any]]:
@@ -440,6 +504,26 @@ class Experiment(object):
 
         #logging.info(f"Batch size = {self.batch_size}, calling self.start_sequential()")
         #return self.start_sequential(input_sequences)
+
+    def merge_bpe_splits(self, outputs: Dict) -> Dict:
+
+        for i in range(len(outputs['surp'])):
+        
+            s = outputs['surp'][i]
+            t = outputs['token'][i]
+
+            r = mark_subtoken_splits(t, split_marker='Ġ', marker_logic='outside', 
+                                     eos_markers=["<|endoftext|>", "<|endoftext|>"])
+
+            x, t1, _ = merge_states(np.expand_dims(np.array(s), axis=1), 
+                                    bpe_split_indices=np.array(r), 
+                                    tokens=t,
+                                    mergefun=np.sum)
+
+            outputs['surp'][i] = np.squeeze(x)    # add merged (summed) surprisal
+            outputs['token'][i] = t1  # add merged strings
+
+        return outputs
 
 def ablate_attn_head(model: transformers.PreTrainedModel, 
                      layers: Tuple, 
@@ -542,20 +626,12 @@ def permute_qk_weights(model=None, per_head=False, seed=None):
     return model
 
 
-def output2dataframe(output_dict: Dict, input_sequences_info: Dict, condition: str) -> Dict:
+def outputs2dataframe(colnames: List, arrays: List, metacols: List, metarrays: List) -> Dict:
 
     experiment_outputs = []
 
-    meta_cols = ["trialID", "positionID", "subtok"]
-    colnames = ["token"] + meta_cols + ["surp"]
-    arrays = [output_dict["token"],
-                input_sequences_info["trialID"],
-                input_sequences_info["positionID"],
-                input_sequences_info["subtok"],
-                output_dict["surp"]]
-
     counter = 1  # counter for trials
-    n_sequences = len(output_dict["surp"])
+    n_sequences = len(arrays[0])
 
     # make a new single dict with all rows for the df below
     dfrows = {key_arr[0]: key_arr[1] for i, key_arr in enumerate(zip(colnames, arrays))}
@@ -570,11 +646,10 @@ def output2dataframe(output_dict: Dict, input_sequences_info: Dict, condition: s
         dftmp = pd.DataFrame(row_values)
 
         # now add the constant values for the current sequence rows
-        dftmp["stimid"] = input_sequences_info["stimid"][i]                # stimulus id
-        dftmp['prompt'] = input_sequences_info["prompt"][i]                # add a column of prompt labels
-        dftmp["list_len"] = input_sequences_info["list_len"][i]            # add list length
+        for k, x in zip(metacols, metarrays):
+            dftmp[k] = x[i]   # this array just contains a constant for the whole sequence             
+        
         dftmp['stimID'] = counter                               # track sequence id
-        dftmp['second_list'] = condition                 # log condition of the second list
 
         experiment_outputs.append(dftmp)
         counter += 1
@@ -583,6 +658,26 @@ def output2dataframe(output_dict: Dict, input_sequences_info: Dict, condition: s
     output = pd.concat(experiment_outputs)
 
     return output
+
+def delete_timesteps(arrays: Tuple[List[np.array]], delete_these: List[np.array]) -> List:
+    """
+    Parameters:
+    arrays : tuple or list of lists of arrays
+        list of 1-dimensional arrays on which np.delete is called
+    delete_these : list of boolean arrays
+        each element of the list is a boolean and will be used to delete elements in the array
+    """
+    
+    o = []
+    for arr in arrays:
+
+        # test that all 1-dimensional arrays and booleans are of the same length
+        assert all([len(a) == len(ids) for a, ids in zip(arr, delete_these)])
+
+        # loop over array elements
+        o.append([np.delete(a, ids, axis=0) for a, ids in zip(arr, delete_these)])
+
+    return o
 
 # ===== Setup for gpt2 ====== #
 def setup():
@@ -629,16 +724,18 @@ def runtime_code(input_args: List = None):
     parser.add_argument("--batch_size", type=int, default=1)
     parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
                         help="whether to run on cpu or cuda")
+    parser.add_argument("--model_statedict_filename", type=str, default="")
     parser.add_argument("--output_dir", type=str,
                         help="str, the name of folder to write the output_filename in")
     parser.add_argument("--output_filename", type=str,
                         help="str, the name of the output file saving the dataframe")
 
 
+    # uncomment these to evaluate code below without having to call the script
     #input_args = [
     #    "--scenario", "sce1",
     #    "--condition", "repeat",
-    #    "--model_type", "ablate",
+    #    "--model_type", "ablation",
     #    "--ablate_layer", "(0,)",
     #    "--ablate_head", "(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)",
     #    "--checkpoint", "gpt2",
@@ -754,22 +851,59 @@ def runtime_code(input_args: List = None):
                             use_cache=False,
                             device=device)
 
+    # run experiment
     output_dict = experiment.start(input_sequences = input_sequences)
 
-    # add token information to the output dictionary
-    output_dict["token"] = [experiment.tokenizer.convert_ids_to_tokens(e[0]) for e in input_sequences]
+    # ===== POST PROCESSING ===== #
+
+    logging.info("Postprocessing outputs...")
+
+    # code relative markers (useful for plotting)
+    output_dict['marker_pos'] = [code_relative_markers(np.array(x))[0] for x in input_sequences_info['trialID']]
+    output_dict['marker_pos_rel'] = [code_relative_markers(np.array(x))[1] for x in input_sequences_info['trialID']]
+
+    # merge tokens and surprisals that were splits into BPE tokens
+    output_dict = experiment.merge_bpe_splits(output_dict)
 
     experiment.model.to("cpu")
 
+    if argins.model_statedict_filename:
+        fn = os.path.join(argins.output_dir, argins.model_statedict_filename)
+        logging.info(f"Saving {fn}")
+        torch.save(experiment.model.state_dict(), fn)
+
     # ===== FORMAT AND SAVE OUTPUT ===== #
-    output_dict = output2dataframe(output_dict=output_dict, 
-                                   input_sequences_info=input_sequences_info, 
-                                   condition=argins.condition)
+
+    colnames = ["token", "surp", "marker_pos", "marker_pos_rel"]
+    metacols = ["trialID", "positionID", "subtok", "list_len", "prompt_len"]
+
+    arrays = [output_dict["token"],
+              output_dict["surp"],
+              output_dict['marker_pos'],
+              output_dict['marker_pos_rel']]
+    
+    metarrays = [input_sequences_info["trialID"],
+                 input_sequences_info["positionID"],
+                 input_sequences_info["subtok"],
+                 input_sequences_info["list_len"],
+                 input_sequences_info["prompt"]]
+
+    #nan_timesteps = [np.squeeze(np.isnan(a)) for a in output_dict['surp']]
+    #arrays = delete_timesteps(arrays, nan_timesteps)
+    #metarrays = delete_timesteps(metarrays, nan_timesteps)
+
+    # put everything into a dataframe
+    logging.info("Converting to dataframe...")
+
+    output_df = outputs2dataframe(colnames, arrays, metacols, metarrays)
+
+    # drop nan rows (merged BPE timesteps + <|endoftext symbols|>)
+    output_df = output_df.dropna()
 
     # save output
     outpath = os.path.join(argins.output_dir, argins.output_filename)
-    print("Saving {}".format(os.path.join(outpath)))
-    output_dict.to_csv(outpath, sep="\t")
+    logging.info("Saving {}".format(os.path.join(outpath)))
+    output_df.to_csv(outpath, sep="\t")
 
 # ===== RUN ===== #
 if __name__ == "__main__":
