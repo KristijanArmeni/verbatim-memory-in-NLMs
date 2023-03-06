@@ -1,6 +1,6 @@
 #! /bin/bash
 
-scenario="sce5"
+scenario="sce1"
 model_id="gpt2"
 
 # bert stimuli
@@ -10,7 +10,7 @@ do
     for condition in "repeat";
     do
 
-        for list_len in "n3";
+        for list_len in "n5";
         do
 
             for prompt_key in "1";
@@ -22,10 +22,10 @@ do
                                                     --condition $condition \
                                                     --prompt_key $prompt_key \
                                                     --list_len $list_len \
-                                                    --path_to_tokenizer "gpt2" \
+                                                    --path_to_tokenizer "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer" \
                                                     --device "cuda" \
                                                     --input_filename $list_type"_lists.json" \
-                                                    --output_dir "/home/ka2773/project/lm-mem/src/data/transformer_input_files/gpt2" \
+                                                    --output_dir "/home/ka2773/project/lm-mem/src/data/transformer_input_files/transformer_wt103_v2" \
                                                     --output_filename $output_name
 
             done

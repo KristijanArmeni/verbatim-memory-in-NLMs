@@ -446,12 +446,14 @@ def main():
     # this tells the bpe split counter what symbol to look for
     bpe_split_marker_dict = {"gpt2": "Ġ",
                              "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
+                             "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "Ġ",
                              "bert-base-uncased": "##",
                              "transfo-xl-wt103": None}
 
     # this tells the bpe split counter how these symbols are used
     marker_logic_dict = {"gpt2": "outside",
                          "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
+                         "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "outside",
                          "bert-base-uncased": "within",
                          "transfo-xl-wt103": None}
 
