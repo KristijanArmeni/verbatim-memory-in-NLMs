@@ -22,6 +22,7 @@ do
                                                     --condition $condition \
                                                     --prompt_key $prompt_key \
                                                     --list_len $list_len \
+                                                    --pretokenize_moses \
                                                     --path_to_tokenizer "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer" \
                                                     --device "cuda" \
                                                     --input_filename $list_type"_lists.json" \
