@@ -4,6 +4,11 @@
         "gpt2",
         "gpt2"
     ],
+    "b-10": [
+        "pretrained",
+        "bert-base-uncased",
+        "bert-base-uncased"
+    ],
     "r-10": [
         "random",
         "",
@@ -27,6 +32,31 @@
     "w-12": [
         "wikitext-12-layer",
         "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_40m_12-768-1024_a_02/checkpoint-31000",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer"
+    ],
+    "w-12v2": [
+        "wikitext-12-layer",
+        "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_full_12-768-1024_a_01/checkpoint-27500",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer"
+    ],
+    "w-12b": [
+	"wikitext-12-layer-b",
+    	"/scratch/ka2773/project/lm-mem/checkpoints/gpt2_40m_12-768-1024_b_02/checkpoint-26500",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer"
+    ],
+    "w-12c": [
+	"wikitext-12-layer-c",
+	"/scratch/ka2773/project/lm-mem/checkpoints/gpt2_40m_12-768-1024_c_02/checkpoint-26000",
+	"/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer"
+    ],
+    "w-12e": [
+        "wikitext-12-layer-e",
+        "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_40m_12-768-1024_e_02/checkpoint-24000",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer"
+    ],
+    "w-12d": [
+        "wikitext-12-layer-d",
+        "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_40m_12-768-1024_d_02/checkpoint-22500",
         "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer"
     ],
     "w-06": [

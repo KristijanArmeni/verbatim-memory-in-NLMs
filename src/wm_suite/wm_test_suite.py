@@ -1,21 +1,10 @@
-"""
-surprisal.py is used to run the perplexity experiment with GPT-2
-it relies on the Experiment() class which is just a class with wrapper methods
-around the Transformers library.
-
-Use as:
-
-python experiment.py
-or from an ipython console:
-%run experiment.py ""
-
-"""
 
 import json
 import sys, os
 import argparse
 from itertools import product
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import transformers
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config, \
@@ -25,11 +14,13 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.nn import functional as F
 from tqdm import trange
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Sequence
 from string import punctuation
-from tqdm import tqdm
+from tqdm import tqdm, trange
 import logging
 
+sys.path.append("/home/ka2773/project/lm-mem/src")
+from data.wt103.dataset import WikiTextDataset
 from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits
 
 logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
@@ -54,19 +45,21 @@ class SimpleDataset(Dataset):
     def __len__(self) -> int:
         return len(self.items)
 
-def make_filename_from_config(model:str, vignette: str, condition: str, prompt:str, list_len:str, list_type:str) -> Tuple[str, str]:
-    """make_filename_from_config() is a simple utility function that compuses a filename string
-    from input configurations"""
-
-    inputs_file = f"{model}_{condition}_{vignette}_{prompt}_n{list_len}_{list_type}.json"
-    inputs_file_info = f"{model}_{condition}_{vignette}_{prompt}_n{list_len}_{list_type}_info.json"
-
-    return inputs_file, inputs_file_info
-
 # ===== HELPER FUNCTION FOR MERGING BPE SPLIT TOKENS ===== #
 
-def code_relative_markers(markers: np.array) -> Tuple[np.array, np.array]:
-    
+def code_relative_markers(markers: npt.ArrayLike) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Helper function to code the position of timesteps relative to lists of nouns within each sequences.
+    These markers are used for aggregating prior to visualization.
+
+    Parameters:
+    ----------
+    markers : np.ndarray or array-like
+
+    Returns:
+    tuple of arrays containing the marker positions and relative marker positions
+    -------
+    """
     marker_pos, marker_pos_rel = [], []
 
     codes = np.unique(markers)
@@ -85,7 +78,7 @@ def code_relative_markers(markers: np.array) -> Tuple[np.array, np.array]:
 
     return np.hstack(marker_pos), np.hstack(marker_pos_rel)
 
-def merge_states(x:np.array, bpe_split_indices:np.array, tokens:np.array, mergefun=np.mean):
+def merge_states(x:np.ndarray, bpe_split_indices:np.ndarray, tokens:np.ndarray, mergefun=np.mean):
     """
     finds repeated indices marked by bpe_split_indices() then loops
     and merges over these indices by applying <mergefun> to axis 0
@@ -153,13 +146,14 @@ class Experiment(object):
 
     """
 
-    def __init__(self, model, ismlm, tokenizer, context_len, batch_size, use_cache, device):
+    def __init__(self, model, ismlm, tokenizer, context_len, batch_size, stride, use_cache, device):
 
         self.model = model
         self.ismlm = ismlm
         self.device = device
         self.tokenizer = tokenizer
         self.context_len = context_len
+        self.stride = stride
         self.batch_size = batch_size
         self.use_cache = use_cache
 
@@ -167,35 +161,6 @@ class Experiment(object):
 
         self.model.to(device)
         
-
-    def get_logits(self, input_string):
-
-        inp_ids = self.tokenizer.encode(input_string, return_tensors="pt")
-
-        # take the output logits of the model
-        with torch.no_grad():
-            logits = self.model(inp_ids)[0]  # tuple of shape = (logits, layer and attention output)
-
-        return logits
-
-    def get_probs(self, logits, n_tokens=5, k=10^3, p=0.9):
-
-        """get_probs(self, logtis, k, p) is a convenience fun wrapping around
-        top_k_top_p_filtering(logits, top_k, top_p), calling F.softmax() on the output and sampling from   there
-        """
-
-        # take only the top 10 logits
-        filtered_logits = top_k_top_p_filtering(logits[:, -1, :], top_k=k, top_p=p)
-
-        # apply the softmax to the truncated distribution
-        probs = F.softmax(filtered_logits, dim=-1)
-
-        # now sample n tokens
-        # next_tokens = torch.multinomial(probs, num_samples=n_tokens, replacement=False)
-
-        token_prob, token_ids = torch.topk(x=probs, dim=1, k=n_tokens, sorted=True)
-
-        return token_prob, token_ids
 
     # loop over input list
     def ppl(self, 
@@ -248,9 +213,9 @@ class Experiment(object):
             # do not compute the loss on  tokens (-100) that are used for context
             target_ids[:, :-trg_len] = -100
 
-            if i in range(0, 5):
-                print(f"inputs: {sel_input_ids}")
-                print(f"targets: {target_ids}")
+            #if i in range(0, 5):
+            #    print(f"inputs: {sel_input_ids}")
+            #    print(f"targets: {target_ids}")
 
             # set model to evaluation mode
             self.model.eval()
@@ -265,12 +230,13 @@ class Experiment(object):
                log_likelihood = outputs.loss.item() * trg_len  # not sure about this multiplication here (undoing averaging?)
 
                llh.append(log_likelihood)
-               toks = self.tokenizer.decode(target_ids[0][-stride::])
-               tokens.append(toks)  # store the last token (target_id)
+               if stride == 1:
+                    toks = self.tokenizer.decode(target_ids[0][-stride::])
+                    tokens.append(toks)  # store the last token (target_id)
 
         # compute perplexity, divide by the lenth of the sequence
         # use np.nansum as token at position 0 will have -LL of nan
-        ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc).cpu()
+        ppl = torch.exp(torch.tensor(np.nansum(llh)) / (end_loc-1)).cpu()
         return ppl, llh, tokens
 
     def ppl_batched(self, 
@@ -286,6 +252,12 @@ class Experiment(object):
         """
 
         batch_size = len(seq_lens)
+
+        assert batch_size == self.batch_size
+
+        if (stride > 1):
+            raise ValueError(".self_batched is only tested on stride == 1,"
+                             "higher values are not accepted currently")
 
         # to match every token need to insert <eos> token artificially at beginning
         llhs = [
@@ -364,9 +336,9 @@ class Experiment(object):
                 del selected_input_ids
 
                 # compute loss per every sequence in batch shape = (batch, sequence_len)
-                losses = self.loss_fct_batched(
-                    outputs.logits[:, -1, :].view(-1, outputs.logits.size(-1)), target_ids[:, -1].view(-1)
-                )
+                losses = self.loss_fct_batched(outputs.logits[:, -1, :].view(-1, outputs.logits.size(-1)), 
+                                               target_ids[:, -1].view(-1)
+                                                )
                 # del outputs
                 del target_ids
 
@@ -391,12 +363,11 @@ class Experiment(object):
             )
         return ppls, final_llhs
 
-    def start_sequential(self, input_sequences_ids=None) -> List:
+    def start_sequential(self, input_sequences_ids:List[torch.tensor]=None) -> List:
         """
-        Experiment.start_sequential() will loop over prefixes, prompts, and word_lists and run the .ppl() method on them
-        
         Parameters:
         ---------
+        input_sequences_ids: list of tensors
         
         Returns:
         -------
@@ -431,34 +402,47 @@ class Experiment(object):
         return outputs
 
 
-    def start_batched(self, input_sequences: List[torch.Tensor]):
+    def get_batch(self, sequence_list: List[torch.Tensor]) -> Tuple[torch.Tensor]:
+        """Converts list of sequences into a padded torch Tensor and its lengths"""
 
-                # 1. collate_fn
-        def get_batch(sequence_list: List[torch.Tensor]) -> Tuple[torch.Tensor]:
-            """Converts list of sequences into a padded torch Tensor and its lengths"""
+        # get lengths of all sequences
+        sequence_lengths = [len(sequence[0]) for sequence in sequence_list]
 
-            # get lengths of all sequences
-            sequence_lengths = [len(sequence[0]) for sequence in sequence_list]
+        batched_sequence = torch.nn.utils.rnn.pad_sequence(
+            [sequence[0] for sequence in sequence_list],
+            batch_first=True,
+            padding_value=self.tokenizer.encode(self.tokenizer.unk_token)[0],
+        )
+        target_sequence = torch.nn.utils.rnn.pad_sequence(
+            [sequence[0] for sequence in sequence_list],
+            batch_first=True,
+            padding_value=self.loss_fct_batched.ignore_index,
+        )
+        return batched_sequence, sequence_lengths, target_sequence
 
-            batched_sequence = torch.nn.utils.rnn.pad_sequence(
-                [sequence[0] for sequence in sequence_list],
-                batch_first=True,
-                padding_value=self.tokenizer.encode(self.tokenizer.unk_token)[0],
-            )
-            target_sequence = torch.nn.utils.rnn.pad_sequence(
-                [sequence[0] for sequence in sequence_list],
-                batch_first=True,
-                padding_value=self.loss_fct_batched.ignore_index,
-            )
-            return batched_sequence, sequence_lengths, target_sequence
 
-        # 2. make dataset and dataloader
+    def start_batched(self, input_sequences: List[List[torch.Tensor]]) -> Dict:
+        """
+        Parameters:
+        ----------
+        input_sequences : list of sequence lists
+
+        Returns:
+        -------
+        output_dict : dict
+            dict with keys:
+            'surp': surprisals for each token in the sequence
+            'sequence_ppl': perplexity (in bits) for every sequence
+            'token': token strings for each time step (if self.stride == 1)
+        """
+
+        # initiate dataset class and data loader
         sequence_dataset = SimpleDataset(input_sequences)
 
         sequence_loader = DataLoader(sequence_dataset, 
                                      batch_size=self.batch_size, 
                                      shuffle=False, 
-                                     collate_fn=get_batch,
+                                     collate_fn=self.get_batch,
         )
 
         # 3. go through sequences
@@ -473,7 +457,7 @@ class Experiment(object):
 
             ppls, surprisals = self.ppl_batched(input_ids=input_ids,
                                                 context_len=self.context_len, 
-                                                stride=1,
+                                                stride=self.stride,
                                                 seq_lens=sequence_lengths, 
                                                 targets=targets)
 
@@ -482,7 +466,8 @@ class Experiment(object):
             outputs["surp"].extend(surprisals)
 
         # store tokens
-        outputs["token"] = [self.tokenizer.convert_ids_to_tokens(e[0]) for e in input_sequences]
+        if self.stride == 1:
+            outputs["token"] = [self.tokenizer.convert_ids_to_tokens(e[0]) for e in input_sequences]
 
         return outputs
 
@@ -512,7 +497,9 @@ class Experiment(object):
             s = outputs['surp'][i]
             t = outputs['token'][i]
 
-            r = mark_subtoken_splits(t, split_marker='Ġ', marker_logic='outside', 
+            r = mark_subtoken_splits(t, 
+                                     split_marker='Ġ', 
+                                     marker_logic='outside', 
                                      eos_markers=["<|endoftext|>", "<|endoftext|>"])
 
             x, t1, _ = merge_states(np.expand_dims(np.array(s), axis=1), 
@@ -659,26 +646,6 @@ def outputs2dataframe(colnames: List, arrays: List, metacols: List, metarrays: L
 
     return output
 
-def delete_timesteps(arrays: Tuple[List[np.array]], delete_these: List[np.array]) -> List:
-    """
-    Parameters:
-    arrays : tuple or list of lists of arrays
-        list of 1-dimensional arrays on which np.delete is called
-    delete_these : list of boolean arrays
-        each element of the list is a boolean and will be used to delete elements in the array
-    """
-    
-    o = []
-    for arr in arrays:
-
-        # test that all 1-dimensional arrays and booleans are of the same length
-        assert all([len(a) == len(ids) for a, ids in zip(arr, delete_these)])
-
-        # loop over array elements
-        o.append([np.delete(a, ids, axis=0) for a, ids in zip(arr, delete_these)])
-
-    return o
-
 # ===== Setup for gpt2 ====== #
 def setup():
     logging.info("SETUP: nltk punkt")
@@ -735,16 +702,16 @@ def runtime_code(input_args: List = None):
     #input_args = [
     #    "--scenario", "sce1",
     #    "--condition", "repeat",
-    #    "--model_type", "ablation",
-    #    "--ablate_layer", "(0,)",
-    #    "--ablate_head", "(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)",
-    #    "--checkpoint", "gpt2",
-    #    "--tokenizer", "gpt2",
+    #    "--model_type", "pretrained",
+        #"--ablate_layer", "(0,)",
+        #"--ablate_head", "(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)",
+    #    "--checkpoint", "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_full_12-768-1024_a_01/checkpoint-27500",
+    #    "--tokenizer", "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer",
     #    "--model_seed", "12345",
-    #    "--inputs_file", f"/home/ka2773/project/lm-mem/src/data/transformer_input_files/gpt2/gpt2_repeat_sce1_1_n3_random.json",
-    #    "--inputs_file_info", f"/home/ka2773/project/lm-mem/src/data/transformer_input_files/gpt2/gpt2_repeat_sce1_1_n3_random_info.json",
+    #    "--inputs_file", f"/home/ka2773/project/lm-mem/src/data/transformer_input_files/transformer_wt103_v2/gpt2_repeat_sce1_1_n5_random.json",
+    #    "--inputs_file_info", f"/home/ka2773/project/lm-mem/src/data/transformer_input_files/transformer_wt103_v2/gpt2_repeat_sce1_1_n5_random_info.json",
     #    "--output_dir", "/scratch/ka2773/project/lm-mem/output/ablation",
-    #    "--output_file", "surprisal_gpt2_ablate-3-3_sce1_repeat_random.csv",
+    #    "--output_file", "surprisal_gpt2_pretrained_sce1_repeat_random.csv",
     #    "--device", "cuda",
     #]
 
@@ -848,11 +815,28 @@ def runtime_code(input_args: List = None):
                             tokenizer=tokenizer,
                             context_len=argins.context_len,
                             batch_size=argins.batch_size,
+                            stride=1,
                             use_cache=False,
                             device=device)
 
     # run experiment
     output_dict = experiment.start(input_sequences = input_sequences)
+
+    # compute perplexity on a WT103 test set
+    test_set_path = '/home/ka2773/project/lm-mem/data/wikitext-103/wiki.test.tokens'
+    logging.info(f"Loading {test_set_path}...")
+    toks, ids = WikiTextDataset(tokenizer=tokenizer).retokenize_txt(test_set_path)
+
+    #initialize experiment class
+    experiment2 = Experiment(model=model, ismlm=ismlm,
+                            tokenizer=tokenizer,
+                            context_len=argins.context_len,
+                            batch_size=argins.batch_size,
+                            stride=256,
+                            use_cache=False,
+                            device=device)
+    
+    ppl, _, _ = experiment2.ppl(input_ids=torch.tensor([ids]), context_len=1024, stride=256)
 
     # ===== POST PROCESSING ===== #
 
@@ -872,30 +856,38 @@ def runtime_code(input_args: List = None):
         logging.info(f"Saving {fn}")
         torch.save(experiment.model.state_dict(), fn)
 
+            # store wikitext-103 perplexity
+        ppl_dict = {"wt103_ppl": round(ppl, 2),
+                    "model": argins.model_statedict_filename}
+        
+        fn = os.path.join(argins.output_dir, argins.model_statedict_filename.replace(".pt", "_ppl.json"))
+        with open(fn, 'w') as fh:
+            json.dump(ppl_dict, fh)
+
     # ===== FORMAT AND SAVE OUTPUT ===== #
 
     colnames = ["token", "surp", "marker_pos", "marker_pos_rel"]
-    metacols = ["trialID", "positionID", "subtok", "list_len", "prompt_len"]
+    metacols = ["ppl", "trialID", "positionID", "subtok", "list_len", "prompt_len"]
 
     arrays = [output_dict["token"],
               output_dict["surp"],
               output_dict['marker_pos'],
               output_dict['marker_pos_rel']]
     
-    metarrays = [input_sequences_info["trialID"],
+    metarrays = [output_dict['sequence_ppl'],
+                 input_sequences_info["trialID"],
                  input_sequences_info["positionID"],
                  input_sequences_info["subtok"],
                  input_sequences_info["list_len"],
                  input_sequences_info["prompt"]]
 
-    #nan_timesteps = [np.squeeze(np.isnan(a)) for a in output_dict['surp']]
-    #arrays = delete_timesteps(arrays, nan_timesteps)
-    #metarrays = delete_timesteps(metarrays, nan_timesteps)
-
     # put everything into a dataframe
     logging.info("Converting to dataframe...")
 
     output_df = outputs2dataframe(colnames, arrays, metacols, metarrays)
+
+    output_df.attrs = {'wt103_ppl': round(ppl, 2),
+                       'argins': argins}
 
     # drop nan rows (merged BPE timesteps + <|endoftext symbols|>)
     output_df = output_df.dropna()

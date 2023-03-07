@@ -8,7 +8,7 @@ Created on Thu Mar 18 16:03:16 2021
 """
 
 import argparse
-import os
+import os, sys
 import time
 from ast import literal_eval
 from datetime import timedelta
@@ -23,7 +23,8 @@ from transformers import GPT2Config, GPT2TokenizerFast, GPT2LMHeadModel, \
                         EarlyStoppingCallback
 
 # own module
-from dataset import WikiTextDataset
+sys.path.append("/home/ka2773/project/lm-mem/src")
+from data.wt103.dataset import WikiTextDataset
 
 # ============================== #
 # ===== DATASET MANAGEMENT ===== #
@@ -105,10 +106,16 @@ def compute_perplexity(model, input_ids, tokenizer, context_len, stride, device)
                # indices are shifted under the hood by model.__call__()
                outputs = model(sel_input_ids, labels=target_ids)
 
-               # first element of the tuple contains the loss
-               log_likelihood = outputs.loss.item() * trg_len  # not sure about this multiplication here (undoing averaging?)
+               # get loss and multiply with the length of items
+               # forward pass returns average loos over predicted tokens, we multiply so that we get summation back from average
+               # we compute the true average over appended LLHs before the output below
+               # (if stride == 1, this doesn't really do anything ofc)
+               log_likelihood = outputs.loss.item() * trg_len  
 
                llh.append(log_likelihood)
+
+               #print(f"begin_loc: {begin_loc} | end_loc: {end_loc} | trg_len {trg_len} | loss {outputs.loss.item()} | loss2: {outputs[0]} | llh {log_likelihood}" )
+               #print(f"inputs {sel_input_ids[0, -3::]} | target_ids {target_ids[0, -3::]}")
 
                # only output tokens if we are computing token-by-token ppl
                # (i.e. stride == 1)
@@ -118,7 +125,7 @@ def compute_perplexity(model, input_ids, tokenizer, context_len, stride, device)
 
         # compute perplexity, divide by the lenth of the sequence
         # use np.nansum as token at position 0 will have -LL of nan
-        ppl = torch.exp(torch.tensor(np.nansum(llh)) / end_loc).cpu()
+        ppl = torch.exp(torch.tensor(np.nansum(llh)) / (end_loc-1)).cpu()
         return ppl, llh, tokens
 
 # ======================== #

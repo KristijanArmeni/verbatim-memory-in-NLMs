@@ -10,6 +10,7 @@ from tqdm import trange
 from typing import List, Tuple, Dict
 from string import punctuation
 import logging
+from mosestokenizer import MosesTokenizer
 
 logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
 
@@ -96,6 +97,7 @@ def concat_and_tokenize_inputs(prefix:str,
                                bpe_split_marker:str, 
                                marker_logic:str, 
                                ismlm:bool,
+                               pretokenize_moses:bool=False,
                                tokenizer=None) -> Tuple[List[torch.Tensor], Dict]:
 
     """
@@ -150,9 +152,19 @@ def concat_and_tokenize_inputs(prefix:str,
         eos2 = tokenizer.eos_token
 
     logging.info(f"Using {eos1} and {eos2} as start and end eos tokens, respectively")
+    if pretokenize_moses:
+        logging.info(f"Pretokenizing input sequenes with MosesTokenizer('en') ...")
 
     # list storing outputs
     input_seqs_tokenized = []
+
+    # pretokenize with moses and conver back to strings if need be
+    if pretokenize_moses:
+        with MosesTokenizer('en') as pretokenize:
+            prefix = " ".join(pretokenize(prefix))
+            input_seqs = [" " + " ".join(pretokenize(list1)) for list1 in input_seqs]
+            input_seqs2 = [" " + " ".join(pretokenize(list2)) for list2 in input_seqs2]
+            prompt = " ".join(pretokenize(prompt))
 
     # loop over trials
     for i in trange(len(input_seqs), desc="sequence: "):
@@ -161,7 +173,7 @@ def concat_and_tokenize_inputs(prefix:str,
         i1 = tokenizer.encode(eos1 + " " + prefix, add_special_tokens=False, return_tensors="pt")   # prefix IDs, add eos token
         i2 = tokenizer.encode(input_seqs[i], add_special_tokens=False, return_tensors="pt")
         i3 = tokenizer.encode(" " + prompt, add_special_tokens=False, return_tensors="pt")                       # prompt IDs
-        i4 = tokenizer.encode(input_seqs2[i] + eos2, add_special_tokens=False, return_tensors="pt")
+        i4 = tokenizer.encode(" " + input_seqs2[i] + eos2, add_special_tokens=False, return_tensors="pt")
 
         # compose the input ids tensors
         input_ids = torch.cat((i1, i2, i3, i4), dim=1)
@@ -333,6 +345,8 @@ def main():
     parser.add_argument("--condition", type=str, choices=["repeat", "permute", "control"],
                         help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
     # To download a different model look at https://huggingface.co/models?filter=gpt2
+    parser.add_argument("--pretokenize_moses", action="store_true",
+                        help="Whether or not to pretokenize the input text with MosesTokenizer('en')")
     parser.add_argument("--path_to_tokenizer", type=str, default="gpt2",
                         help="the path to tokenizer folder (expected to work with tokenizer.from_pretrained() method")
     parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
@@ -365,6 +379,8 @@ def main():
 
     logging.info("condition == {}".format(argins.condition))
     logging.info("scenario == {}".format(argins.scenario))
+    logging.info("list_len == {}".format(argins.list_len))
+    logging.info("prompt_key == {}".format(argins.prompt_key))
 
     # ===== DATA MANAGEMENT ===== #
 
@@ -443,15 +459,17 @@ def main():
 
     # ===== PREPARE INPUT SEQUENCES ===== #
 
-    # this tells the bpe split counter what symbol to look for
+    # this tells the bpe split counter what symbol to look for and how it codes for splits
     bpe_split_marker_dict = {"gpt2": "Ġ",
                              "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
+                             "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "Ġ",
                              "bert-base-uncased": "##",
                              "transfo-xl-wt103": None}
 
     # this tells the bpe split counter how these symbols are used
     marker_logic_dict = {"gpt2": "outside",
                          "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
+                         "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "outside",
                          "bert-base-uncased": "within",
                          "transfo-xl-wt103": None}
 
@@ -463,6 +481,7 @@ def main():
                                                             word_list1=word_lists1[argins.list_len],
                                                             word_list2=word_lists2[argins.list_len],
                                                             ngram_size=argins.list_len.strip("n"),
+                                                            pretokenize_moses=argins.pretokenize_moses,
                                                             tokenizer=tokenizer,
                                                             bpe_split_marker=bpe_split_marker_dict[argins.path_to_tokenizer],
                                                             marker_logic=marker_logic_dict[argins.path_to_tokenizer],

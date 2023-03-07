@@ -71,10 +71,12 @@ class WikiTextDataset(Dataset):
             with open(save_retokenized, "w") as fname:
                 json.dump(tokens, fname)
 
-            # save tokens as .json
-            logging.info("Saving {}".format(save_retokenized.replace("tokens", "inds")))
-            with open(save_retokenized.replace("tokens", "inds"), "w") as fname:
+            # save indices as .json and make sure it ends with inds.bpe.json
+            logging.info("Saving {}".format(save_retokenized.replace(".bpe.json", ".inds.bpe.json")))
+            with open(save_retokenized.replace(".bpe.json", ".inds.bpe.json"), "w") as fname:
                 json.dump(ids, fname)
+        
+        return tokens, ids
 
     def make_input_sequences(self, json_path, sequence_length=1024):
 
@@ -120,6 +122,9 @@ def runtime_code():
     parser.add_argument("--tokenizer_train_tokens", type=str)
     parser.add_argument("--tokenizer_savedir", type=str,
                         help="folder where merges.txt and vocab.txt are saved")
+    parser.add_argument("--train_savename", type=str)
+    parser.add_argument("--valid_savename", type=str)
+    parser.add_argument("--test_savename", type=str)
     parser.add_argument("--savedir", type=str,
                         help="path to where the tokenized dataset is saved")
 
@@ -154,22 +159,23 @@ def runtime_code():
 
 
     # now retokenize wikitext and save
+    suffix = ".bpe.json"
     if args.train_tokens:
         train_ds = WikiTextDataset(tokenizer=tokenizer)
         train_ds.retokenize_txt(path=args.train_tokens,
-                                save_retokenized=args.train_tokens + ".bpe.json")
+                                save_retokenized=os.path.join(args.savedir, args.train_savename + suffix))
 
     # validation set
     if args.valid_tokens:
         eval_ds = WikiTextDataset(tokenizer=tokenizer)
         eval_ds.retokenize_txt(path=args.valid_tokens,
-                               save_retokenized=args.valid_tokens + ".bpe.json")
+                               save_retokenized=os.path.join(args.savedir, args.valid_savename + suffix))
 
     # validation set
     if args.test_tokens:
         test_ds = WikiTextDataset(tokenizer=tokenizer)
         test_ds.retokenize_txt(path=args.test_tokens,
-                                save_retokenized=args.test_tokens + ".bpe.json")
+                                save_retokenized=os.path.join(args.savedir, args.test_savename + suffix))
 
 if __name__ == "__main__":
 
