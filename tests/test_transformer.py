@@ -23,6 +23,7 @@ def test_transformer_experiment(transformer_test_data):
                             tokenizer=tokenizer,
                             context_len=1024,
                             batch_size=1,
+                            stride=1,
                             use_cache=False,
                             device=device)
 
