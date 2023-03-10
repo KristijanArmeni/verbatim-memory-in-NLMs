@@ -173,7 +173,7 @@ def concat_and_tokenize_inputs(prefix:str,
         i1 = tokenizer.encode(eos1 + " " + prefix, add_special_tokens=False, return_tensors="pt")   # prefix IDs, add eos token
         i2 = tokenizer.encode(input_seqs[i], add_special_tokens=False, return_tensors="pt")
         i3 = tokenizer.encode(" " + prompt, add_special_tokens=False, return_tensors="pt")                       # prompt IDs
-        i4 = tokenizer.encode(" " + input_seqs2[i] + eos2, add_special_tokens=False, return_tensors="pt")
+        i4 = tokenizer.encode(input_seqs2[i] + eos2, add_special_tokens=False, return_tensors="pt")
 
         # compose the input ids tensors
         input_ids = torch.cat((i1, i2, i3, i4), dim=1)
@@ -214,7 +214,7 @@ def concat_and_tokenize_inputs(prefix:str,
     return input_seqs_tokenized, metadata
 
 
-def sample_indices_by_group(groups, seed):
+def sample_indices_by_group(groups: np.ndarray, seed: int) -> np.ndarray:
 
     """
     randomized_indices = sample_indices_by_group(groups, seed)
