@@ -9,13 +9,11 @@ import pandas as pd
 import transformers
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config, \
                          BertForMaskedLM, TransfoXLLMHeadModel, TransfoXLTokenizer, \
-                         AutoTokenizer, top_k_top_p_filtering
+                         AutoTokenizer
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torch.nn import functional as F
 from tqdm import trange
 from typing import List, Dict, Tuple, Any, Sequence
-from string import punctuation
 from tqdm import tqdm, trange
 import logging
 
