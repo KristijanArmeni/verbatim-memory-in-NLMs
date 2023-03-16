@@ -9,19 +9,18 @@ import pandas as pd
 import transformers
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config, \
                          BertForMaskedLM, TransfoXLLMHeadModel, TransfoXLTokenizer, \
-                         AutoTokenizer, top_k_top_p_filtering
+                         AutoTokenizer
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torch.nn import functional as F
 from tqdm import trange
 from typing import List, Dict, Tuple, Any, Sequence
-from string import punctuation
 from tqdm import tqdm, trange
 import logging
 
 sys.path.append("/home/ka2773/project/lm-mem/src")
 from data.wt103.dataset import WikiTextDataset
-from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits
+from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits, make_word_lists, concat_and_tokenize_inputs
+from wm_suite.io.stimuli import prefixes, prompts
 
 logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
 
@@ -664,6 +663,7 @@ def setup():
 def runtime_code(input_args: List = None):
 
     from ast import literal_eval
+    from string import punctuation
 
     # ===== INITIATIONS ===== #
     # collect input arguments
@@ -673,9 +673,12 @@ def runtime_code(input_args: List = None):
                         help="downloads and places nltk model and Tokenizer")
     parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3", "sce4", "sce5", "sce6", "sce7"],
                         help="str, which scenario to use")
-    parser.add_argument("--condition", type=str)
-    parser.add_argument("--inputs_file", type=str, help="json file with input sequence IDs which are converted to tensors")
-    parser.add_argument("--inputs_file_info", type=str, help="json file with information about input sequences")
+    parser.add_argument("--condition", type=str, choices=["repeat", "permute", "control"])
+    parser.add_argument("--list_len", type=str, choices=["3", "5", "7", "10"])
+    parser.add_argument("--prompt_len", type=str, choices=["1", "2", "3", "4", "5"])
+    parser.add_argument("--list_type", type=str, choices=["random", "categorized"])
+    parser.add_argument("--pretokenize_moses", action="store_true")
+    parser.add_argument("--noun_list_file", type=str, help="json file with noun lists")
     parser.add_argument("--tokenizer", type=str)
     parser.add_argument("--context_len", type=int, default=1024,
                         help="length of context window in tokens for transformers")
@@ -702,14 +705,18 @@ def runtime_code(input_args: List = None):
     #input_args = [
     #    "--scenario", "sce1",
     #    "--condition", "repeat",
+    #    "--list_type", "random",
+    #    "--list_len", "3",
+    #    "--prompt_len", "1",
+    #    "--pretokenize_moses",
     #    "--model_type", "pretrained",
-        #"--ablate_layer", "(0,)",
-        #"--ablate_head", "(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)",
+    #    "--ablate_layer", "(0,)",
+    #    "--ablate_head", "(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)",
     #    "--checkpoint", "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_full_12-768-1024_a_01/checkpoint-27500",
     #    "--tokenizer", "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer",
     #    "--model_seed", "12345",
-    #    "--inputs_file", f"/home/ka2773/project/lm-mem/src/data/transformer_input_files/transformer_wt103_v2/gpt2_repeat_sce1_1_n5_random.json",
-    #    "--inputs_file_info", f"/home/ka2773/project/lm-mem/src/data/transformer_input_files/transformer_wt103_v2/gpt2_repeat_sce1_1_n5_random_info.json",
+    #    #"--inputs_file", f"/home/ka2773/project/lm-mem/src/data/transformer_input_files/transformer_wt103_v2/trf-wt103_repeat_sce1_1_n5_random.json",
+    #    #"--inputs_file_info", f"/home/ka2773/project/lm-mem/src/data/transformer_input_files/transformer_wt103_v2/trf-wt103_repeat_sce1_1_n5_random_info.json",
     #    "--output_dir", "/scratch/ka2773/project/lm-mem/output/ablation",
     #    "--output_file", "surprisal_gpt2_pretrained_sce1_repeat_random.csv",
     #    "--device", "cuda",
@@ -727,13 +734,15 @@ def runtime_code(input_args: List = None):
     sys.path.append("/home/ka2773/project/lm-mem/src/data/")
     
     # ===== LOAD INPUTS ===== #
-    with open(argins.inputs_file, "r") as fh:
-        input_sequences = [torch.tensor(e) for e in json.load(fh)]
+    #with open(argins.inputs_file, "r") as fh:
+    #    input_sequences2 = [torch.tensor(e) for e in json.load(fh)]
 
-    with open(argins.inputs_file_info, "r") as fh:
-        input_sequences_info = json.load(fh)
+    #with open(argins.inputs_file_info, "r") as fh:
+    #    input_sequences_info = json.load(fh)
 
-    # ===== INITIATE EXPERIMENT CLASS ===== #
+        # load the word lists in .json files
+
+    # ===== INITIATE MODEL AND TOKANIZER CLASS ===== #
 
     # declare device and paths
     device = torch.device(argins.device if torch.cuda.is_available() else "cpu")
@@ -805,10 +814,49 @@ def runtime_code(input_args: List = None):
                                  heads=literal_eval(argins.ablate_heads),
                                  head_dim=64)
 
-    # set to evaluation mode
-    model.eval()
+
+    # ===== TOKENIZE AND PREPARE THE VIGNETTES ===== #
+
+    # fname = os.path.join(data_dir, argins.input_filename)
+    word_lists1, word_lists2 = make_word_lists(argins.noun_list_file, condition=argins.condition)
+
+    # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== #
+
+    # this tells the bpe split counter what symbol to look for and how it codes for splits
+    bpe_split_marker_dict = {"gpt2": "Ġ",
+                             "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
+                             "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "Ġ",
+                             "bert-base-uncased": "##",
+                             "transfo-xl-wt103": None}
+
+    # this tells the bpe split counter how these symbols are used
+    marker_logic_dict = {"gpt2": "outside",
+                         "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
+                         "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "outside",
+                         "bert-base-uncased": "within",
+                         "transfo-xl-wt103": None}
+
+    # this routing loops over prompts and prefixes
+    # it keeps track of that in meta_data
+    logging.info("Tokenizing and concatenating sequences...")
+    input_sequences, input_sequences_info = concat_and_tokenize_inputs(prompt=prompts[argins.scenario][argins.prompt_len],
+                                                                       prefix=prefixes[argins.scenario]["1"],
+                                                                       word_list1=word_lists1[f"n{argins.list_len}"],
+                                                                       word_list2=word_lists2[f"n{argins.list_len}"],
+                                                                       ngram_size=str(argins.list_len),
+                                                                       pretokenize_moses=argins.pretokenize_moses,
+                                                                       tokenizer=tokenizer,
+                                                                       bpe_split_marker=bpe_split_marker_dict[argins.tokenizer],
+                                                                       marker_logic=marker_logic_dict[argins.tokenizer],
+                                                                       ismlm=ismlm)
+
+    input_sequences_info["prompt"] = [argins.prompt_len for _ in input_sequences_info['list_len']]
+
 
     # ===== EXPERIMENT ===== #
+
+    # set to evaluation mode
+    model.eval()
 
     #initialize experiment class
     experiment = Experiment(model=model, ismlm=ismlm,
@@ -832,7 +880,7 @@ def runtime_code(input_args: List = None):
                             tokenizer=tokenizer,
                             context_len=argins.context_len,
                             batch_size=argins.batch_size,
-                            stride=256,
+                            stride=1,
                             use_cache=False,
                             device=device)
     
@@ -842,39 +890,59 @@ def runtime_code(input_args: List = None):
 
     logging.info("Postprocessing outputs...")
 
-    # code relative markers (useful for plotting)
-    output_dict['marker_pos'] = [code_relative_markers(np.array(x))[0] for x in input_sequences_info['trialID']]
-    output_dict['marker_pos_rel'] = [code_relative_markers(np.array(x))[1] for x in input_sequences_info['trialID']]
-
     # merge tokens and surprisals that were splits into BPE tokens
     output_dict = experiment.merge_bpe_splits(output_dict)
 
+    # find timesteps that correspond to punctuation, end of string and empty slots
+    punct_symbols = [np.array([s.strip("Ġ") in punctuation for s in l]) for l in output_dict['token']]        # find positions of punctuation symbols
+    eos_symbols = [np.array([s.strip("Ġ") in tokenizer.eos_token for s in l]) for l in output_dict['token']]  # find positions for end of text symbols
+    empty_symbols = [np.array([s.strip("Ġ") == '' for s in l]) for l in output_dict['token']]                 # make sure to track empty strings after merging
+    
+    # create a joint boolean, per sequence
+    timesteps = [[(~punct & ~eos & ~empty) for punct, eos, empty in zip(x, y, z)] for x, y, z in zip(punct_symbols, eos_symbols, empty_symbols)]
+
+    # create nan arrays that are going to be populated with markers and will have nan values elsewhere
+    output_dict['marker_pos'] = [np.full(shape=len(s), fill_value=np.nan) for s in output_dict['token']]
+    output_dict['marker_pos_rel'] = [np.full(shape=len(s), fill_value=np.nan) for s in output_dict['token']]
+
+    # now create absolute and relative markers for each sequence
+    for i, markers in enumerate(input_sequences_info['trialID']):
+
+        sel = timesteps[i]
+        output_dict['marker_pos'][i][sel] = code_relative_markers(np.array(markers)[sel])[0]
+        output_dict['marker_pos_rel'][i][sel] = code_relative_markers(np.array(markers)[sel])[1]
+
     experiment.model.to("cpu")
 
+    # ===== SAVING MODEL AND PERPLEXITY ===== #
     if argins.model_statedict_filename:
+
         fn = os.path.join(argins.output_dir, argins.model_statedict_filename)
         logging.info(f"Saving {fn}")
         torch.save(experiment.model.state_dict(), fn)
 
             # store wikitext-103 perplexity
-        ppl_dict = {"wt103_ppl": round(ppl, 2),
+        ppl_dict = {"wt103_ppl": round(ppl.cpu().item(), 2),
                     "model": argins.model_statedict_filename}
         
         fn = os.path.join(argins.output_dir, argins.model_statedict_filename.replace(".pt", "_ppl.json"))
         with open(fn, 'w') as fh:
             json.dump(ppl_dict, fh)
 
-    # ===== FORMAT AND SAVE OUTPUT ===== #
+    # ===== FORMAT AND SAVE OUTPUT FILES ===== #
 
     colnames = ["token", "surp", "marker_pos", "marker_pos_rel"]
-    metacols = ["ppl", "trialID", "positionID", "subtok", "list_len", "prompt_len"]
+    metacols = ["ppl", "scenario", "second_list", "list", "trialID", "positionID", "subtok", "list_len", "prompt_len"]
 
     arrays = [output_dict["token"],
               output_dict["surp"],
               output_dict['marker_pos'],
               output_dict['marker_pos_rel']]
     
-    metarrays = [output_dict['sequence_ppl'],
+    metarrays = [output_dict['sequence_ppl'],                                                  
+                 [argins.scenario for _ in range(len(input_sequences_info["trialID"]))],  # "sce1" | "sce2" | etc. 
+                 [argins.condition for _ in range(len(input_sequences_info["trialID"]))], # "repeat" | "permute" | "control"
+                 [argins.list_type for _ in range(len(input_sequences_info["trialID"]))], # "random" | "categorized"
                  input_sequences_info["trialID"],
                  input_sequences_info["positionID"],
                  input_sequences_info["subtok"],
@@ -886,11 +954,11 @@ def runtime_code(input_args: List = None):
 
     output_df = outputs2dataframe(colnames, arrays, metacols, metarrays)
 
-    output_df.attrs = {'wt103_ppl': round(ppl, 2),
+    output_df.attrs = {'wt103_ppl': np.round(ppl.cpu().item(), 2),
                        'argins': argins}
 
-    # drop nan rows (merged BPE timesteps + <|endoftext symbols|>)
-    output_df = output_df.dropna()
+    # drop nan rows (merged BPE timesteps)
+    output_df = output_df.loc[~output_df.token.str.strip("Ġ").isin([""]), :]
 
     # save output
     outpath = os.path.join(argins.output_dir, argins.output_filename)

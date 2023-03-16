@@ -173,7 +173,7 @@ def concat_and_tokenize_inputs(prefix:str,
         i1 = tokenizer.encode(eos1 + " " + prefix, add_special_tokens=False, return_tensors="pt")   # prefix IDs, add eos token
         i2 = tokenizer.encode(input_seqs[i], add_special_tokens=False, return_tensors="pt")
         i3 = tokenizer.encode(" " + prompt, add_special_tokens=False, return_tensors="pt")                       # prompt IDs
-        i4 = tokenizer.encode(" " + input_seqs2[i] + eos2, add_special_tokens=False, return_tensors="pt")
+        i4 = tokenizer.encode(input_seqs2[i] + eos2, add_special_tokens=False, return_tensors="pt")
 
         # compose the input ids tensors
         input_ids = torch.cat((i1, i2, i3, i4), dim=1)
@@ -214,7 +214,7 @@ def concat_and_tokenize_inputs(prefix:str,
     return input_seqs_tokenized, metadata
 
 
-def sample_indices_by_group(groups, seed):
+def sample_indices_by_group(groups: np.ndarray, seed: int) -> np.ndarray:
 
     """
     randomized_indices = sample_indices_by_group(groups, seed)
@@ -302,6 +302,63 @@ def ensure_list2_notequal(list1: List,
 
     return list2_new
 
+def make_word_lists(inputs_file: str, condition: str) -> Tuple[List, List]:
+
+    logging.info("Loading {} ...".format(inputs_file))
+    with open(inputs_file) as f:
+
+        stim = json.load(f)
+
+    word_lists1 = stim
+
+    if condition == "permute":
+
+        # This condition test for the effect of word order
+        # Lists have the same words, but the word order is permuted
+        # int the second one
+        word_lists2 = {key: [np.random.RandomState((543+j)*5).permutation(stim[key][j]).tolist()
+                    for j in range(len(stim[key]))]
+                    for key in stim.keys()}
+
+        for list_size in word_lists2.keys():
+
+            word_lists2[list_size] = ensure_list2_notequal(list1=word_lists1[list_size],
+                                                        list2=word_lists2[list_size],
+                                                        start_seed=123,
+                                                        seed_increment=10)
+
+
+        # make sure control tokens do not appear in the target lists
+        for k in stim.keys():
+            assert ~np.any([[t1 == t2] for t1, t2 in zip(word_lists1[k], word_lists2[k])])
+
+    elif condition == "control":
+
+        # This serves as a control conditions
+        # Here list length is the only common factor between two lists
+
+        logging.info("Creating control condition...")
+
+        n_items_per_group = 10
+        n_groups = len(word_lists1["n10"])//n_items_per_group
+        groups = np.repeat(np.arange(0, n_groups), n_items_per_group)
+
+        ids = sample_indices_by_group(groups=groups, seed=12345)
+
+        word_lists2 = {key: np.asarray(stim[key])[ids].tolist() for key in stim.keys()}
+
+        # make sure control tokens do not appear in the target lists
+        for k in stim.keys():
+            assert ~np.any([set(t1).issubset(set(t2))
+                            for t1, t2 in zip(word_lists1[k], word_lists2[k])])
+
+    # this is repeat condition where the two lists are the same
+    else:
+        word_lists2 = word_lists1
+
+    return word_lists1, word_lists2
+
+
 # ===== Setup for gpt2 ====== #
 
 def get_args_for_dev(setup=False, scenario="sce1", prompt_key="1", list_len="n5", condition="repeat", path_to_tokenizer="gpt2", 
@@ -386,67 +443,11 @@ def main():
 
     # load the word lists in .json files
     fname = os.path.join(data_dir, argins.input_filename)
-    with open(fname) as f:
 
-        logging.info("Loading {} ...".format(fname))
-        stim = json.load(f)
-
-        # convert word lists to strings and permute the second one if needed
-        # add space at the string onset
-        word_lists1 = stim
-
-
-    if argins.condition == "permute":
-
-        # This condition test for the effect of word order
-        # Lists have the same words, but the word order is permuted
-        # int the second one
-        word_lists2 = {key: [np.random.RandomState((543+j)*5).permutation(stim[key][j]).tolist()
-                    for j in range(len(stim[key]))]
-                    for key in stim.keys()}
-
-        for list_size in word_lists2.keys():
-
-            word_lists2[list_size] = ensure_list2_notequal(list1=word_lists1[list_size],
-                                                        list2=word_lists2[list_size],
-                                                        start_seed=123,
-                                                        seed_increment=10)
-
-
-        # make sure control tokens do not appear in the target lists
-        for k in stim.keys():
-            assert ~np.any([[t1 == t2] for t1, t2 in zip(word_lists1[k], word_lists2[k])])
-
-    elif argins.condition == "control":
-
-        # This serves as a control conditions
-        # Here list length is the only common factor between two lists
-
-        logging.info("Creating control condition...")
-
-        n_items_per_group = 10
-        n_groups = len(word_lists1["n10"])//n_items_per_group
-        groups = np.repeat(np.arange(0, n_groups), n_items_per_group)
-
-        ids = sample_indices_by_group(groups=groups, seed=12345)
-
-        word_lists2 = {key: np.asarray(stim[key])[ids].tolist() for key in stim.keys()}
-
-        # make sure control tokens do not appear in the target lists
-        for k in stim.keys():
-            assert ~np.any([set(t1).issubset(set(t2))
-                            for t1, t2 in zip(word_lists1[k], word_lists2[k])])
-
-    # this is repeat condition where the two lists are the same
-    else:
-
-        word_lists2 = word_lists1
+    word_lists1, word_lists2 = make_word_lists(fname, condition=argins.condition)
 
 
     # ===== INITIATE EXPERIMENT CLASS ===== #
-
-    # declare device and paths
-    device = torch.device(argins.device if torch.cuda.is_available() else "cpu")
 
     # setup the model
     logging.info("Loading tokenizer {}".format(argins.path_to_tokenizer))
@@ -457,7 +458,7 @@ def main():
     if argins.path_to_tokenizer in ['bert-base-uncased']:
         ismlm=True
 
-    # ===== PREPARE INPUT SEQUENCES ===== #
+    # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== #
 
     # this tells the bpe split counter what symbol to look for and how it codes for splits
     bpe_split_marker_dict = {"gpt2": "Ġ",
