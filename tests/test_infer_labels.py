@@ -3,7 +3,7 @@ from src.wm_suite.preprocess_and_merge_csvfiles import infer_labels_from_filebas
 
 def test_infer_labels():
 
-    filename = "wms_gpt2_a-10_sce1_1_n3_repeat_random.csv"
+    filename = "wms_gpt2_a-10_sce1_1_n3_random_repeat.csv"
 
     labels = infer_labels_from_filebasename(filename)
 
