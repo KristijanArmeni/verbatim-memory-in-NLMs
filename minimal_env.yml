@@ -12,9 +12,8 @@ dependencies:
   - pandas
   - transformers
   - pytorch::pytorch
-  - nvidia::cudatoolkit=10.0
+  - nvidia::cudatoolkit=11.1
   - scipy
   - pip
   - nltk
-  - pip:
-    - pynvrtc 
+  - pytest
