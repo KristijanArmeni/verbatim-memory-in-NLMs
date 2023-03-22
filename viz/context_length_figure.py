@@ -17,7 +17,7 @@ scenario = "sce1"
 
 def generate_plot(model):
 
-    logging.info(f"Generating plot for {model}logg")
+    logging.info(f"Generating plot for {model}")
 
     # ==== LOAD DATA ===== #
 
