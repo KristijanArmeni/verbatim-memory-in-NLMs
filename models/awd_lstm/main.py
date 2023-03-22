@@ -165,9 +165,12 @@ def print_n_params(model, criterion):
     print('Model total parameters method2 (M):', total_params2//1e6)
     print('Model total learneable parameters (M)\n:', learneable_params//1e6)
 
+    return params
+
 print('Args:', args)
 print('Model:\n', model)
-print_n_params(model, criterion)
+
+params = print_n_params(model, criterion)
 
 ###############################################################################
 # Training code
@@ -197,7 +200,7 @@ def train():
     hidden = model.init_hidden(args.batch_size)
     batch, i = 0, 0
 
-    print_n_params(model, criterion)
+    #params = print_n_params(model, criterion)
 
     while i < train_data.size(0) - 1 - 1:
         bptt = args.bptt if np.random.random() < 0.95 else args.bptt / 2.

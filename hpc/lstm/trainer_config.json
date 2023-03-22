@@ -2,9 +2,13 @@
     
     "root_dir": "/scratch/ka2773/project/lm-mem/checkpoints/lstm/",
     "log_dir": "/scratch/ka2773/project/lm-mem/logs/lstm",
-    "wandb_project": "",
-    "wandb_group": "",
-    "wandb_name": "",
-    "wandb_id": ""
+    "ray_dir": "/scratch/ka2773/project/lm-mem/checkpoints/ray_dir/",
+    "wandb_project": "lstm-mem",
+    "wandb_group": "lstm-4-layer",
+    "wandb_name": "testing",
+    "wandb_id": "",
+    "lr": 1e-2,
+    "beta1": 0,
+    "beta2": 0.9
 
 }
