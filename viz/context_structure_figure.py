@@ -15,6 +15,8 @@ ylims={"gpt2": (None, None), "awd_lstm": (60, None), "w-12v2": (60, None)}
 
 def generate_plot(model):
 
+    logging.info(f"Generating plot for {model}")
+
     tmp = []
 
     for sce in ["sce1", "sce2", "sce1rnd"]:

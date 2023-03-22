@@ -48,13 +48,12 @@ def filter_and_aggregate(datain, model, model_id, groups, aggregating_metric):
     d = datain.loc[sel].copy()
     
     ## Aggregate
-    # average separately per list_len, stimulus id (sentid), model (lstm or gpt2), marker (1 or 3), list (random, categorized) and second list (repeated, permuted or control)
+    # average separately across markers per list_len, stimulus id (sentid), model (lstm or gpt2), marker (1 or 3), list (random, categorized) and second list (repeated, permuted or control)
     units = [var1, "stimid", "model", "marker", "list", "second_list"]
 
     logging.info(f"Manipulated variable == {var1}")    
-    logging.info(f"Aggregating metric == {aggregating_metric}")
-    logging.info("Aggregating over these variables:")
-    display(units)
+    logging.info(f"Aggregating function == {aggregating_metric}")
+    logging.info(f"Aggregating over tokens separately per these variables: {units}")
     
     # aggregate with .groupby and .agg
     dagg = d.groupby(units).agg({"surp": [aggregating_metric, "std"], "token": list}).reset_index()
@@ -94,12 +93,13 @@ def get_relative_change(x1=None, x2=None, labels1=None, labels2=None):
     x_perc = (x2/x1)*100
     return x_del, x_perc
 
+
 def relative_change_wrapper(df_agg, groups, compared_col):
     
     # unpack the dicts
     g1, g2, g3, g4 = groups
     
-    # define coloms for data
+    # define columns for data
     col1 = list(g1.keys())[0]
     col2 = list(g2.keys())[0]
     col3 = list(g3.keys())[0]

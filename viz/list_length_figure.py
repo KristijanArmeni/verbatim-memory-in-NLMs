@@ -40,7 +40,7 @@ def generate_plot(model):
                  {"context": ["intact"]},
                  {"marker_pos_rel": list(range(1, 10))}]
 
-    # filter the dataframe and aggreage surprisal over lists
+    # filter the dataframe and aggreage surprisal over lists (over the <marker_pos_rel> variable)
     data_, _ = filter_and_aggregate(datain=data, 
                                     model=data.model.unique()[0], 
                                     model_id=model_ids[model], 

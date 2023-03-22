@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ---
 # jupyter:
 #   jupytext:
@@ -31,10 +32,13 @@ from matplotlib import pyplot as plt
 import matplotlib
 from matplotlib.patches import Rectangle
 
-from stimuli import prefixes, prompts
+from src.wm_suite.io.stimuli import prefixes, prompts
 import json
 import logging
 logging.basicConfig(format="[INFO] %(message)s", level=logging.INFO)
+
+# %%
+from viz import timecourse_figure, list_length_figure, context_length_figure, context_structure_figure
 
 # %%
 # set some matplotlib options to handle text better
@@ -379,7 +383,7 @@ def make_point_plot(data_frame, estimator, x, y, hue, style, col,
 # ## make_timecourse_plot()
 
 # %%
-def make_timecourse_plot(datain, x, style, col, col_order, style_order, hue_order, estimator, err_style, xticks):
+def make_timecourse_plot(datain, x, style, col, col_order, style_order, hue_order, estimator, err_style):
     
     usetex = plt.rcParams["text.usetex"]
     
@@ -526,7 +530,7 @@ def make_example_plot(data, seed, model_id, title, ylim=None, context="intact"):
 # %% [markdown]
 # ## select_data_for_timecourse()
 
-# %%
+# %% tags=[]
 def select_data_for_timecourse(data, context_len, list_len, context, model_tags, timesteps=list(range(-4, 10))):
     
     sel = (data.prompt_len == context_len) & \
@@ -545,6 +549,29 @@ def select_data_for_timecourse(data, context_len, list_len, context, model_tags,
 
 
 # %% [markdown]
+# ## load_wt103_data()
+
+# %%
+def load_wt103_data(path):
+    
+    o = []
+    for f in glob(path):
+        
+        # temp: read in column values form filenames
+        model_id = os.path.basename(f).split("_")[2]
+        
+        tmp = pd.read_csv(f, sep='\t')
+        tmp['model_id'] = model_id
+        tmp.token = tmp.token.str.strip("Ġ")
+        tmp.rename(columns={"scenario": "context", "trialID": "marker", "stimID": "stimid"}, inplace=True)
+        tmp.stimid = (tmp.stimid - 1)
+        
+        o.append(tmp)
+
+    return pd.concat(o, ignore_index=True)    
+
+
+# %% [markdown]
 # # Example time courses
 
 # %% [markdown]
@@ -552,28 +579,26 @@ def select_data_for_timecourse(data, context_len, list_len, context, model_tags,
 
 # %%
 data_gpt = pd.read_csv(os.path.join(data_dir, "output_gpt2_a-10_sce1.csv"), sep="\t", index_col=0)
-data_40m = pd.read_csv(os.path.join(data_dir, "output_gpt2_w-12_sce1.csv"), sep="\t", index_col=0)
-
-data_rnn = pd.read_csv(os.path.join(data_dir, "output_rnn_a-10_sce1.csv"), sep="\t", index_col=None)
-data_rnn2 = pd.read_csv(os.path.join(data_dir, "output_rnn-vs2019_a-70_sce1.csv"), sep="\t", index_col=None)
-
+data_wt103 = load_wt103_data(os.path.join(data_dir, 'wt103_v2', '*')).dropna()
+data_wt103.prompt_len = data_wt103.prompt_len.map({1: 8, 2: 30, 3:100, 4:200, 5:400})
 data_awd = pd.read_csv(os.path.join(data_dir, "output_awd-lstm-3_a-10_sce1.csv"), sep="\t", index_col=None)
 
-data_rnn.rename(columns={"word": "token"}, inplace=True)
-data_rnn2.rename(columns={"word": "token"}, inplace=True)
+#data_rnn.rename(columns={"word": "token"}, inplace=True)
+#data_rnn2.rename(columns={"word": "token"}, inplace=True)
 data_awd.rename(columns={"word": "token"}, inplace=True)
-data_rnn["model"] = "lstm"
-data_rnn2["model"] = "lstm"
+#data_rnn["model"] = "lstm"
+#data_rnn2["model"] = "lstm"
 
 data_gpt["model"] = "gpt-2"
 data_40m["model"] = "gpt-2"
+data_awd["model"] = "lstm"
 
 # %% [markdown]
 # ## Data check
 
 # %%
 # show original and target lists for stimulus input 11
-for dat in (data_gpt, data_40m):
+for dat in (data_gpt, data_wt103):
     
     sel = (dat.list_len==5) & (dat.prompt_len==8) & (dat.context=="intact") & (dat.list=="random") & (dat.second_list=="permute") & (dat.marker.isin([1, 3]))
     d = dat.loc[sel]
@@ -585,14 +610,16 @@ for dat in (data_gpt, data_40m):
 # ## Make plots
 
 # %%
-ids = ("a-10", "w-12", "a-10", "a-70")
-tags = ("trf", "trf", "awd-lstm", "lstm")
-titles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)", "LSTM (Wikitext-103)", "LSTM (80M tokens, 1600 hidden)")
+ids = ("a-10", "w-12v2", "a-10")
+tags = ("trf", "trf", "awd-lstm")
+titles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)", "LSTM (Wikitext-103)")
 scenario = "sce1"
 
-for dat, model_id, tag, title in zip((data_gpt, data_40m, data_rnn, data_rnn2), ids, tags, titles):
+for dat, model_id, tag, title in zip((data_gpt, data_wt103, data_awd), ids, tags, titles):
 
     f, a = make_example_plot(data=dat, seed=123, model_id=model_id, context="intact", ylim=(0, 30), title=title)
+    
+    plt.show()
     
     if savefigs:
         
@@ -600,9 +627,6 @@ for dat, model_id, tag, title in zip((data_gpt, data_40m, data_rnn, data_rnn2), 
         print("Saving {}".format(os.path.join(savedir, "example_{}_{}-{}.".format(scenario, tag, model_id))))
         f.savefig(os.path.join(savedir, "example_{}_{}-{}.pdf".format(scenario, tag, model_id)), transparent=True, dpi=300, bbox_inches="tight")
         f.savefig(os.path.join(savedir, "example_{}_{}-{}.png".format(scenario, tag, model_id)), dpi=300, bbox_inches="tight")
-
-# %% [markdown]
-# ## Bert: load data
 
 # %%
 data_bert = pd.read_csv(os.path.join(data_dir, "output_bert_b-10_sce1.csv"), sep="\t", index_col=0)
@@ -620,9 +644,6 @@ for dat in (data_bert,):
     stimid=11
     display("Original and target lists for stimulus {}:".format(stimid))
     display(d.loc[d.stimid==stimid, ["token", "marker", "model", "second_list", "list_len"]])
-
-# %% [markdown]
-# ## Bert: make plots
 
 # %%
 ids = ("b-10",)
@@ -644,11 +665,12 @@ for dat, model_id, tag, title in zip((data_bert,), ids, tags, titles):
 # %% [markdown]
 # # Timecourse plots 
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # ### Prepare data
 
 # %%
-data = awd_sce1
+data = data_wt103.dropna()
+data = data.drop(["Unnamed: 0"], axis=1)
 
 # rename some row variables for plotting
 new_list_names = {"categorized": "semantic", "random": "arbitrary"}
@@ -666,7 +688,7 @@ sel = (data.prompt_len == context_len) & \
       (data.list_len == list_len) & \
       (data.list.isin(["semantic", "arbitrary"])) & \
       (data.context == context) & \
-      (data.model_id.isin(["a-10"])) & \
+      (data.model_id.isin(["w-12v2"])) & \
       (data.marker.isin([2, 3])) & \
       (data.second_list.isin(["repeated", "permuted", "novel"])) &\
       (data.marker_pos_rel.isin(list(range(-4, 10))))
@@ -679,8 +701,103 @@ d.rename(columns={"list": "list structure", "second_list": "condition"}, inplace
 new_second_list_names = {"novel": "Novel", "repeated": "Repeated", "permuted": "Permuted"}
 d.condition = d.condition.map(new_second_list_names)
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # ### Plots
+
+# %%
+# common fig properties
+w, h = 12, 2
+
+model_ids = ("w-12v2",)
+tags = ("trf-w12v2",)
+titles = ("Transformer (WT103, 12-layer)",)
+arcs = ("gpt-2",)
+ylims=((0, None),)
+scenario = "sce1"
+
+for model_id, suptitle, arc, tag, ylim in zip(model_ids, titles, arcs, tags, ylims):
+    
+    sel = ((d["model_id"] == model_id) & (d.model == arc))
+    
+    d.rename(columns={"marker_pos_rel": "marker-pos-rel", "condition": "Second list"}, inplace=True)
+    
+    p, ax, _ = make_timecourse_plot(d.loc[sel], x="marker-pos-rel", style="Second list", col="list structure",
+                                    estimator=np.median,
+                                    col_order=["arbitrary", "semantic"], err_style="band", 
+                                    hue_order=["Repeated", "Permuted", "Novel"],
+                                    style_order=["Repeated", "Permuted", "Novel"])
+
+    _, _, stat = make_timecourse_plot(d.loc[sel], x="marker-pos-rel", style="Second list", col="list structure", 
+                                      estimator = np.median,
+                                      col_order=["arbitrary", "semantic"], err_style="bars", 
+                                      hue_order=["Repeated", "Permuted", "Novel"],
+                                      style_order=["Repeated", "Permuted", "Novel"])
+    
+    plt.close(plt.gcf())
+
+    # set ylims
+    ymin, ymax = ylim
+    if ymin is None: ymin = ax[0].get_ylim()[0]
+    if ymax is None: ymax = ax[0].get_ylim()[1]
+    ax[0].set(ylim=(ymin, ymax))
+    
+    ax[0].set_title("Arbitrary list", fontsize=16)
+    ax[1].set_title("Semantically coherent list", fontsize=16)
+    ax[0].set_ylabel("Surprisal\n(bit)")
+    for a in ax:
+        a.set_xlabel("Token position relative to list onset")
+        a.set_xticks(list(range(-4, 10, 2)))
+        a.set_xticklabels(list(range(-4, 10, 2)))
+            
+    p.fig.suptitle(suptitle, fontsize=18)
+    p.fig.set_size_inches(w=w, h=h)
+    p.fig.subplots_adjust(top=0.65)
+
+    plt.show()
+    
+    if savefigs:
+        
+        print("Saving {}".format(os.path.join(savedir, "timecourse_{}_{}_{}".format(scenario, tag, model_id))))
+        p.savefig(os.path.join(savedir, "timecourse_{}_{}_{}.pdf".format(scenario, tag, model_id)), transparent=True, bbox_inches="tight")
+        p.savefig(os.path.join(savedir, "timecourse_{}_{}_{}.png".format(scenario, tag, model_id)), dpi=300, bbox_inches="tight")
+        
+        # save numerical tables
+        
+        # create a column with string formated and save the table as well
+        stat = stat.round({"ci_min": 1, "ci_max": 1, "median": 1})
+        strfunc = lambda x: str(x["median"]) + " " + "(" + str(x["ci_min"]) + "-" + str(x["ci_max"]) + ")"
+        stat["report_str"] = stat.apply(strfunc, axis=1)
+
+            # save the original .csv
+        fname = os.path.join(table_savedir, "timecourse_{}_{}_{}_table.csv".format(scenario, tag, model_id))
+        print("Writing {}".format(fname))
+        stat.to_csv(fname)
+
+        # save for latex
+        stat.rename(columns={"list structure": "List", "marker-pos-rel": "Token position"}, inplace=True)
+        tex = stat.loc[stat["Token position"].isin(list(range(0, 4))), :]\
+                  .pivot(index=["List", "Second list"], columns=["Token position"], values="report_str")\
+                  .to_latex(bold_rows=True,
+                            label="tab:timecourse_{}_{}_{}".format(scenario, tag, model_id),
+                            caption="{} surprisal values for four initial token positions, list type and second list condition.".format(suptitle))
+
+        # now save as .tex file
+        fname = os.path.join(table_savedir, "timecourse_{}_{}_{}_table.tex".format(scenario, tag, model_id))
+        print("Writing {}".format(fname))
+        with open(fname, "w") as f:
+            f.writelines(tex)
+
+# %%
+_, _ = timecourse_figure.generate_plot("gpt2")
+plt.show()
+
+# %%
+_, _ = timecourse_figure.generate_plot("w-12v2")
+plt.show()
+
+# %%
+_, _ = timecourse_figure.generate_plot("awd_lstm")
+plt.show()
 
 # %%
 # common fig properties
@@ -820,6 +937,7 @@ def filter_and_aggregate(datain, model, model_id, groups, aggregating_metric):
     units = [var1, "stimid", "model", "marker", "list", "second_list"]
     
     logging.info("Aggregating metric == {}".format(aggregating_metric))
+    logging.info(f"Manipulated variable == {var1}")
     logging.info("Aggregating over these variables:")
     display(units)
     
@@ -855,18 +973,19 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["intact"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_40m_, dat_gpt_, dat_awd_ = None, None, None
+dat_wt103_, _ = filter_and_aggregate(datain=data_wt103, model="gpt-2", model_id="w-12v2", groups=variables, aggregating_metric="mean")
 dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
-dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="mean")
+dat_awd_, _ = filter_and_aggregate(datain=data_awd, model="lstm", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %% [markdown]
 # ## Plot
 
 # %%
-dfs = (dat_40m_, dat_gpt_, dat_rnn_)
+dfs = (dat_wt103_, dat_gpt_, dat_awd_)
 suptitles = ("Transformer (12-layer, WT-103)", "Transformer (Radford et al, 2019)", "LSTM (Merity et al, 2017)")
-savetags = ("trf-w12", "trf-a10", "lstm-a10")
-ylims=((60, 115), (None, None), (80, 115))
+savetags = ("trf-w12v2", "trf-a10", "lstm-a10")
+ylims=((60, 100), (None, None), (80, 115))
 basename="set-size"
 scenario = "sce1"
 
@@ -932,6 +1051,18 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         with open(fname, "w") as f:
             f.writelines(tex)
 
+# %%
+_, _ = list_length_figure.generate_plot("gpt2")
+plt.show()
+
+# %%
+_, _ = list_length_figure.generate_plot("w-12v2")
+plt.show()
+
+# %%
+_, _ = list_length_figure.generate_plot("awd_lstm")
+plt.show()
+
 # %% [markdown]
 # # Context length effect
 
@@ -944,30 +1075,30 @@ variables = [{"prompt_len": [8, 100, 200, 400]},
              {"context": ["intact"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, dat_gpt_, dat_rnn_ = None, None, None
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_wt103_, dat_gpt_, dat_rnn_ = None, None, None
+dat_wt103_, _ = filter_and_aggregate(datain=data_wt103, model="gpt-2", model_id="w-12v2", groups=variables, aggregating_metric="mean")
 dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
-dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="mean")
+dat_awd_, _ = filter_and_aggregate(datain=data_awd, model="lstm", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %%
-dat_40m_.prompt_len = dat_40m_.prompt_len.astype(int)
+dat_wt103_.prompt_len = dat_wt103_.prompt_len.astype(int)
 dat_gpt_.prompt_len = dat_gpt_.prompt_len.astype(int)
-dat_rnn_.prompt_len = dat_rnn_.prompt_len.astype(int)
+dat_awd_.prompt_len = dat_awd_.prompt_len.astype(int)
 
 # rename prompt length values to more meaningful ones
 prompt_len_map = {8: 26, 30: 47, 100: 99, 200: 194, 400: 435}
 
-dat_40m_.prompt_len = dat_40m_.prompt_len.map(prompt_len_map)
+dat_wt103_.prompt_len = dat_wt103_.prompt_len.map(prompt_len_map)
 dat_gpt_.prompt_len = dat_gpt_.prompt_len.map(prompt_len_map)
-dat_rnn_.prompt_len = dat_rnn_.prompt_len.map(prompt_len_map)
+dat_awd_.prompt_len = dat_awd_.prompt_len.map(prompt_len_map)
 
 # %% [markdown]
 # ## Plot
 
 # %%
-dfs = (dat_40m_, dat_gpt_, dat_rnn_)
+dfs = (dat_wt103_, dat_gpt_, dat_awd_)
 suptitles = ("Transformer (12-layer, WT-103)", "Transformer (Radford et al, 2019)", "LSTM (Merity et al, 2017)")
-savetags = ("trf-w12", "trf-a10", "lstm-a10")
+savetags = ("trf-w12v2", "trf-a10", "lstm-a10")
 ylims=((60, 115), (None, None), (80, 115))
 basename="inter-text-size"
 scenario = "sce1"
@@ -1032,6 +1163,18 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         with open(fname, "w") as f:
             f.writelines(tex)
 
+# %%
+_, _ = context_length_figure.generate_plot("gpt2")
+plt.show()
+
+# %%
+_, _ = context_length_figure.generate_plot("w-12v2")
+plt.show()
+
+# %%
+_, _ = context_length_figure.generate_plot("awd_lstm")
+plt.show()
+
 # %% [markdown] tags=[]
 # # Effect of context structure
 
@@ -1050,24 +1193,30 @@ for sce in ["sce1", "sce2", "sce1rnd"]:
     logging.info("Loading {}".format(os.path.join(data_dir, "output_gpt2_a-10_{}.csv".format(sce))))
     gptlst.append(pd.read_csv(os.path.join(data_dir, "output_gpt2_a-10_{}.csv".format(sce)), sep="\t", index_col=0))
     
-    logging.info("Loading {}".format(os.path.join(data_dir, "output_gpt2_w-12_{}.csv".format(sce))))
-    gptlst2.append(pd.read_csv(os.path.join(data_dir, "output_gpt2_w-12_{}.csv".format(sce)), sep="\t", index_col=0))
+    fn3 = os.path.join(data_dir, 'wt103_v2', f'*trf_w-12v2_{sce}_5_10*.csv')
+    logging.info(f"Loading matches to {fn3}")
+    gptlst2.append(load_wt103_data(fn3).dropna())
 
 data_gpt = pd.concat(gptlst)
-data_40m = pd.concat(gptlst2)
+data_wt103 = pd.concat(gptlst2)
 data_rnn = pd.concat(rnnlst)
-data_40m["model"] = "gpt-2"
+data_wt103["model"] = "gpt-2"
 data_gpt["model"] = "gpt-2"
 data_rnn["model"] = "lstm"
 
 # %%
+data_wt103.dropna(inplace=True)
+data_wt103.prompt_len = data_wt103.prompt_len.map({5: 400})
+data_wt103.context = data_wt103.context.map({"sce1": "intact", "sce1rnd": "scrambled", "sce2": "incongruent"})
+
+# %%
 variables = [{"context": ["intact", 'scrambled', 'incongruent']},
-             {"prompt_len": [200]},
+             {"prompt_len": [400]},
              {"list_len": [10]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, dat_gpt_, dat_rnn_ = None, None, None
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_wt103_, dat_gpt_, dat_rnn_ = None, None, None
+dat_wt103_, _ = filter_and_aggregate(datain=data_wt103, model="gpt-2", model_id="w-12v2", groups=variables, aggregating_metric="mean")
 dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
 dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10", groups=variables, aggregating_metric="mean")
 
@@ -1075,7 +1224,7 @@ dat_rnn_, _ = filter_and_aggregate(datain=data_rnn, model="lstm", model_id="a-10
 # ## Plot
 
 # %%
-dfs = (dat_gpt_, dat_40m_, dat_rnn_)
+dfs = (dat_gpt_, dat_wt103_, dat_rnn_)
 suptitles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)", "LSTM (Merity et al, 2017)")
 savetags = ("trf-a10", "trf-w12", "lstm-a10")
 ylims = ((None, None), (60, None), (60, None))
@@ -1137,6 +1286,14 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
         with open(fname, "w") as f:
             f.writelines(tex)
 
+
+# %%
+_, _ = context_structure_figure.generate_plot("gpt2")
+plt.show()
+
+# %%
+_, _ = context_structure_figure.generate_plot("w-12v2")
+plt.show()
 
 # %% [markdown] tags=[]
 # # Effect of short context
@@ -1494,7 +1651,7 @@ for df, suptitle, ylim, tag in zip(dfs, suptitles, ylims, savetags):
 # %% [markdown]
 # ## Average timecourse plots
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # ### Prepare data
 
 # %%
@@ -1529,7 +1686,7 @@ d.rename(columns={"list": "list structure", "second_list": "condition"}, inplace
 new_second_list_names = {"novel": "Novel", "repeated": "Repeated", "permuted": "Permuted"}
 d.condition = d.condition.map(new_second_list_names)
 
-# %% [markdown]
+# %% [markdown] tags=[]
 # ### Plots
 
 # %%
@@ -1625,25 +1782,28 @@ data_gpt, data_40m, data_rnn = None, None, None
 scenario = "sce5"
 scenario_title = "Comma as cue"
 data_gpt = pd.read_csv(os.path.join(data_dir, "output_gpt2_a-10_{}.csv".format(scenario)), sep="\t", index_col=0)
-data_40m = pd.read_csv(os.path.join(data_dir, "output_gpt2_w-12_{}.csv".format(scenario)), sep="\t", index_col=0)
+data_wt103 = load_wt103_data(os.path.join(data_dir, "wt103_v2", f"*_w-12v2_{scenario}*.csv".format(scenario))).dropna()
 
 data_gpt["context"] = "no-comma"
-data_40m["context"] = "no-comma"
+data_wt103["context"] = "no-comma"
 data_gpt["model"] = "gpt-2"
-data_40m["model"] = "gpt-2"
+data_wt103["model"] = "gpt-2"
+data_wt103.prompt_len = data_wt103.prompt_len.map({1: 8})
 
 # %% [markdown]
 # ## Example time course
 
 # %%
-ids = ("a-10", "w-12")
+ids = ("a-10", "w-12v2")
 tags = ("trf", "trf")
 titles = ("Transformer (Radford et al, 2019)", "Transformer (Wikitext-103)")
 scenario = "sce5"
 
-for dat, model_id, tag, title in zip((data_gpt, data_40m), ids, tags, titles):
+for dat, model_id, tag, title in zip((data_gpt, data_wt103), ids, tags, titles):
 
     f, a = make_example_plot(data=dat, seed=123, model_id=model_id, context="no-comma", ylim=(0, 30), title="{} ".format(scenario_title) + title)
+    
+    plt.show()
     
     if savefigs:
         
@@ -1746,16 +1906,16 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["no-comma"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_wt103_, _ = filter_and_aggregate(datain=data_wt103, model="gpt-2", model_id="w-12v2", groups=variables, aggregating_metric="mean")
 dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %% [markdown]
 # ## Point plot
 
 # %%
-dfs = (dat_40m_, dat_gpt_)
+dfs = (dat_wt103_, dat_gpt_)
 suptitles = (f"{scenario_title}", f"{scenario_title}")
-savetags = ("trf-w12", "trf-a10")
+savetags = ("trf-w12v2", "trf-a10")
 ylims=((60, 115), (None, None))
 basename="set-size"
 scenario = "sce5"
@@ -1768,7 +1928,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     
     grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", style="condition", col="list", ylim=ylim,
                                      estimator=np.median,
-                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
+                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(%)",
                                      suptitle=suptitle, suptitle_fs=24, scale=1, errwidth=1.5,
                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                      size_inches=plot_size)
@@ -1784,6 +1944,8 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         a.set_xlabel(a.get_xlabel(), fontsize=22)
 
     ax[0].set_ylabel("Repeat surprisal\n(\%)", fontsize=22)
+    
+    plt.show()
     
     if savefigs:
         
@@ -1904,27 +2066,30 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
 
 # %%
 data_gpt, data_40m, data_rnn = None, None, None
-scenario = "sce6"a
+scenario = "sce6"
 scenario_txt = "'John' instead of 'Mary'"
 data_gpt = pd.read_csv(os.path.join(data_dir, "output_gpt2_a-10_{}.csv".format(scenario)), sep="\t", index_col=0)
-data_40m = pd.read_csv(os.path.join(data_dir, "output_gpt2_w-12_{}.csv".format(scenario)), sep="\t", index_col=0)
+data_wt103 = load_wt103_data(os.path.join(data_dir, "wt103_v2", f"*_w-12v2_{scenario}*.csv".format(scenario))).dropna()
 
 data_gpt["context"] = "mary-john"
-data_40m["context"] = "mary-john"
+data_wt103["context"] = "mary-john"
 data_gpt["model"] = "gpt-2"
-data_40m["model"] = "gpt-2"
+data_wt103["model"] = "gpt-2"
+data_wt103.prompt_len = data_wt103.prompt_len.map({1: 8})
 
 # %% [markdown]
 # ## Example time course
 
 # %%
-ids = ("a-10", "w-12")
+ids = ("a-10", "w-12v2")
 tags = ("trf", "trf")
 titles = ("{} (GPT-2)".format(scenario_txt), "{} Transformer (Wikitext-103)".format(scenario_txt))
 
-for dat, model_id, tag, title in zip((data_gpt, data_40m), ids, tags, titles):
+for dat, model_id, tag, title in zip((data_gpt, data_wt103), ids, tags, titles):
 
     f, a = make_example_plot(data=dat, seed=123, model_id=model_id, context="mary-john", ylim=(0, 30), title=title)
+    
+    plt.show()
     
     if savefigs:
         
@@ -2025,14 +2190,14 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["mary-john"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_wt103_, _ = filter_and_aggregate(datain=data_wt103, model="gpt-2", model_id="w-12v2", groups=variables, aggregating_metric="mean")
 dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %% [markdown]
 # ## Point plot
 
 # %%
-dfs = (dat_40m_, dat_gpt_)
+dfs = (dat_wt103_, dat_gpt_)
 suptitles = (f"{scenario_txt}", f"{scenario_txt}")
 savetags = ("trf-w12", "trf-a10")
 ylims=((60, 115), (None, None))
@@ -2064,6 +2229,8 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         a.set_xlabel(a.get_xlabel(), fontsize=label_fs)
     
     ax[0].set_ylabel("Repeat surprisal\n(\%)", fontsize=label_fs)
+    
+    plt.show()
     
     if savefigs:
         
@@ -2186,25 +2353,28 @@ data_gpt, data_40m, data_rnn = None, None, None
 scenario = "sce4"
 scenario_txt = "Shuffled preface string"
 data_gpt = pd.read_csv(os.path.join(data_dir, "output_gpt2_a-10_{}.csv".format(scenario)), sep="\t", index_col=0)
-data_40m = pd.read_csv(os.path.join(data_dir, "output_gpt2_w-12_{}.csv".format(scenario)), sep="\t", index_col=0)
+data_wt103 = load_wt103_data(os.path.join(data_dir, "wt103_v2", f"*_w-12v2_{scenario}*.csv".format(scenario))).dropna()
+data_wt103.prompt_len = data_wt103.prompt_len.map({1: 8})
 
 data_gpt["context"] = "shuf-preface"
-data_40m["context"] = "shuf-preface"
+data_wt103["context"] = "shuf-preface"
 data_gpt["model"] = "gpt-2"
-data_40m["model"] = "gpt-2"
+data_wt103["model"] = "gpt-2"
 
 # %% [markdown]
 # ## Example time course
 
 # %%
-ids = ("a-10", "w-12")
+ids = ("a-10", "w-12v2")
 tags = ("trf", "trf")
 titles = ("{}\nTransformer (Radford et al, 2019)".format(scenario_txt), "{}\nTransformer (Wikitext-103)".format(scenario_txt))
 scenario = "sce4"
 
-for dat, model_id, tag, title in zip((data_gpt, data_40m), ids, tags, titles):
+for dat, model_id, tag, title in zip((data_gpt, data_wt103), ids, tags, titles):
 
     f, a = make_example_plot(data=dat, seed=123, model_id=model_id, context="shuf-preface", ylim=(0, 30), title=title)
+    
+    plt.show()
     
     if savefigs:
         
@@ -2304,17 +2474,17 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["shuf-preface"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_wt103_, _ = filter_and_aggregate(datain=data_wt103, model="gpt-2", model_id="w-12v2", groups=variables, aggregating_metric="mean")
 dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %% [markdown]
 # ## Point plot
 
 # %%
-dfs = (dat_40m_, dat_gpt_)
+dfs = (dat_wt103_, dat_gpt_)
 suptitles = (f"{scenario_txt}", f"{scenario_txt}")
 savetags = ("trf-w12", "trf-a10")
-ylims=((60, 115), (None, None))
+ylims=((50, 115), (None, None))
 basename="set-size"
 scenario = "sce4"
 
@@ -2343,6 +2513,8 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         a.set_xlabel(a.get_xlabel(), fontsize=label_fs)
     
     ax[0].set_ylabel("Repeat surprisal\n(\%)", fontsize=label_fs)
+    
+    plt.show()
     
     if savefigs:
         
@@ -2465,25 +2637,28 @@ data_gpt, data_40m, data_rnn = None, None, None
 scenario = "sce7"
 scenario_txt = "Shuffled prompt string"
 data_gpt = pd.read_csv(os.path.join(data_dir, "output_gpt2_a-10_{}.csv".format(scenario)), sep="\t", index_col=0)
-data_40m = pd.read_csv(os.path.join(data_dir, "output_gpt2_w-12_{}.csv".format(scenario)), sep="\t", index_col=0)
+data_wt103 = load_wt103_data(os.path.join(data_dir, "wt103_v2", f"*_w-12v2_{scenario}*.csv".format(scenario))).dropna()
+data_wt103.prompt_len = data_wt103.prompt_len.map({1: 8})
 
 data_gpt["context"] = "shuf-prompt"
-data_40m["context"] = "shuf-prompt"
+data_wt103["context"] = "shuf-prompt"
 data_gpt["model"] = "gpt-2"
-data_40m["model"] = "gpt-2"
+data_wt103["model"] = "gpt-2"
 
 # %% [markdown]
 # ## Example time course
 
 # %%
-ids = ("a-10", "w-12")
+ids = ("a-10", "w-12v2")
 tags = ("trf", "trf")
 titles = ("{}\nTransformer (Radford et al, 2019)".format(scenario_txt), "{}\nTransformer (Wikitext-103)".format(scenario_txt))
 scenario = "sce7"
 
-for dat, model_id, tag, title in zip((data_gpt, data_40m), ids, tags, titles):
+for dat, model_id, tag, title in zip((data_gpt, data_wt103), ids, tags, titles):
 
     f, a = make_example_plot(data=dat, seed=123, model_id=model_id, context="shuf-prompt", ylim=(0, 30), title=title)
+    
+    plt.show()
     
     if savefigs:
         
@@ -2599,17 +2774,17 @@ variables = [{"list_len": [3, 5, 7, 10]},
              {"context": ["shuf-prompt"]},
              {"marker_pos_rel": list(range(1, 10))}]
 
-dat_40m_, _ = filter_and_aggregate(datain=data_40m, model="gpt-2", model_id="w-12", groups=variables, aggregating_metric="mean")
+dat_40m_, _ = filter_and_aggregate(datain=data_wt103, model="gpt-2", model_id="w-12v2", groups=variables, aggregating_metric="mean")
 dat_gpt_, _ = filter_and_aggregate(datain=data_gpt, model="gpt-2", model_id="a-10", groups=variables, aggregating_metric="mean")
 
 # %% [markdown]
 # ## Point plot
 
 # %%
-dfs = (dat_40m_, dat_gpt_)
+dfs = (dat_wt103_, dat_gpt_)
 suptitles = (f"{scenario_txt}", f"{scenario_txt}")
 savetags = ("trf-w12", "trf-a10")
-ylims=((60, 115), (None, None))
+ylims=((50, 115), (None, None))
 basename="set-size"
 scenario = "sce7"
 
@@ -2639,6 +2814,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
     
     ax[0].set_ylabel("Repeat surprisal\n(\%)", fontsize=label_fs)
 
+    plt.show()
             
     if savefigs:
         
@@ -2836,7 +3012,7 @@ for df, suptitle, ylim, model_id, tag in zip(dfs, suptitles, ylims, model_ids, s
     plot_size=(5, 3)
     grid, ax, stat = make_point_plot(data_frame=df, x="list_len", y="x_perc", hue="condition", style="condition", col="list", ylim=ylim,
                                      estimator=np.median,
-                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
+                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(%)",
                                      suptitle=suptitle, suptitle_fs=22, scale=1, errwidth=1.5,
                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                      size_inches=plot_size)
@@ -2851,7 +3027,9 @@ for df, suptitle, ylim, model_id, tag in zip(dfs, suptitles, ylims, model_ids, s
             label.set_fontsize(tick_fs)
         a.set_xlabel(a.get_xlabel(), fontsize=label_fs)
     
-    ax[0].set_ylabel("Repeat surprisal\n(\%)", fontsize=label_fs)
+    ax[0].set_ylabel("Repeat surprisal\n(%)", fontsize=label_fs)
+    
+    plt.show()
     
     if savefigs:
         print("Saving {}".format(os.path.join(savedir, "{}_{}_{}-{}.".format(basename, scenario, tag, model_id))))
@@ -2888,30 +3066,37 @@ for df, suptitle, ylim, model_id, tag in zip(dfs, suptitles, ylims, model_ids, s
 # # Transformer and depth
 
 # %%
-model_ids = ["w-01", "w-03", "w-06", "w-12"]
+model_ids = ["w-01v2", "w-03v2", "w-06v2", "w-12v2"]
 scenario = "sce3"
 
 dfs = []
 for model_id in model_ids:
     
-    logging.info("Loading {}".format(os.path.join(data_dir, "output_gpt2_{}_sce3.csv".format(model_id))))
-    tmp = pd.read_csv(os.path.join(data_dir, "output_gpt2_{}_sce3.csv".format(model_id)), sep="\t", index_col=None)
+    #logging.info("Loading {}".format(os.path.join(data_dir, "output_gpt2_{}_sce3.csv".format(model_id))))
+    #tmp = pd.read_csv(os.path.join(data_dir, "output_gpt2_{}_sce3.csv".format(model_id)), sep="\t", index_col=None)
+    fn = os.path.join(data_dir, 'wt103_v2', f'*{model_id}_sce3*.csv')
+    tmp = load_wt103_data(fn)
     tmp["model"] = "gpt-2"
+    tmp.context = tmp.context.map({"sce3": "short"})
+    tmp.prompt_len = tmp.prompt_len.map({1: 8})
     dfs.append(tmp)
 
 # %% [markdown]
 # ## Plot example trial
 
 # %%
-tags = ("trf", "trf", "trf", "trf", "trf")
-titles = ("Transformer (1 layer)", 
-          "Transformer (3 layer)", 
-          "Transformer (6 layer)",
-          "Transformer (12 layer)")
+tags = ("trf", "trf", "trf", "trf")
+titles = ("Transformer (Wt103, 1-layer)", 
+          "Transformer (Wt103, 3-layer)", 
+          "Transformer (Wt103, 6-layer)",
+          "Transformer (Wt103, 12-layer)"
+         )
 
 for dat, model_id, tag, title in zip(dfs, model_ids, tags, titles):
     
-    f, a = make_example_plot(data=dat, seed=123, model_id=model_id, context="short", ylim=(0, 30), title=title)
+    f, a = make_example_plot(data=dat.dropna(), seed=123, model_id=model_id, context="short", ylim=(0, 30), title=title)
+    
+    plt.show()
     
     if savefigs:
         
@@ -2932,7 +3117,7 @@ variables = [{"list_len": [3, 5, 7, 10]},
 dfs_ = []
 for i, model_id in enumerate(model_ids):
     
-    tmp, _ = filter_and_aggregate(datain=dfs[i], model="gpt-2", model_id=model_id, groups=variables, aggregating_metric="mean")
+    tmp, _ = filter_and_aggregate(datain=dfs[i].dropna(), model="gpt-2", model_id=model_id, groups=variables, aggregating_metric="mean")
     dfs_.append(tmp)
 
 
@@ -2942,11 +3127,12 @@ for i, model_id in enumerate(model_ids):
 # %%
 scenario = "sce3"
 savetags = ("trf", "trf", "trf", "trf")
-ylims = ((70, None), (70, None), (70, None), (70, None))
+ylims = ((50, None), (50, None), (50, None), (50, None))
 titles = ("1-layer", 
           "3-layer", 
           "6-layer",
-          "12-layer")
+          "12-layer"
+         )
 
 basename = "set-size"
 
@@ -2967,17 +3153,20 @@ for df, suptitle, ylim, model_id, tag in zip(tuple(dfs_), titles, ylims, model_i
     plt.suptitle(suptitle, fontsize=24)
 
     # handle yticks and labels
-    ax[0].set_yticks(list(range(ylim[0], 120, 10)))
-    ax[1].set_yticks(list(range(ylim[0], 120, 10)))
-    ax[0].set_yticklabels(list(range(ylim[0], 120, 10)))
+    ax[0].set_yticks(list(range(ylim[0], 120, 20)))
+    ax[1].set_yticks(list(range(ylim[0], 120, 20)))
+    ax[0].set_yticklabels(list(range(ylim[0], 120, 20)))
         
     tick_fs, label_fs = 22, 22
+    
     for a in ax:
         for label in (a.get_xticklabels() + a.get_yticklabels()): 
             label.set_fontsize(tick_fs)
         a.set_xlabel(a.get_xlabel(), fontsize=label_fs)
     
     ax[0].set_ylabel("Repeat surprisal\n(\%)", fontsize=label_fs)
+    
+    plt.show()
     
     if savefigs:
         
@@ -3126,7 +3315,7 @@ for i, zipped in enumerate(zip(dfs, suptitles, ylims, savetags)):
         with open(fname, "w") as f:
             f.writelines(tex)
 
-# %% [markdown]
+# %% [markdown] jp-MarkdownHeadingCollapsed=true tags=[]
 # # Experiment 6: n-gram experiment
 
 # %%
