@@ -35,8 +35,23 @@
         "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer"
     ],
     "w-12v2": [
-        "wikitext-12-layer",
+        "wikitext-12-layer-v2",
         "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_full_12-768-1024_a_01/checkpoint-27500",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer"
+    ],
+    "w-06v2": [
+        "wikitext-06-layer-v2",
+        "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_full_6-768-1024_a_01/checkpoint-21000",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer"
+    ],
+    "w-03v2": [
+        "wikitext-03-layer-v2",
+        "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_full_3-768-1024_a_01/checkpoint-23500",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer"
+    ],
+    "w-01v2": [
+        "wikitext-01-layer-v2",
+        "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_full_1-768-1024_a_01/checkpoint-19000",
         "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer"
     ],
     "w-12b": [
