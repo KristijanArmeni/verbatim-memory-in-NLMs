@@ -10,6 +10,15 @@ train_gpt2_jobs.sh  # ignore the high-level script with login key info
 /notebooks/.ipynb_checkpoints/
 /output/
 /rnn/wandb/
+hpc/*
+/data/transformer_input_files/
+/data/rnn_input_files/
+/greene_scripts/lstm/wandb/
+/src/wm_suite/rnn/wandb/
+src/models/rnn/wandb/*
+wm_suite/rnn/wandb/run-*
+hpc/lstm/wandb/offline-run*/
+hpc/lstm/wandb/run*/
 
 # Editors
 .idea
