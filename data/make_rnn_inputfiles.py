@@ -1,4 +1,4 @@
-from stimuli import prompts, prefixes
+from src.wm_suite.stimuli import prompts, prefixes
 import json
 import argparse
 from nltk import word_tokenize
