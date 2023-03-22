@@ -1,19 +1,19 @@
 #! /bin/bash
 
 scenario="sce1"
-model_id="gpt2"
+model_id="trf-wt103"
 
 # bert stimuli
-for list_type in "random";
+for list_type in "random" "categorized";
 do
 
-    for condition in "repeat";
+    for condition in "repeat" "permute" "control";
     do
 
-        for list_len in "n5";
+        for list_len in "n3" "n5" "n7" "n10";
         do
 
-            for prompt_key in "1";
+            for prompt_key in "1" "2" "3" "4" "5";
             do
 
                 output_name=$model_id"_"$condition"_"$scenario"_"$prompt_key"_"$list_len"_"$list_type
