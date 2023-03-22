@@ -1,3 +1,6 @@
-sbatch $HOME/project/lm-mem/src/greene_scripts/train_gpt2_script.scr d8b913bbe52746e27b67249e76bbedb6c49ea85b $HOME/project/lm-mem/src/greene_scripts/gpt2_40m_12-768-1024_d.config "_d_02" "actual-fourth-seed"
+#sbatch $HOME/project/lm-mem/src/greene_scripts/train_gpt2_script.scr d8b913bbe52746e27b67249e76bbedb6c49ea85b $HOME/project/lm-mem/src/greene_scripts/gpt2_40m_12-768-1024_d.config "_d_02" "rerun with new tokenizer (v2)"
 # sbatch $HOME/project/lm-mem/src/greene_scripts/train_gpt2_script.scr d8b913bbe52746e27b67249e76bbedb6c49ea85b $HOME/project/lm-mem/src/greene_scripts/gpt2_40m_12-768-1024_e.config "_e_02" "fifth-seed"
-
+#sbatch $HOME/project/lm-mem/src/hpc/gpt2/train_gpt2_script_v2.scr d8b913bbe52746e27b67249e76bbedb6c49ea85b $HOME/project/lm-mem/src/hpc/gpt2/gpt2_full_12-768-1024.config "_a_01" "rerun-with-new-tokenizer-v2"
+sbatch $HOME/project/lm-mem/src/hpc/gpt2/train_gpt2_script_v2.scr d8b913bbe52746e27b67249e76bbedb6c49ea85b $HOME/project/lm-mem/src/hpc/gpt2/gpt2_full_01-768-1024.config "_a_01" "rerun-with-new-tokenizer-v2"
+sbatch $HOME/project/lm-mem/src/hpc/gpt2/train_gpt2_script_v2.scr d8b913bbe52746e27b67249e76bbedb6c49ea85b $HOME/project/lm-mem/src/hpc/gpt2/gpt2_full_03-768-1024.config "_a_01" "rerun-with-new-tokenizer-v2"
+sbatch $HOME/project/lm-mem/src/hpc/gpt2/train_gpt2_script_v2.scr d8b913bbe52746e27b67249e76bbedb6c49ea85b $HOME/project/lm-mem/src/hpc/gpt2/gpt2_full_06-768-1024.config "_a_01" "rerun-with-new-tokenizer-v2"
