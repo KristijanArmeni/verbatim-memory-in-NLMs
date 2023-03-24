@@ -136,8 +136,8 @@ def main(input_args=None):
 
     p, stat = generate_plot(model=args.model)
 
-    figsavename = f"context-structure_{tags[args.model]}_{model_ids[args.model]}"
-    tablesavename = f"context-structure_{tags[args.model]}_{model_ids[args.model]}_table"
+    figsavename = f"context-structure_{tags[args.model]}"
+    tablesavename = f"context-structure_{tags[args.model]}_table"
 
     savefig(p, savedir=args.savedir, figfname=figsavename)
     savetable(stat, savedir=args.savedir, tablefname=tablesavename)

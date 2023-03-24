@@ -3,11 +3,15 @@ import pandas as pd
 import logging
 from glob import glob
 from tqdm import tqdm
+from matplotlib import pyplot as plt
+import matplotlib
+import seaborn as sns
 
 home_dir = os.path.join(os.environ['homepath'], "project", "lm-mem")
 data_dir = os.path.join(home_dir, "data", "outputs")
 savedir = os.path.join(home_dir, "fig", "raw", "camera_ready")
 table_savedir = os.path.join(home_dir, "tables", "revised")
+
 
 def load_wt103_data(path: str) -> pd.DataFrame:
     
@@ -28,6 +32,7 @@ def load_wt103_data(path: str) -> pd.DataFrame:
 
     return pd.concat(o, ignore_index=True)    
 
+
 def load_csv_data(model:str, datadir:str, fname:str) -> pd.DataFrame:
 
     if model == "gpt2":
@@ -42,10 +47,9 @@ def load_csv_data(model:str, datadir:str, fname:str) -> pd.DataFrame:
         logging.info(f"Loading {fn}")
         data = pd.read_csv(fn, sep="\t", index_col=None)
 
-    elif model == "w-12v2":
+    elif model in ["w-01v2", "w-03v2", "w-06v2", "w-12v2"]:
 
+        logging.info(f"Loading matches to {fname}...dd")
         data = load_wt103_data(os.path.join(datadir, fname))
     
     return data
-
-

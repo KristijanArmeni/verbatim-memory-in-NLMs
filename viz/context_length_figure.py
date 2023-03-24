@@ -80,9 +80,10 @@ def generate_plot(model):
 
 def savefig(grid, savedir, figfname):
 
-        print("Saving {}".format(os.path.join(savedir, figfname)))
-        grid.savefig(figfname + ".pdf", transparent=True, bbox_inches="tight")
-        grid.savefig(figfname + ".png", dpi=300, bbox_inches="tight")
+        fn = os.path.join(savedir, figfname)
+        print(f"Saving {fn}")
+        grid.savefig(fn + ".pdf", transparent=True, bbox_inches="tight")
+        grid.savefig(fn + ".png", dpi=300, bbox_inches="tight")
     
 
 def savetable(stat, savedir, tablefname):
@@ -132,8 +133,8 @@ def main(input_args=None):
 
     p, stat = generate_plot(model=args.model)
 
-    figsavename = f"context-length_{scenario}_{tags[args.model]}_{model_ids[args.model]}"
-    tablesavename = f"context-length_{scenario}_{tags[args.model]}_{model_ids[args.model]}_table"
+    figsavename = f"context-length_{scenario}_{tags[args.model]}"
+    tablesavename = f"context-length_{scenario}_{tags[args.model]}_table"
 
     savefig(p, savedir=args.savedir, figfname=figsavename)
     savetable(stat, savedir=args.savedir, tablefname=tablesavename)
