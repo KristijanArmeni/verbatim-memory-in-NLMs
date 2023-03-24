@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from func import make_point_plot, filter_and_aggregate
-from utils import load_csv_data, data_dir, savedir, table_savedir
+from utils import load_csv_data, data_dir
 import logging
 import numpy as np
 from matplotlib import pyplot as plt
@@ -119,13 +119,15 @@ def main(input_args=None):
     parser.add_argument("--model", type=str)
     parser.add_argument("--savedir", type=str)
 
-    args = parser.parse_args()
-    print(args)
+    if input_args is None:
+        args = parser.parse_args()
+    else:
+        args = parser.parse_args(input_args)
 
     p, stat = generate_plot(model=args.model)
 
-    figsavename = f"list-length_{scenario}_{tags[args.model]}_{model_ids[args.model]}"
-    tablesavename = f"list-length_{scenario}_{tags[args.model]}_{model_ids[args.model]}_table.tex"
+    figsavename = f"list-length_{scenario}_{tags[args.model]}"
+    tablesavename = f"list-length_{scenario}_{tags[args.model]}_table.tex"
 
     savefig(p, savedir=args.savedir, figfname=figsavename)
     savetable(stat, savedir=args.savedir, tablefname=tablesavename)

@@ -3,8 +3,29 @@ import numpy as np
 from scipy.stats import sem, median_absolute_deviation
 import seaborn as sns
 from matplotlib import pyplot as plt
+import matplotlib
 import pandas as pd
 import logging
+
+
+def set_manuscript_style():
+
+    try:
+        plt.style.use("gadfly")
+    except:
+        raise Warning("Couldn't find gadfly matplotlib style using default...")
+
+    # scale font sizes
+    sns.set_context('paper', font_scale=1.6)
+
+    matplotlib.rcParams['font.family'] = 'sans-serif'
+    matplotlib.rcParams['font.sans-serif'] = ['Segoe UI']
+
+    matplotlib.rcParams['pdf.fonttype'] = 42
+    matplotlib.rcParams['ps.fonttype'] = 42
+
+    return 0
+
 
 def filter_and_aggregate(datain, model, model_id, groups, aggregating_metric):
     """
@@ -285,9 +306,10 @@ def make_point_plot(data_frame, estimator, x, y, hue, style, col,
     
     # legend
     # Improve the legend
+    linecolors = plt.rcParams["axes.prop_cycle"].by_key()["color"][0:3]
     if custom_legend:
         handles, labels = ax[1].get_legend_handles_labels()
-        ax[1].legend(handles[0:3], labels[0:3], fontsize=16,
+        ax[1].legend(handles[0:3], labels[0:3], fontsize=16, labelcolor=linecolors,
                      markerscale=1.4, handletextpad=1, columnspacing=1, bbox_to_anchor=(1, 1),
                      loc="upper left", ncol=1, frameon=False, facecolor='white', framealpha=0.2, 
                      title=legend_title, title_fontsize=17)
@@ -386,8 +408,9 @@ def make_bar_plot(data_frame, estimator, x, y, hue, col,
             axis_with_legend = 1
             #ax[0].get_legend().remove()
         
+        linecolors = plt.rcParams["axes.prop_cycle"].by_key()["color"][0:3]
         handles, labels = ax[axis_with_legend].get_legend_handles_labels()
-        ax[axis_with_legend].legend(handles[0:3], labels[0:3], labelcolor=['#00BEFF', '#D4CA3A', '#FF6DAE'],
+        ax[axis_with_legend].legend(handles[0:3], labels[0:3], labelcolor=linecolors,
                                     handletextpad=1, columnspacing=1, bbox_to_anchor=(1, 1),
                                     loc="upper left", ncol=1, frameon=False, title=legend_title)
 

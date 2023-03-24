@@ -166,8 +166,8 @@ def main(input_args=None):
 
     p, stat = generate_plot(model=args.model)
 
-    figsavename = f"timecourse_{scenario}_{tags[args.model]}_{model_ids[args.model]}"
-    tablesavename = f"timecourse_{scenario}_{tags[args.model]}_{model_ids[args.model]}_table.tex"
+    figsavename = f"timecourse_{scenario}_{tags[args.model]}"
+    tablesavename = f"timecourse_{scenario}_{tags[args.model]}_table.tex"
 
     savefig(p, savedir=args.savedir, figfname=figsavename)
     savetable(stat, savedir=args.savedir, tablefname=tablesavename)
