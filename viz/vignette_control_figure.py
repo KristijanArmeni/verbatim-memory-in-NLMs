@@ -13,7 +13,7 @@ suptitles = {"punctuation": "Comma as cue",
               "shuffled-preface": "Shuffled preface string",
               "shuffled-prompt": "Shuffled prompt string"}
 savetags = {"w-12v2": "trf-w12v2", "gpt2": "trf-a10"}
-ylims = {"w-12v2": (60, 115), "gpt2": (None, None)}
+ylims = {"w-12v2": (55, 115), "gpt2": (None, None)}
 label2vignette = {"punctuation": "sce5", "name": "sce6", "shuffled-preface": "sce4", "shuffled-prompt": "sce7"}
 
 def generate_plot(model, experiment):
@@ -65,7 +65,7 @@ def generate_plot(model, experiment):
             label.set_fontsize(22)
         a.set_xlabel(a.get_xlabel(), fontsize=22)
 
-    ax[0].set_ylabel("Repeat surprisal\n(\%)", fontsize=22)
+    ax[0].set_ylabel("Repeat surprisal\n(%)", fontsize=22)
 
     return grid, stat
 

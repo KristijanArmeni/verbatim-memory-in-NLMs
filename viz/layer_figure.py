@@ -37,7 +37,7 @@ def generate_plot(model_id):
     grid, ax, stat = make_point_plot(data_frame=data_, estimator=np.median, 
                                      x="list_len", y="x_perc", hue="condition", style="condition",
                                      col="list", ylim=ylims[model_id],
-                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(\%)",
+                                     xlabel="Set size\n(n. tokens)", ylabel="Repeat surprisal\n(%)",
                                      suptitle=titles[model_id], suptitle_fs=24, scale=1, errwidth=1.5,
                                      legend=False, legend_out=True, custom_legend=True, legend_title="Second list",
                                      size_inches=plot_size)
@@ -60,7 +60,7 @@ def generate_plot(model_id):
             label.set_fontsize(tick_fs)
         a.set_xlabel(a.get_xlabel(), fontsize=label_fs)
     
-    ax[0].set_ylabel("Repeat surprisal\n(\%)", fontsize=label_fs)
+    ax[0].set_ylabel("Repeat surprisal\n(%)", fontsize=label_fs)
 
     return grid, stat
 

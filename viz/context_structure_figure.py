@@ -1,10 +1,9 @@
 import os
 import pandas as pd
 from func import make_bar_plot, filter_and_aggregate
-from utils import load_csv_data, data_dir, savedir, table_savedir
+from utils import load_csv_data, data_dir
 import logging
 import numpy as np
-from matplotlib import pyplot as plt
 
 # define dicts that contain text elements for plots
 model_ids = {"gpt2": "a-10", "awd_lstm": "a-10", "w-12v2": "w-12v2"}
