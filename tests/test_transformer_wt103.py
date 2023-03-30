@@ -12,8 +12,8 @@ from data.wt103.dataset import WikiTextDataset
 def test_transformer_wt103_experiment(transformer_wt103_test_data):
 
     # load model and its tokenizer
-    model = GPT2LMHeadModel.from_pretrained("/scratch/ka2773/project/lm-mem/checkpoints/gpt2_full_12-768-1024_a_01/checkpoint-27500")
-    tokenizer = GPT2TokenizerFast.from_pretrained("/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer")
+    model = GPT2LMHeadModel.from_pretrained("Kristijan/gpt2_wt103_12-layer")
+    tokenizer = GPT2TokenizerFast.from_pretrained("Kristijan/wikitext-103_tokenizer_v2")
 
     # set to evaluation mode
     model.eval()
