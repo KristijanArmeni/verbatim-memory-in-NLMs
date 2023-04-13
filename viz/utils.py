@@ -7,10 +7,13 @@ from matplotlib import pyplot as plt
 import matplotlib
 import seaborn as sns
 
-home_dir = os.path.join(os.environ['homepath'], "project", "lm-mem")
-data_dir = os.path.join(home_dir, "data", "outputs")
-savedir = os.path.join(home_dir, "fig", "raw", "camera_ready")
-table_savedir = os.path.join(home_dir, "tables", "revised")
+logging.basicConfig(level=logging.INFO)
+
+#home_dir = os.path.join(os.environ['homepath'], "project", "lm-mem")
+#data_dir = os.path.join(home_dir, "data", "outputs")
+#savedir = os.path.join(home_dir, "fig", "raw", "camera_ready")
+data_dir = "/home/ka2773/project/lm-mem/src/data/test_d"
+#table_savedir = os.path.join(home_dir, "tables", "revised")
 
 
 def load_wt103_data(path: str) -> pd.DataFrame:
