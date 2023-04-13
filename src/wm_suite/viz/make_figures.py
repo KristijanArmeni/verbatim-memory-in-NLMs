@@ -48,6 +48,7 @@ def main(model, figpath):
         logging.info(f"Making control figure ({exp}) for model {model}")
         vignette_control_figure.main(["--model", f"{model}", "--experiment", exp, "--savedir", figpath])
 
+    logging.info("\n##### ===== DONE ===== #####")
 
     return 0
 
@@ -57,7 +58,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str)
+    parser.add_argument("--model", type=str, choices=["gpt2", "awd_lstm", "w-12v2"])
     parser.add_argument("--savedir", type=str)
 
     args = parser.parse_args()
