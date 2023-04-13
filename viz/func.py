@@ -7,13 +7,15 @@ import matplotlib
 import pandas as pd
 import logging
 
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+
 
 def set_manuscript_style():
 
     try:
         plt.style.use("gadfly")
     except:
-        raise Warning("Couldn't find gadfly matplotlib style using default...")
+        logging.info("Couldn't find gadfly matplotlib style, using default...")
 
     # scale font sizes
     sns.set_context('paper', font_scale=1.6)
