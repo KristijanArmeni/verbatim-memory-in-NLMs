@@ -38,8 +38,8 @@ def generate_plot(model):
             fn3 = f'*trf_w-12v2_{sce}_5_10*.csv'
             logging.info(f"Loading matches to {fn3}")
             dat_ = load_csv_data(model=model, 
-                       datadir=os.path.join(data_dir, "wt103_v2"), 
-                       fname=fn3).dropna()
+                                 datadir=data_dir, 
+                                 fname=fn3).dropna()
             dat_["model"] = "gpt2"
             dat_.prompt_len = dat_.prompt_len.map({5:400})
             dat_.context = dat_.context.map({"sce1": "intact", "sce1rnd": "scrambled", "sce2": "incongruent"})

@@ -16,7 +16,7 @@ scenario = "sce1"
 
 def generate_plot(model):
 
-    logging.info(f"Generating plot for {model}logg")
+    logging.info(f"Generating plot for {model}")
 
     # ==== LOAD DATA ===== #
 
@@ -30,7 +30,7 @@ def generate_plot(model):
         data.rename(columns={"word": "token"}, inplace=True)
 
     elif model == "w-12v2":
-        data = load_csv_data(model=model, datadir=os.path.join(data_dir, "wt103_v2"), fname=f"*{model}*sce1_1_*.csv").dropna()
+        data = load_csv_data(model=model, datadir=data_dir, fname=f"*{model}*sce1_1_*.csv").dropna()
         data["model"] = "gpt2"
         data.prompt_len = data.prompt_len.map({1: 8, 2: 30, 3:100, 4:200, 5:400})
         data.context = data.context.map({"sce1": "intact"})
