@@ -20,6 +20,9 @@ def load_wt103_data(path: str) -> pd.DataFrame:
     
     o = []
     files = glob(path)
+
+    logging.info(f"Found {len(files)} files...")
+
     for f in tqdm(files, desc="file"):
 
         # temp: read in column values form filenames
@@ -52,7 +55,7 @@ def load_csv_data(model:str, datadir:str, fname:str) -> pd.DataFrame:
 
     elif model in ["w-01v2", "w-03v2", "w-06v2", "w-12v2"]:
 
-        logging.info(f"Loading matches to {fname}...dd")
+        logging.info(f"Loading matches to {fname}...")
         data = load_wt103_data(os.path.join(datadir, fname))
     
     return data
