@@ -1,7 +1,7 @@
 import os
 import pandas as pd
-from func import make_point_plot, filter_and_aggregate
-from utils import load_csv_data, data_dir, savedir, table_savedir
+from wm_suite.viz.func import make_point_plot, filter_and_aggregate
+from wm_suite.viz.utils import load_csv_data, data_dir
 import logging
 import numpy as np
 from matplotlib import pyplot as plt
@@ -18,7 +18,7 @@ titles = {"w-01v2": "1-layer",
 def generate_plot(model_id):
 
     fn = f'*{model_id}_sce3*.csv'
-    data = load_csv_data(model=model_id, datadir=os.path.join(data_dir, 'wt103_v2'), fname=fn)
+    data = load_csv_data(model=model_id, datadir=data_dir, fname=fn)
     data["model"] = "gpt2"
     data.context = data.context.map({"sce3": "short"})
     data.prompt_len = data.prompt_len.map({1: 8})

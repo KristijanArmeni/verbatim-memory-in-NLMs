@@ -1,7 +1,7 @@
 import os
 import pandas as pd
-from func import make_point_plot, filter_and_aggregate
-from utils import load_csv_data, data_dir, savedir, table_savedir
+from wm_suite.viz.func import make_point_plot, filter_and_aggregate
+from wm_suite.viz.utils import load_csv_data, data_dir
 import logging
 import numpy as np
 from matplotlib import pyplot as plt
@@ -30,7 +30,7 @@ def generate_plot(model, experiment):
         data["context"] = experiment
 
     elif model == "w-12v2":
-        data = load_csv_data(model=model, datadir=os.path.join(data_dir, "wt103_v2"), fname=f"*_w-12v2_{vignette}*.csv").dropna()
+        data = load_csv_data(model=model, datadir=data_dir, fname=f"*_w-12v2_{vignette}*.csv").dropna()
         data["model"] = "gpt2"
         data.prompt_len = data.prompt_len.map({1: 8, 2: 30, 3:100, 4:200, 5:400})
         data["context"] = experiment

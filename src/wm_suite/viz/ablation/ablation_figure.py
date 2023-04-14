@@ -1,11 +1,14 @@
 
-import os, json
+import os, json, sys
+
+sys.path.append("/home/ka2773/project/lm-mem/src")
+
 import numpy as np
 import pandas as pd
 from scipy.stats import sem
 from scipy.stats import median_abs_deviation
 from matplotlib import pyplot as plt
-from func import filter_and_aggregate
+from viz.func import filter_and_aggregate
 import logging
 from typing import List, Dict, Tuple
 
@@ -257,6 +260,10 @@ def main(input_args=None):
         fn = os.path.join(args.savedir, "ablation_single-multi_across-tokens.png")
         print(f"Saving {fn}")
         fig.savefig(fn, dpi=300)
+
+        fn = os.path.join(args.savedir, "ablation_single-multi_across-tokens.pdf")
+        print(f"Saving {fn}")
+        fig.savefig(fn, transparent=True, bbox_inches="tight")
 
     return 0
 
