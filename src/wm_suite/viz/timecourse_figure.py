@@ -1,7 +1,7 @@
 import os
 import pandas as pd
-from func import make_timecourse_plot
-from utils import load_csv_data, data_dir
+from wm_suite.viz.func import make_timecourse_plot
+from wm_suite.viz.utils import load_csv_data, data_dir
 import logging
 import numpy as np
 from matplotlib import pyplot as plt

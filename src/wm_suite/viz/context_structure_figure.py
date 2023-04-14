@@ -1,7 +1,7 @@
 import os
 import pandas as pd
-from func import make_bar_plot, filter_and_aggregate
-from utils import load_csv_data, data_dir
+from wm_suite.viz.func import make_bar_plot, filter_and_aggregate
+from wm_suite.viz.utils import load_csv_data, data_dir
 import logging
 import numpy as np
 
