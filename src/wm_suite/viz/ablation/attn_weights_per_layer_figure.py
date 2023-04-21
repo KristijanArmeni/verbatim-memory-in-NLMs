@@ -14,6 +14,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 ABLATION_FILENAME_CODES = [str(i) for i in range(12)] + ["01", "23", "56", "711", "0123", "56711", "all"]
 
+
 def check_datadir(datadir: str) -> str:
 
     if "WMS_DATADIR" in os.environ.keys():
@@ -81,10 +82,8 @@ def plot_attention(ax: mpl.axes.Axes, x: np.ndarray, token_ids: np.ndarray, labe
     return ax
 
 
-def attn_amplitude_plot(gs: GridSpec, x: np.ndarray, d: Dict, target_id=13, query_id=45, seed=12345):
+def attn_amplitude_plot(axes, x: np.ndarray, d: Dict, target_id=13, query_id=45, seed=12345):
 
-    i = 2 #
-    xs = np.arange(12)
     ylabels = [s.strip('Ġ') for s in d['tokens'][0]]
     
     ids1 = (target_id, target_id+1, target_id+3, target_id+5)
@@ -93,10 +92,12 @@ def attn_amplitude_plot(gs: GridSpec, x: np.ndarray, d: Dict, target_id=13, quer
               f"second noun [{ids1[2]+1}]", 
               f"third noun [{ids1[3]+1}]"]
 
-    ax1, ax2, ax3 = plt.subplot(gs[0, :]), plt.subplot(gs[1, 0]), plt.subplot(gs[1, 1])
-    for a in (ax1, ax2, ax3):
+    #ax1, ax2, ax3 = plt.subplot(gs[0, :]), plt.subplot(gs[1, 0]), plt.subplot(gs[1, 1])
+    for a in axes:
         a.set_prop_cycle('color', plt.cm.YlGnBu(np.linspace(0.4, 0.9, len(labels))))
         
+    ax1, ax2, ax3 = axes
+
     plot_attention(ax1, x, ids1, labels)
     query_ids = (query_id-1, query_id-2, query_id-3)
     labs = (f"{ylabels[q]} (t-{i+1}) [{q}]" for i, q in enumerate(query_ids))
@@ -112,7 +113,7 @@ def attn_amplitude_plot(gs: GridSpec, x: np.ndarray, d: Dict, target_id=13, quer
     ax3.set_title("To random intermediate tokens (control)")
 
     ax3.set_ylabel("")
-    ax3.set_yticklabels("")
+    #ax3.set_yticklabels("")
     ax3.spines['left'].set_visible(False)
     
     return ax1, ax2, ax3
@@ -122,20 +123,50 @@ def generate_plot(datadir:str, query: str):
 
     if query == "colon":
         fn = "gpt2_attn.npz"
+        query_idx = 45
+        title_string = ":"
+    elif query == "colon-colon-n2":
+        fn = "gpt2_attn_query-n2.npz"
+        query_idx = 48
+        title_string = ":"
+    elif query == "colon-semicolon-p1":
+        fn = "attention_weights_gpt2_colon-semicolon.npz"
+        query_idx = 45
+        title_string = ';'
+    elif query == "colon-semicolon-n1":
+        fn = "attention_weights_gpt2_colon-semicolon-n1.npz"
+        query_idx = 46  # this is first noun in the list
+        title_string = "first noun"
+    
+    elif query == "colon-semicolon-n2":
+        fn = "attention_weights_gpt2_colon-semicolon-n2.npz"
+        query_idx = 48 # this is the position of the second noun in the list
+        title_string = "second noun"
 
     x1, d1 = get_data(os.path.join(datadir, fn))
 
-    gs = GridSpec(2, 2)
-
     fig = plt.figure(figsize = (11, 7))
+    gs = plt.GridSpec(2, 2)
 
-    ax1, ax2, ax3 = attn_amplitude_plot(gs, x1, d1)
+    #fig, ax = plt.subplots(nrows=2, ncols=2, sharey="all", gridspec_kw={"heigth_ratios": [1, 1], width_ratios: [2, 1]})
+    
+    ax1 = fig.add_subplot(gs[0, :])
+    ax2 = fig.add_subplot(gs[1, 0])
+    ax3 = fig.add_subplot(gs[1, 1])
 
+    #ax1, ax2, ax3 = gs.subplots(sharey='all')
+
+    ax1, ax2, ax3 = attn_amplitude_plot((ax1, ax2, ax3), x1, d1, query_id=query_idx)
+
+    ylim_max = max([a.get_ylim()[-1] for a in (ax1, ax2, ax3)])
     for a in (ax1, ax2, ax3):
-        a.set_ylim(0, 0.3)
+        a.set_ylim((0, ylim_max))
         a.legend(title="Attention to", fontsize=12)
 
-    plt.suptitle("GPT2 attention per layer ({query} as query token)", fontsize=18)
+    ax3.set_yticklabels("")
+
+    qt = d1['tokens'][0][query_idx].strip()
+    plt.suptitle(f"GPT2 attention per layer\n('{title_string}' as query token)", fontsize=18)
     plt.tight_layout()
 
     return fig
@@ -156,7 +187,7 @@ def main(input_args=None):
 
     datadir = check_datadir(args.datadir)
 
-    fig = generate_plot(datadir=datadir, query = "colon")
+    fig = generate_plot(datadir=datadir, query="semicolon-semicolon")
 
     savefn = os.path.join(args.savedir, "gpt2_attn_query-colon.png")
     logging.info(f"Saving {savefn}")
