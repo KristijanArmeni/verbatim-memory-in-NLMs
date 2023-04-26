@@ -1,6 +1,7 @@
 
 import os, json, sys
 
+sys.path.append(os.environ['PROJ_ROOT'])
 sys.path.append("/home/ka2773/project/lm-mem/src")
 
 import numpy as np
@@ -8,7 +9,7 @@ import pandas as pd
 from scipy.stats import sem
 from scipy.stats import median_abs_deviation
 from matplotlib import pyplot as plt
-from viz.func import filter_and_aggregate
+from src.wm_suite.viz.func import filter_and_aggregate, set_manuscript_style
 import logging
 from typing import List, Dict, Tuple
 
@@ -225,7 +226,18 @@ def generate_plot(datadir: str, timesteps: str):
             a.tick_params(axis="x", labelsize=13)
 
         # subtitles
-        ax[1, 0].set_xlabel("Surprisal on second list\nrelative to first list (%)", fontsize=13)
+        ax[1, 0].set_xlabel("Surprisal on second list relative to first list (%)", fontsize=13)
+        
+        if timesteps == "first_token":
+            ax[1, 0].set_xlabel("Surprisal on first token of second list relative to first token on first list (%)", fontsize=13)
+
+        ax[1, 0].annotate('', xy=(80, -1.8), xytext=(20,-1.8),                   
+                    arrowprops=dict(arrowstyle='<->'),  
+                    annotation_clip=False)                               
+
+        ax[1, 0].annotate('better memory', xy=(22,-1.7), xytext=(22,-1.7), annotation_clip=False)
+        ax[1, 0].annotate('worse memory', xy=(61,-1.7), xytext=(61,-1.7), annotation_clip=False)
+
         ax[0, 0].set_title("Working memory task", fontsize=13)
 
         fig.text(0.84, 0.045, 'Test set perplexity', ha='center', fontsize=13)
@@ -251,19 +263,22 @@ def main(input_args=None):
     else:
         args = parser.parse_args(input_args)
 
+    set_manuscript_style()
+
     # actual script
     with plt.style.context('seaborn-whitegrid'):
     
-        fig = generate_plot(datadir=args.datadir, timesteps="all_tokens")
+        fig = generate_plot(datadir=args.datadir, timesteps="first_token")
         plt.show()
 
-        fn = os.path.join(args.savedir, "ablation_single-multi_across-tokens.png")
-        print(f"Saving {fn}")
-        fig.savefig(fn, dpi=300)
+        if args.savedir:
+            fn = os.path.join(args.savedir, "ablation_single-multi_first-token.png")
+            print(f"Saving {fn}")
+            fig.savefig(fn, dpi=300)
 
-        fn = os.path.join(args.savedir, "ablation_single-multi_across-tokens.pdf")
-        print(f"Saving {fn}")
-        fig.savefig(fn, transparent=True, bbox_inches="tight")
+            fn = os.path.join(args.savedir, "ablation_single-multi_first-token.pdf")
+            print(f"Saving {fn}")
+            fig.savefig(fn, transparent=True, bbox_inches="tight")
 
     return 0
 
