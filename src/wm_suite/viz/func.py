@@ -10,15 +10,16 @@ import logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
-def set_manuscript_style():
+def set_manuscript_style(style=None):
 
-    try:
-        plt.style.use("gadfly")
-    except:
-        logging.info("Couldn't find gadfly matplotlib style, using default...")
+    if style is not None:
+        try:
+            plt.style.use(style)
+        except:
+            logging.info(f"Couldn't find {style} matplotlib style, using default...")
 
     # scale font sizes
-    sns.set_context('paper', font_scale=1.6)
+    #sns.set_context('paper', font_scale=1.6)
 
     matplotlib.rcParams['font.family'] = 'sans-serif'
     matplotlib.rcParams['font.sans-serif'] = ['Segoe UI']
