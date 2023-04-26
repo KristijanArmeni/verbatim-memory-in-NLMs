@@ -1,12 +1,14 @@
-import os, json
+import os, sys
+sys.path.append(os.environ["PROJ_ROOT"])
+
 import numpy as np
 import pandas as pd
 from scipy.stats import sem
-from scipy.stats import median_abs_deviation
+from scipy.stats import bootstrap, median_abs_deviation
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 import matplotlib as mpl
-from viz.func import filter_and_aggregate
+from src.wm_suite.viz.func import filter_and_aggregate
 import logging
 from typing import List, Dict, Tuple
 
@@ -42,16 +44,29 @@ def get_mean_se(x: np.ndarray, axis: Tuple) -> Tuple[float, float]:
     """
     Parameters:
     ----------
-    x : np.ndarray, shape = (layers, timesteps, samples, heads)
-        the data array containing weihgs
+    x : np.ndarray, shape = (n_samples, n_timesteps, n_heads, n_layers)
+        the data array containing wesihgs
     axis: tuple
         axis over which to average
 
+    Returns:
+    -------
+    m : np.ndarray, shape = (n_layers,)
+        mean
+    se : np.ndarray, shape = (n_layers,)
+        the standard error of the mean
     """
+    logging.info("Call to get_mean_se(), assuming dimensions:")
+    logging.info(f"n_samples (0): {x.shape[0]}\n n_heads (1): {x.shape[1]}\n n_layers (2): {x.shape[2]}")
+
+    logging.info(f"Taking mean over dimensions {axis} of lengths {x.shape[axis[0]]} and {x.shape[1]}")
     m = np.mean(x, axis=axis)
-    se = sem(np.mean(x, axis=0), axis=0)
+
+    # first average over sequences, then get SEM over heads for each layer (axis=1)
+    mean_per_head_layer = np.mean(x, axis=0)
+    sem_per_layer = median_abs_deviation(mean_per_head_layer, axis=0)
     
-    return m, se
+    return m, sem_per_layer
 
 
 def plot_attention(ax: mpl.axes.Axes, x: np.ndarray, token_ids: np.ndarray, labels: List):
@@ -63,18 +78,24 @@ def plot_attention(ax: mpl.axes.Axes, x: np.ndarray, token_ids: np.ndarray, labe
     x: np.ndarray, shape = (layers, timesteps, sequences, heads)
 
     """
+
+    # loop over selected target tokens that we're attending to
     for t, l in zip(token_ids, labels):
 
         # average acrross heads and across sequences
-        m, se = get_mean_se(x[:, t, :, :], axis=(0, 1))
+        attn_at_timestep = x[:, t, :, :]  # shape = (sequences, heads, layers)
+
+        # now compute mean over heads and layers (0, 1)
+        m, se = get_mean_se(attn_at_timestep, axis=(0, 1))
 
         ax.plot(m, '--o', label=l)
         ax.fill_between(np.arange(m.shape[-1]), y1=m+se, y2=m-se, alpha=0.2)
 
-    ax.set_ylabel('average attention weight\n(across heads & sequences)')
-    ax.set_xlabel('layer')
+    fontsize=16
+    ax.set_ylabel('Avg. attention weight\n(across heads & sequences)', fontsize=fontsize)
+    ax.set_xlabel('Layer', fontsize=fontsize)
     ax.set_xticks(np.arange(12))
-    ax.set_xticklabels(np.arange(12)+1)
+    ax.set_xticklabels(np.arange(12)+1, fontsize=fontsize)
 
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -84,44 +105,89 @@ def plot_attention(ax: mpl.axes.Axes, x: np.ndarray, token_ids: np.ndarray, labe
 
 def attn_amplitude_plot(axes, x: np.ndarray, d: Dict, target_id=13, query_id=45, seed=12345):
 
+    # set ylabels for legend
     ylabels = [s.strip('Ġ') for s in d['tokens'][0]]
     
-    ids1 = (target_id, target_id+1, target_id+3, target_id+5)
-    labels = [f"':' (first list) [{ids1[0]+1}]", 
-              f"first noun [{ids1[1]+1}]", 
-              f"second noun [{ids1[2]+1}]", 
-              f"third noun [{ids1[3]+1}]"]
+    ids1 = (target_id+5, target_id+3, target_id+1, target_id)
+    labels = [f"third noun [{ids1[0]+1}]", 
+              f"second noun [{ids1[1]+1}]", 
+              f"first noun [{ids1[2]+1}]", 
+              f"cue token (':') [{ids1[3]+1}]"]
 
     #ax1, ax2, ax3 = plt.subplot(gs[0, :]), plt.subplot(gs[1, 0]), plt.subplot(gs[1, 1])
     for a in axes:
         a.set_prop_cycle('color', plt.cm.YlGnBu(np.linspace(0.4, 0.9, len(labels))))
         
-    ax1, ax2, ax3 = axes
+    ax1, ax2 = axes
+
 
     plot_attention(ax1, x, ids1, labels)
+    ax1.set_title("Attention to tokens in first list", fontsize=12)    
+    
     query_ids = (query_id-1, query_id-2, query_id-3)
-    labs = (f"{ylabels[q]} (t-{i+1}) [{q}]" for i, q in enumerate(query_ids))
+    labs = [f"{ylabels[q]} (t-{i+1}) [{q}]" for i, q in enumerate(query_ids)]
     plot_attention(ax2, x, query_ids, labs)
+    ax2.set_title("Attention to immediately preceding tokens", fontsize=12)
+
+    return ax1, ax2
+
+
+def attn_amplitude_plot_control_tokens(ax, x: np.ndarray, d: Dict, seed=12345):
+
+    ylabels = [s.strip('Ġ') for s in d['tokens'][0]]
 
     np.random.seed(seed)
     ints = np.random.choice(np.arange(20, 35), 3)
     labs = [f"{ylabels[i]} [{i+1}]" for i in ints]
-    plot_attention(ax3, x, ints, labs)
 
-    ax1.set_title("To first list")
-    ax2.set_title("To immediately preceeding tokens")
-    ax3.set_title("To random intermediate tokens (control)")
+    ax.set_prop_cycle('color', plt.cm.YlGnBu(np.linspace(0.4, 0.9, len(labs))))
 
-    ax3.set_ylabel("")
-    #ax3.set_yticklabels("")
-    ax3.spines['left'].set_visible(False)
+    plot_attention(ax, x, ints, labs)
+
+    ax.set_title("To random intermediate tokens (control)")
+
+    return ax
+
+
+def plot_imshow_and_average(axes, dat):
+
+    m = np.mean(dat, axis=(0, 1))
+    se = sem(np.mean(dat, axis=0), axis=0)
     
-    return ax1, ax2, ax3
-    
+    axes[0].plot(m, '--o', markersize=7.5, mec='white')
+    axes[0].fill_between(np.arange(dat.shape[-1]), y1=m+se, y2=m-se, alpha=0.2)
+    im1 = axes[1].imshow(np.mean(dat, axis=0), aspect='auto')
 
-def generate_plot(datadir:str, query: str):
+    return axes, im1
 
-    if query == "colon":
+
+def attn_weights_per_head_layer(ax, x, query_id, target_id):
+
+    # token indices from nearest to furthest
+    first_list = (target_id+5, target_id+3, target_id+1)
+    preceding = (query_id-1, query_id-2, query_id-3)
+
+    sel = np.zeros(shape=x.shape[1], dtype=bool)
+    sel[np.array(first_list)] = True
+    xtmp = np.sum(x[:, sel, ...], 1)
+    _, img1 = plot_imshow_and_average(ax[:, 1], xtmp)
+
+    sel = np.zeros(shape=x.shape[1], dtype=bool)
+    sel[np.array(preceding)] = True
+    xtmp = np.sum(x[:, sel, ...], 1)
+    _, img2 = plot_imshow_and_average(ax[:, 0], xtmp)
+
+    for a in ax[0, :]:
+        a.grid(visible=True, linewidth=0.5)
+        a.spines['top'].set_visible(False)
+        a.spines['right'].set_visible(False)
+
+    return ax, img2
+
+
+def generate_plot2(datadir, query):
+
+    if query == "colon-colon-p1":
         fn = "gpt2_attn.npz"
         query_idx = 45
         title_string = ":"
@@ -145,31 +211,117 @@ def generate_plot(datadir:str, query: str):
 
     x1, d1 = get_data(os.path.join(datadir, fn))
 
-    fig = plt.figure(figsize = (11, 7))
-    gs = plt.GridSpec(2, 2)
+    fig, ax = plt.subplots(2, 2, figsize=(7, 4), sharex="all", sharey="row", gridspec_kw={'height_ratios': [1.3, 2.7]})
 
-    #fig, ax = plt.subplots(nrows=2, ncols=2, sharey="all", gridspec_kw={"heigth_ratios": [1, 1], width_ratios: [2, 1]})
-    
-    ax1 = fig.add_subplot(gs[0, :])
-    ax2 = fig.add_subplot(gs[1, 0])
-    ax3 = fig.add_subplot(gs[1, 1])
+    ax, img2 = attn_weights_per_head_layer(ax=ax, x=x1, target_id=13, query_id=45)
 
-    #ax1, ax2, ax3 = gs.subplots(sharey='all')
+    lfs=15
 
-    ax1, ax2, ax3 = attn_amplitude_plot((ax1, ax2, ax3), x1, d1, query_id=query_idx)
+    ax[1, 0].set_ylabel("Head", fontsize=lfs)
+    ax[0, 0].set_ylabel("Avg. attn.\nweight", fontsize=lfs)
 
-    ylim_max = max([a.get_ylim()[-1] for a in (ax1, ax2, ax3)])
-    for a in (ax1, ax2, ax3):
-        a.set_ylim((0, ylim_max))
-        a.legend(title="Attention to", fontsize=12)
+    # suptitles
+    ax[0, 1].set_title("To tokens in first list", fontsize=14)
+    ax[0, 0].set_title("To preceeding tokens", fontsize=14)
 
-    ax3.set_yticklabels("")
 
-    qt = d1['tokens'][0][query_idx].strip()
-    plt.suptitle(f"GPT2 attention per layer\n('{title_string}' as query token)", fontsize=18)
-    plt.tight_layout()
+    # ticks and ticklabels
+    for a in ax[1, :]:
+        a.set_xticks(np.arange(0, 11, 2))
+        a.set_xticklabels(np.arange(1, 12, 2), fontsize=lfs)
+
+ 
+    ax[0, 0].tick_params(axis="y", labelsize=lfs)
+    ax[1, 0].set_yticks(np.arange(0, 12, 2))
+    ax[1, 0].set_yticklabels(np.arange(1, 12, 2), fontsize=lfs)
+
+    # colorbar
+    cax = ax[1, 1].inset_axes([1.04, 0.2, 0.05, 0.7])
+    cbar = fig.colorbar(img2, ax=ax[1, :], cax=cax)
+    cbar.ax.set_ylabel("Attention weight", rotation=90, fontsize=lfs)
+    cbar.ax.tick_params(labelsize=lfs)
+
+    fig.supxlabel("Layer", fontsize=lfs)
+    fig.suptitle("GPT-2 attention weights from second list onset", fontsize=16)
+    fig.tight_layout()
 
     return fig
+
+
+def generate_plot(datadir:str, query: str):
+
+    if query == "colon-colon-p1":
+        fn = "gpt2_attn.npz"
+        query_idx = 45
+        title_string = ":"
+    elif query == "colon-colon-n2":
+        fn = "gpt2_attn_query-n2.npz"
+        query_idx = 48
+        title_string = ":"
+    elif query == "colon-semicolon-p1":
+        fn = "attention_weights_gpt2_colon-semicolon.npz"
+        query_idx = 45
+        title_string = ';'
+    elif query == "colon-semicolon-n1":
+        fn = "attention_weights_gpt2_colon-semicolon-n1.npz"
+        query_idx = 46  # this is first noun in the list
+        title_string = "first noun"
+    
+    elif query == "colon-semicolon-n2":
+        fn = "attention_weights_gpt2_colon-semicolon-n2.npz"
+        query_idx = 48 # this is the position of the second noun in the list
+        title_string = "second noun"
+
+    x1, d1 = get_data(os.path.join(datadir, fn))
+
+    ##### ==== MAIN FIGURE ===== #####
+    fig1, ax = plt.subplots(2, 1, figsize=(6, 6), sharey="all")
+
+    ax1, ax2 = attn_amplitude_plot((ax[0], ax[1]), x1, d1, query_id=query_idx)
+
+    for a in (ax1, ax2):
+        a.legend(title="Target token", fontsize=12, title_fontsize=12)
+
+    ax1.set_xlabel("")
+    ax1.set_xticklabels("")
+
+    # fix ylabel
+    for a in (ax1, ax2):
+        a.set_ylabel("")
+    
+    fig1.supylabel('Avg. attention weight', ha='center', fontsize=16)
+
+    fig1.suptitle(f"GPT-2 attention per layer\n('{title_string}' as query token)", fontsize=15)
+    fig1.tight_layout()
+
+    fig2, ax3 = plt.subplots(1, 1, figsize=(6, 3), sharey="all")
+    ax3.set_ylim(0, ax1.get_ylim()[-1])
+
+    ax3 = attn_amplitude_plot_control_tokens(ax3, x1, d1, seed=12345)
+    ax3.legend(title="Target token", fontsize=12, title_fontsize=12)
+
+    for a in (ax1, ax2, ax3):
+        a.tick_params(which="both", labelsize=16)
+
+    qt = d1['tokens'][0][query_idx].strip()
+    
+    fig2.suptitle(f"GPT-2 attention per layer\n('{title_string}' as query token)", fontsize=15)
+    fig2.tight_layout()
+
+    return fig1, fig2
+
+
+def save_png_pdf(fig, savename: str):
+
+    savefn = os.path.join(savename + ".png")
+    logging.info(f"Saving {savefn}")
+    fig.savefig(savefn, dpi=300, format="png")
+
+    savefn = os.path.join(savename + ".pdf")
+    logging.info(f"Saving {savefn}")
+    fig.savefig(savefn, format="pdf", transparent=True, bbox_inches="tight")
+
+    return 0
 
 
 def main(input_args=None):
@@ -187,16 +339,19 @@ def main(input_args=None):
 
     datadir = check_datadir(args.datadir)
 
-    fig = generate_plot(datadir=datadir, query="semicolon-semicolon")
+    with plt.style.context("seaborn-ticks"):
+        fig1 = generate_plot2(datadir=datadir, query="colon-colon-p1")
+        plt.show()
 
-    savefn = os.path.join(args.savedir, "gpt2_attn_query-colon.png")
-    logging.info(f"Saving {savefn}")
-    fig.savefig(savefn, dpi=300)
+    if args.savedir:
 
-    savefn = os.path.join(args.savedir, "gpt2_attn_query-colon.pdf")
-    logging.info(f"Saving {savefn}")
-    fig.savefig(savefn, transparent=True, bbox_inches="tight")
+        save_png_pdf(fig1, os.path.join(args.savedir, "gpt2_attn_colon-colon2"))
 
+    #plt.close("all")
+
+    #with plt.style.context("seaborn-whitegrid"):
+
+    #    fig1, fig2 = generate_plot(datadir=datadir, query="colon-semicolon-p1")
 
 if __name__ == "__main__":
 
