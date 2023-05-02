@@ -251,24 +251,31 @@ def generate_plot2(datadir, query):
         fn = "attention_weights_gpt2_colon-colon-p1.npz"
         query_idx = 45
         suptitle = "GPT-2 attention patterns over past context"
+        n_tokens_per_window = 3
+
+    elif query == "colon-semicolon-p1":
+        fn = "attention_weights_gpt2_colon-semicolon-p1.npz"
+        query_idx = 45
+        suptitle = "GPT-2 attention patterns over past context"
+        n_tokens_per_window = 3
+    
+    elif query == "comma-comma-p1":
+        fn = "attention_weights_gpt2_comma-comma-p1.npz"
+        query_idx = 45  # this is first noun in the list
+        suptitle = "GPT-2 attention patterns over past context"
+        n_tokens_per_window = 3
+
     elif query == "colon-colon-p1-n1":
         fn = "attention_weights_gpt2_colon-colon-p1.npz"
         query_idx = 45
         suptitle = "GPT-2 attention patterns over past context (single-token window)"
         n_tokens_per_window = 1
+
     elif query == "colon-colon-n2":
         fn = "gpt2_attn_query-n2.npz"
         query_idx = 48
         title_string = ":"
-    elif query == "colon-semicolon-p1":
-        fn = "attention_weights_gpt2_colon-semicolon-p1.npz"
-        query_idx = 45
-        suptitle = "GPT-2 attention patterns over past context"
-    elif query == "comma-comma-p1":
-        fn = "attention_weights_gpt2_comma-comma-p1.npz"
-        query_idx = 45  # this is first noun in the list
-        suptitle = "GPT-2 attention patterns over past context"
-    
+
     elif query == "colon-semicolon-n2":
         fn = "attention_weights_gpt2_colon-semicolon-n2.npz"
         query_idx = 48 # this is the position of the second noun in the list
@@ -486,18 +493,18 @@ def main(input_args=None):
 
     with plt.style.context("seaborn-ticks"):
 
-        #fig1, fig1_ = generate_plot2(datadir=datadir, query="colon-colon-p1")
-        #if args.savedir:
-        #    save_png_pdf(fig1, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1"))
-        #    save_png_pdf(fig1_, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1_control"))
+        fig1, fig1_ = generate_plot2(datadir=datadir, query="colon-colon-p1")
+        if args.savedir:
+            save_png_pdf(fig1, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1"))
+            save_png_pdf(fig1_, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1_control"))
 
-        #fig2, _ = generate_plot2(datadir=datadir, query="colon-semicolon-p1")
-        #if args.savedir:
-        #    save_png_pdf(fig2, os.path.join(args.savedir, "gpt2_attn_colon-semicolon-p1"))
+        fig2, _ = generate_plot2(datadir=datadir, query="colon-semicolon-p1")
+        if args.savedir:
+            save_png_pdf(fig2, os.path.join(args.savedir, "gpt2_attn_colon-semicolon-p1"))
 
-        #fig3, _ = generate_plot2(datadir=datadir, query="comma-comma-p1")
-        #if args.savedir:
-        #    save_png_pdf(fig3, os.path.join(args.savedir, "gpt2_attn_comma-comma-p1"))
+        fig3, _ = generate_plot2(datadir=datadir, query="comma-comma-p1")
+        if args.savedir:
+            save_png_pdf(fig3, os.path.join(args.savedir, "gpt2_attn_comma-comma-p1"))
 
         # single token plot
         fig4, fig4_ = generate_plot2(datadir=datadir, query="colon-colon-p1-n1")
