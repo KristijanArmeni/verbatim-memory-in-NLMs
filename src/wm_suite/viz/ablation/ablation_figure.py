@@ -15,7 +15,7 @@ from typing import List, Dict, Tuple
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-ABLATION_FILENAME_CODES = [str(i) for i in range(12)] + ["01", "23", "56", "711", "0123", "56711", "all"]
+ABLATION_FILENAME_CODES = [str(i) for i in range(12)] + ["01", "23", "0123", "56", "711", "56711", "All"]
 
 
 def load_ablation_files(datadir: str) -> pd.DataFrame:
@@ -91,14 +91,14 @@ def ablation_memory_plot(ax, y, y0_m, y0_sd):
     
     # plot shaded vertical line for the unablated model
     for a, d in zip(ax[:], (y_joint, y_ind)):
-        a.vlines(x = y0_m, ymin=0, ymax=len(d)+1, linestyle='--', color='tab:gray', label='unablated model', zorder=0)
+        a.vlines(x = y0_m, ymin=0, ymax=len(d)+1, linestyle='--', color='tab:gray', label='Unablated model', zorder=0)
         a.fill_betweenx(y = np.arange(0, len(d)+2), x1=y0_m-y0_sd, x2=y0_m+y0_sd, alpha=0.2, color='tab:gray', zorder=0)
     
     # ticks and tick labels
     ticklabelfs=13
     ax[0].set_ylim([0, len(y_joint)+1])
     ax[1].set_ylim([0, len(y_ind)+1])
-    ax[0].set_yticklabels(["1-2", "3-4", "6-7", "8-12", "1-2-3-4", "6-7-8-12", "all"], fontsize=ticklabelfs)
+    ax[0].set_yticklabels(["1-2", "3-4", "1-2-3-4", "6-7", "8-12", "6-7-8-12", "All"], fontsize=ticklabelfs)
     ax[1].set_yticklabels([i+1 for i in range(12)], fontsize=ticklabelfs)
 
     # spines
@@ -113,8 +113,9 @@ def ablation_memory_plot(ax, y, y0_m, y0_sd):
 
 def ablation_perplexity_plot(ax, ppls: List):
 
+
     single_layer_ablations = list(range(12))
-    multi_layer_ablations = ['01', '23', '56', '711', '0123', '56711', 'all']
+    multi_layer_ablations = ['01', '23', '0123', '56', '711', '56711', 'All']
 
     # plot perplexities
     y3 = np.array([ppls[str(k)]['wt103_ppl'] for k in single_layer_ablations])
@@ -125,8 +126,12 @@ def ablation_perplexity_plot(ax, ppls: List):
 
     ax[0, 0].barh(np.arange(7)+1, width=y4)
     ax[0, 1].barh(np.arange(7)+1, width=y4)
-    ax[0, 0].set_xlim(0, 120)
-    ax[0, 1].set_xlim(300, None)
+    ax[0, 0].set_xlim(0, 150)
+    ax[0, 0].set_xticks([0, 50, 100, 150])
+    ax[0, 0].set_xticklabels([0, 50, 100, 150])
+    ax[0, 1].set_xlim(350, None)
+    ax[0, 1].set_xticks([500, 1000, 1500])
+    ax[0, 1].set_xticklabels([500, "", 1500])
     
     for a in ax[:, 1]:
         a.spines['left'].set_visible(False)
@@ -147,11 +152,11 @@ def ablation_perplexity_plot(ax, ppls: List):
                     linestyle="--",
                     color='tab:orange',
                     zorder=2,
-                    label="unablated\nmodel")
+                    label="Unablated\nmodel")
         
     # add the // mark
     for a in ax[:, 0]:
-        a.text(a.get_xlim()[-1]+20, -0.25, "//", fontsize=13)
+        a.text(a.get_xlim()[-1]+50, -0.3, "//", fontsize=13)
 
         a.spines['top'].set_visible(False)
         a.spines['right'].set_visible(False)
@@ -214,10 +219,10 @@ def generate_plot(datadir: str, timesteps: str):
     y = np.stack(y1)
 
 
-    with plt.style.context('seaborn-whitegrid'):
+    with plt.style.context('seaborn-ticks'):
 
-        fig, ax = plt.subplots(2, 3, figsize=(11, 9), sharex="col", sharey='row', 
-                               gridspec_kw={'height_ratios': [1.3, 2.7], 'width_ratios': [2, 0.5, 0.5]})
+        fig, ax = plt.subplots(2, 3, figsize=(10, 7), sharex="col", sharey='row', 
+                               gridspec_kw={'height_ratios': [1.3, 2.5], 'width_ratios': [2, 0.6, 0.6]})
 
         _ = ablation_memory_plot(ax[:, 0], y, y0_m, y0_sd)
         _ = ablation_perplexity_plot(ax[:, 1::], ppls)
@@ -229,20 +234,25 @@ def generate_plot(datadir: str, timesteps: str):
         ax[1, 0].set_xlabel("Surprisal on second list relative to first list (%)", fontsize=13)
         
         if timesteps == "first_token":
-            ax[1, 0].set_xlabel("Surprisal on first token of second list relative to first token on first list (%)", fontsize=13)
+            ax[1, 0].set_xlabel("Repeat surprisal on the first token in list (%)", fontsize=13)
 
-        ax[1, 0].annotate('', xy=(80, -1.8), xytext=(20,-1.8),                   
+        ax[1, 0].annotate('', xy=(82, -3), xytext=(18,-3),                   
                     arrowprops=dict(arrowstyle='<->'),  
                     annotation_clip=False)                               
 
-        ax[1, 0].annotate('better memory', xy=(22,-1.7), xytext=(22,-1.7), annotation_clip=False)
-        ax[1, 0].annotate('worse memory', xy=(61,-1.7), xytext=(61,-1.7), annotation_clip=False)
+        ax[1, 0].annotate('Better memory', xy=(22,-2.8), xytext=(22,-2.8), fontsize=12, annotation_clip=False)
+        ax[1, 0].annotate('Worse memory', xy=(54,-2.8), xytext=(54,-2.8), fontsize=12, annotation_clip=False)
 
         ax[0, 0].set_title("Working memory task", fontsize=13)
 
+        for a in ax[0, :]:
+            a.grid(visible=True, linewidth=0.5)
+        for a in ax[1, :]:
+            a.grid(visible=True, linewidth=0.5)
+
         fig.text(0.84, 0.045, 'Test set perplexity', ha='center', fontsize=13)
-        fig.text(0.84, 0.926, 'Language modeling (Wikitext-103)', ha='center', fontsize=13)
-        fig.text(0.02, 0.5, 'ablated layer(s)', ha='center', rotation='vertical', fontsize=14)
+        fig.text(0.84, 0.91, 'Language modeling (Wikitext-103)', ha='center', fontsize=13)
+        fig.supylabel('Ablated layer(s)', fontsize=14)
 
         plt.suptitle("Effect of GPT-2 attention ablation on memory and language modeling tasks", fontsize=15)
         plt.tight_layout()
