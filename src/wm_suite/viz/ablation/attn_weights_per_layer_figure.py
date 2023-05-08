@@ -145,11 +145,11 @@ def attn_amplitude_plot_control_tokens(axes, x: np.ndarray, d: Dict, colors, see
     sel[np.array(ints)] = True
 
     xtmp = np.sum(x[:, sel, ...], 1)
-    _, img1 = plot_imshow_and_average(axes, xtmp, c=colors[0])
+    _, img1, data1 = plot_imshow_and_average(axes, xtmp, c=colors[0])
 
     axes[0].set_title(f"To random intermediate tokens ({' '.join(labs)})")
 
-    return axes, img1
+    return axes, img1, data1
 
 
 def plot_schematic(ax, d, colors):
@@ -215,7 +215,7 @@ def plot_imshow_and_average(axes, dat, c):
     axes[0].fill_between(np.arange(dat.shape[-1]), y1=m+se, y2=m-se, color=c, alpha=0.3)
     im1 = axes[1].imshow(np.mean(dat, axis=0), aspect='auto', vmin=0, vmax=1)
 
-    return axes, im1
+    return axes, im1, (m, se)
 
 
 def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, query_id: int, target_id: int, n_tokens_per_window: int):
@@ -230,19 +230,19 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, query_id: int, 
     sel = np.zeros(shape=x.shape[1], dtype=bool)
     sel[np.array(first_list)] = True
     xtmp = np.sum(x[:, sel, ...], 1)
-    _, img1 = plot_imshow_and_average(ax[:, 0], xtmp, c=colors[0])
+    _, img1, d1 = plot_imshow_and_average(ax[:, 0], xtmp, c=colors[0])
 
     sel = np.zeros(shape=x.shape[1], dtype=bool)
     sel[np.array(preceding)] = True
     xtmp = np.sum(x[:, sel, ...], 1)
-    _, img2 = plot_imshow_and_average(ax[:, 1], xtmp, c=colors[1])
+    _, img2, d2 = plot_imshow_and_average(ax[:, 1], xtmp, c=colors[1])
 
     for a in ax[0, :]:
         a.grid(visible=True, linewidth=0.5)
         a.spines['top'].set_visible(False)
         a.spines['right'].set_visible(False)
 
-    return ax, img2
+    return ax, img2, (d1, d2)
 
 
 def generate_plot2(datadir, query):
@@ -263,6 +263,30 @@ def generate_plot2(datadir, query):
         fn = "attention_weights_gpt2_comma-comma-p1.npz"
         query_idx = 45  # this is first noun in the list
         suptitle = "GPT-2 attention patterns over past context"
+        n_tokens_per_window = 3
+
+    elif query == "colon-colon-p1-ablate-11":
+        fn = "attention_weights_gpt2-ablate-10-all_colon-colon-p1-ctxlen1.npz"  # this is 0 indexing
+        query_idx = 45
+        suptitle = "GPT-2 attention patterns over past context (ablated layer 11)"
+        n_tokens_per_window = 3
+
+    elif query == "colon-colon-p1-ablate-0":
+        fn = "attention_weights_gpt2-ablate-0-all_colon-colon-p1-ctxlen1.npz"  # this is 0 indexing
+        query_idx = 45
+        suptitle = "GPT-2 attention patterns over past context (ablated layer 1)"
+        n_tokens_per_window = 3
+
+    elif query == "colon-colon-p1-ctxlen3":
+        fn = "attention_weights_gpt2_colon-colon-p1-ctxlen3.npz"  # this is 0 indexing
+        query_idx = 45
+        suptitle = "GPT-2 attention patterns over past context (ctxlen3)"
+        n_tokens_per_window = 3
+
+    elif query == "colon-colon-p1-ctxlen4":
+        fn = "attention_weights_gpt2_colon-colon-p1-ctxlen4.npz"  # this is 0 indexing
+        query_idx = 45
+        suptitle = "GPT-2 attention patterns over past context (ctxlen4)"
         n_tokens_per_window = 3
 
     elif query == "colon-colon-p1-n1":
@@ -318,10 +342,10 @@ def generate_plot2(datadir, query):
                                gridspec_kw={'height_ratios': [1, 2]},
                                )
 
-    ax, img2 = attn_weights_per_head_layer(ax=axes, x=x1, colors=clrs, 
-                                           target_id=13, 
-                                           query_id=query_idx,
-                                           n_tokens_per_window=n_tokens_per_window)
+    ax, img2, data1 = attn_weights_per_head_layer(ax=axes, x=x1, colors=clrs, 
+                                                 target_id=13, 
+                                                 query_id=query_idx,
+                                                 n_tokens_per_window=n_tokens_per_window)
 
     lfs = 20
 
@@ -362,7 +386,7 @@ def generate_plot2(datadir, query):
     fig_, axes2 = plt.subplots(2, 1, figsize=(6, 4.5), sharex="col",
                                gridspec_kw={"height_ratios": [1, 2]})
 
-    axes2, img2_ = attn_amplitude_plot_control_tokens(axes2, x1, d1, colors=clrs, seed=12345)
+    axes2, img2_, data2 = attn_amplitude_plot_control_tokens(axes2, x1, d1, colors=clrs, seed=12345)
     #axes2.legend(title="Target token", fontsize=12, title_fontsize=12)
 
     lfs=14
@@ -396,71 +420,15 @@ def generate_plot2(datadir, query):
     fig_.suptitle(suptitle, fontsize=15)
     fig_.tight_layout()
 
+    # format data in a csv
+    datarec_ax0 = {f"layer-{i+1}": v for i, v in enumerate(data1[0][0])}   # to nouns
+    datarec_ax1 = {f"layer-{i+1}": v for i, v in enumerate(data1[1][0])}   # to nouns
+    datarec_fig0 = {f"layer-{i+1}": v for i, v in enumerate(data2[0])}   # to nouns
+    data = pd.DataFrame.from_dict([datarec_ax0, datarec_ax1, datarec_fig0]).T
+    data.columns = ['distant', 'recent', 'intermediate']
 
-    return fig, fig_
 
-
-def generate_plot(datadir:str, query: str):
-
-    if query == "colon-colon-p1":
-        fn = "gpt2_attn.npz"
-        query_idx = 45
-        title_string = ":"
-    elif query == "colon-colon-n2":
-        fn = "gpt2_attn_query-n2.npz"
-        query_idx = 48
-        title_string = ":"
-    elif query == "colon-semicolon-p1":
-        fn = "attention_weights_gpt2_colon-semicolon.npz"
-        query_idx = 45
-        title_string = ';'
-    elif query == "colon-semicolon-n1":
-        fn = "attention_weights_gpt2_colon-semicolon-n1.npz"
-        query_idx = 46  # this is first noun in the list
-        title_string = "first noun"
-    
-    elif query == "colon-semicolon-n2":
-        fn = "attention_weights_gpt2_colon-semicolon-n2.npz"
-        query_idx = 48 # this is the position of the second noun in the list
-        title_string = "second noun"
-
-    x1, d1 = get_data(os.path.join(datadir, fn))
-
-    ##### ==== MAIN FIGURE ===== #####
-    fig1, ax = plt.subplots(2, 1, figsize=(6, 6), sharey="all")
-
-    ax1, ax2 = attn_amplitude_plot((ax[0], ax[1]), x1, d1, query_id=query_idx)
-
-    for a in (ax1, ax2):
-        a.legend(title="Target token", fontsize=12, title_fontsize=12)
-
-    ax1.set_xlabel("")
-    ax1.set_xticklabels("")
-
-    # fix ylabel
-    for a in (ax1, ax2):
-        a.set_ylabel("")
-    
-    fig1.supylabel('Avg. attention weight', ha='center', fontsize=16)
-
-    fig1.suptitle(f"GPT-2 attention per layer\n('{title_string}' as query token)", fontsize=15)
-    fig1.tight_layout()
-
-    fig2, ax3 = plt.subplots(1, 1, figsize=(6, 3), sharex="row")
-    ax3.set_ylim(0, ax1.get_ylim()[-1])
-
-    ax3 = attn_amplitude_plot_control_tokens(ax3, x1, d1, seed=12345)
-    ax3.legend(title="Target token", fontsize=12, title_fontsize=12)
-
-    for a in (ax1, ax2, ax3):
-        a.tick_params(which="both", labelsize=16)
-
-    qt = d1['tokens'][0][query_idx].strip()
-    
-    fig2.suptitle(f"GPT-2 attention per layer\n('{title_string}' as query token)", fontsize=15)
-    fig2.tight_layout()
-
-    return fig1, fig2
+    return fig, fig_, data
 
 
 def save_png_pdf(fig, savename: str):
@@ -493,23 +461,72 @@ def main(input_args=None):
 
     with plt.style.context("seaborn-ticks"):
 
-        fig1, fig1_ = generate_plot2(datadir=datadir, query="colon-colon-p1")
+        fig1, fig1_, data = generate_plot2(datadir=datadir, query="colon-colon-p1")
         if args.savedir:
             save_png_pdf(fig1, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1"))
             save_png_pdf(fig1_, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1_control"))
 
-        fig2, _ = generate_plot2(datadir=datadir, query="colon-semicolon-p1")
-        if args.savedir:
-            save_png_pdf(fig2, os.path.join(args.savedir, "gpt2_attn_colon-semicolon-p1"))
+            fn = os.path.join(args.savedir, "gpt2_attn_colon-colon-p1" + ".csv")
+            logging.info(f"Saving {fn}")
+            data.to_csv(fn, sep='\t')
 
-        fig3, _ = generate_plot2(datadir=datadir, query="comma-comma-p1")
+        # ===== CONTROL FIGURES: SWAP QUERY TOKENS ==== #
+        fig2, _, data = generate_plot2(datadir=datadir, query="colon-semicolon-p1")
         if args.savedir:
-            save_png_pdf(fig3, os.path.join(args.savedir, "gpt2_attn_comma-comma-p1"))
+
+            savename = "gpt2_attn_colon-semicolon-p1"
+            save_png_pdf(fig2, os.path.join(args.savedir, ))
+
+            fn = os.path.join(args.savedir, savename + ".csv")
+            logging.info(f"Saving {fn}")
+            data.to_csv(fn, sep='\t')
+
+
+        fig3, _, data = generate_plot2(datadir=datadir, query="comma-comma-p1")
+        if args.savedir:
+
+            savename = "gpt2_attn_comma-comma-p1"
+            save_png_pdf(fig3, os.path.join(args.savedir, savename))
+            
+            fn = os.path.join(args.savedir, savename + ".csv")
+            logging.info(f"Saving {fn}")
+            data.to_csv(fn, sep='\t')
 
         # single token plot
-        fig4, fig4_ = generate_plot2(datadir=datadir, query="colon-colon-p1-n1")
+        #fig4, fig4_ = generate_plot2(datadir=datadir, query="colon-colon-p1-n1")
+        #if args.savedir:
+        #    save_png_pdf(fig4, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1-n1"))
+
+        # ===== CONTROL FIGURES: ABLATED MODEL ==== #
+        fig5, fig5_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-ablate-11")
         if args.savedir:
-            save_png_pdf(fig4, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1-n1"))
+            save_png_pdf(fig5, os.path.join(args.savedir, "gpt2-ablate-11_attn_colon-colon-p1"))
+            save_png_pdf(fig5_, os.path.join(args.savedir, "gpt2-ablate-11_attn_colon-colon-p1_control"))
+
+            fn = os.path.join(args.savedir, "gpt2-ablate-11_attn_colon-colon-p1")
+            logging.info(f"Saving {fn}")
+            data.to_csv(fn, sep='\t')
+
+        fig6, fig6_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-ablate-0")
+        if args.savedir:
+            save_png_pdf(fig6, os.path.join(args.savedir, "gpt2-ablate-0_attn_colon-colon-p1"))
+            save_png_pdf(fig6_, os.path.join(args.savedir, "gpt2-ablate-0_attn_colon-colon-p1_control"))
+
+            fn = os.path.join(args.savedir, "gpt2-ablate-0_attn_colon-colon-p1")
+            logging.info(f"Saving {fn}")
+            data.to_csv(fn, sep='\t')
+
+
+        # ===== CONTROL FIGURES: LONG CONTEXT ==== #
+        #fig7, fig7_ = generate_plot2(datadir=datadir, query="colon-colon-p1-ctxlen3")
+        #if args.savedir:
+        #    save_png_pdf(fig7, os.path.join(args.savedir, "gpt2-ablate-11_attn_colon-colon-p1-ctxlen3"))
+        #    save_png_pdf(fig7_, os.path.join(args.savedir, "gpt2-ablate-11_attn_colon-colon-p1-ctxlen3_control"))
+        
+        #fig8, fig8_ = generate_plot2(datadir=datadir, query="colon-colon-p1-ctxlen4")
+        #if args.savedir:
+        #    save_png_pdf(fig8, os.path.join(args.savedir, "gpt2-ablate-0_attn_colon-colon-p1-ctxlen4"))
+        #    save_png_pdf(fig8_, os.path.join(args.savedir, "gpt2-ablate-0_attn_colon-colon-p1-ctxlen4_control"))
 
         plt.show()
 
