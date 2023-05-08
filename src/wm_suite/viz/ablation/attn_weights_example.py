@@ -44,7 +44,7 @@ def make_example_plot(ax: np.ndarray, x: np.ndarray, d: Dict, query_id: int, lay
     labelfs = 16  # fontsize of axis and tick labels
 
     #ax[1].set_xlabel('Token', fontsize=labelfs)
-    ax[1].set_ylabel('Head', fontsize=labelfs)
+    ax[1].set_ylabel(f'Head\n(Layer {layer+1})', fontsize=labelfs)
     ax[1].set_xticks(ticks=np.arange(query_id))
 
     # line plot
@@ -71,14 +71,24 @@ def make_example_plot(ax: np.ndarray, x: np.ndarray, d: Dict, query_id: int, lay
     cue1 = patches.Rectangle((12.5, -0.5), 1, 12, linewidth=2, ec='tab:red', facecolor='none', zorder=2)
     early_window_rect = patches.Rectangle((13.5, -0.5), 5, 12, linewidth=2, edgecolor='tab:blue', facecolor='none', zorder=2)
     preceding_window_rect = patches.Rectangle((query_id-4.5, -0.5), 3, 12, linewidth=2, edgecolor='tab:orange', facecolor='none', zorder=1)
-    for patch in (rect, early_window_rect, preceding_window_rect):
+    for patch in (cue1, rect, early_window_rect):
         ax[1].add_patch(patch)
  
-    rect = patches.Rectangle((query_id-1.5, 0), 1, 0.25, linewidth=2, edgecolor='tab:red', facecolor='tab:red', alpha=0.2, zorder=2)
+    cue2 = patches.Rectangle((query_id-1.5, 0), 1, 0.25, linewidth=2, edgecolor='tab:red', facecolor='tab:red', alpha=0.2, zorder=2)
+    cue1 = patches.Rectangle((12.5, 0), 1, 0.25, linewidth=2, ec='tab:red', facecolor='tab:red', alpha=0.2, zorder=2)
     early_window_rect = patches.Rectangle((13.5, 0), 5, 0.25, linewidth=2, edgecolor='tab:blue', facecolor='tab:blue', alpha=0.2, zorder=2)
     preceding_window_rect = patches.Rectangle((query_id-4.5, 0), 3, 0.25, linewidth=2, edgecolor='tab:orange', facecolor='tab:orange', alpha=0.2, zorder=2)
-    for patch in (rect, early_window_rect, preceding_window_rect):
+    for patch in (cue1, early_window_rect, cue2):
         ax[0].add_patch(patch)
+
+    ax[0].text(x=12.5, y=0.3, s="C1", fontsize=13, fontweight="bold")
+    ax[0].text(x=16, y=0.3, s="P1", fontsize=13, fontweight="bold")
+    ax[0].text(x=query_id-1.5, y=0.3, s="C2", fontsize=13, fontweight="bold")
+
+    ax[0].annotate("", xy=(17, 0.33), xytext=(query_id-1.5, 0.33), 
+                  arrowprops={"arrowstyle": "->", 'connectionstyle': "arc3,rad=0.1"})
+
+    ax[0].text(x=19, y=0.55, s="GPT-2 attention from repeated token to past completions", fontsize=16, fontweight="bold")
 
 
     cax = ax[1].inset_axes([1.04, 0.15, 0.01, 0.7])
@@ -87,7 +97,8 @@ def make_example_plot(ax: np.ndarray, x: np.ndarray, d: Dict, query_id: int, lay
     cbar.ax.get_yaxis().labelpad = 10
     cbar.ax.set_ylabel("Attention\nweight", rotation=90, fontsize=labelfs)
     cbar.ax.tick_params(labelsize=labelfs)
-    
+
+
     return ax
 
 
@@ -101,12 +112,12 @@ def generate_plot(datadir, layer, sequence):
     x, d = get_data(os.path.join(datadir, fn))
 
     # make figure
-    fig, ax = plt.subplots(2, 1, figsize=(14, 4.5), sharex='col', gridspec_kw={'height_ratios': [0.9, 1.8]})
+    fig, ax = plt.subplots(2, 1, figsize=(14, 5.5), sharex='col', gridspec_kw={'height_ratios': [0.9, 1.8]})
 
     # plot
     make_example_plot(ax, x=x, d=d, query_id=query_idx, layer=layer, sequence=sequence)
 
-    plt.suptitle(suptitle, fontsize=18)
+    #plt.suptitle(suptitle, fontsize=18, ha="right")
     plt.tight_layout()
 
     return fig
