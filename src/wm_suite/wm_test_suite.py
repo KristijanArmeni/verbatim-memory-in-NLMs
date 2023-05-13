@@ -16,6 +16,7 @@ from tqdm import trange
 from typing import List, Dict, Tuple, Any, Sequence
 from tqdm import tqdm, trange
 import logging
+from pprint import pprint
 
 sys.path.append("/home/ka2773/project/lm-mem/src")
 from data.wt103.dataset import WikiTextDataset
@@ -43,6 +44,7 @@ class SimpleDataset(Dataset):
 
     def __len__(self) -> int:
         return len(self.items)
+
 
 # ===== HELPER FUNCTION FOR MERGING BPE SPLIT TOKENS ===== #
 
@@ -511,39 +513,6 @@ class Experiment(object):
 
         return outputs
 
-def ablate_attn_head(model: transformers.PreTrainedModel, 
-                     layers: Tuple, 
-                     heads: Tuple, 
-                     head_dim: int) -> transformers.PreTrainedModel:
-
-    for layer_idx in layers:
-
-        layer = model.transformer.h[layer_idx]
-
-        # split attention params into three equal sized matrices (Q, K, V)
-        attn_size = layer.attn.c_attn.weight.shape[0]
-        Q, K, V = layer.attn.c_attn.weight.detach().split(attn_size, dim=1)  # matrices of (model_dim, model_dim)
-
-        # set the Q, K, and V for the specified head to 0
-        q_heads = Q.split(head_dim, dim=1)   # split along the column dimension
-        k_heads = K.split(head_dim, dim=1)
-        v_heads = V.split(head_dim, dim=1)
-
-        for head_idx in heads:
-            q_heads[head_idx][:] = 0
-            k_heads[head_idx][:] = 0
-            v_heads[head_idx][:] = 0
-
-        # assign ablated weights back to the param
-        Q_new = torch.cat(q_heads, dim=1)
-        K_new = torch.cat(k_heads, dim=1)
-        V_new = torch.cat(v_heads, dim=1)
-
-        model.transformer.h[layer_idx].attn.c_attn.weight = torch.nn.parameter.Parameter(
-                                                            torch.cat((Q_new, K_new, V_new), dim=1),
-                                                            requires_grad=False)
-
-    return model
 
 def permute_qk_weights(model=None, per_head=False, seed=None):
 
@@ -667,7 +636,7 @@ def runtime_code(input_args: List = None):
 
     # ===== INITIATIONS ===== #
     # collect input arguments
-    parser = argparse.ArgumentParser(description="surprisal.py runs perplexity experiment")
+    parser = argparse.ArgumentParser(description="")
 
     parser.add_argument("--setup", action="store_true",
                         help="downloads and places nltk model and Tokenizer")
@@ -686,7 +655,9 @@ def runtime_code(input_args: List = None):
                         help="model label controlling which checkpoint to load")
     parser.add_argument("--ablate_layers", type=str, default="none")
     parser.add_argument("--ablate_heads", type=str, default="none")
-    # To download a different model look at https://huggingface.co/models?filter=gpt2
+    parser.add_argument("--ablate_params", type=str, default="Q,K",
+                        help="Attention parameters to be ablate. Specify as comma-separated string.")
+    parser.add_argument("--ablation_type", type=str, choices=["zero", "shuffle"], default="zero")
     parser.add_argument("--checkpoint", type=str, default="gpt2",
                         help="the path to folder with pretrained models (expected to work with model.from_pretraiend() method)")
     parser.add_argument("--model_seed", type=int, default=12345,
@@ -709,21 +680,22 @@ def runtime_code(input_args: List = None):
     #    "--list_len", "3",
     #    "--prompt_len", "1",
     #    "--pretokenize_moses",
-    #    "--model_type", "pretrained",
+    #    "--model_type", "ablation",
     #    "--ablate_layer", "(0,)",
     #    "--ablate_head", "(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)",
-    #    "--checkpoint", "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_full_12-768-1024_a_01/checkpoint-27500",
-    #    "--tokenizer", "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer",
+    #    "--ablation_type", "zero",
+    #    "--checkpoint", "gpt2",
+    #    "--tokenizer", "gpt2",
+    #    #"--checkpoint", "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_full_12-768-1024_a_01/checkpoint-27500",
+    #    #"--tokenizer", "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer",
     #    "--model_seed", "12345",
-    #    #"--inputs_file", f"/home/ka2773/project/lm-mem/src/data/transformer_input_files/transformer_wt103_v2/trf-wt103_repeat_sce1_1_n5_random.json",
-    #    #"--inputs_file_info", f"/home/ka2773/project/lm-mem/src/data/transformer_input_files/transformer_wt103_v2/trf-wt103_repeat_sce1_1_n5_random_info.json",
     #    "--output_dir", "/scratch/ka2773/project/lm-mem/output/ablation",
     #    "--output_file", "surprisal_gpt2_pretrained_sce1_repeat_random.csv",
     #    "--device", "cuda",
     #]
 
     if input_args:
-        logging.info("")
+        logging.info("Using input args provided to main(), not from script.")
         argins = parser.parse_args(input_args)
     else:
         argins = parser.parse_args()
@@ -732,15 +704,7 @@ def runtime_code(input_args: List = None):
         setup()
 
     sys.path.append("/home/ka2773/project/lm-mem/src/data/")
-    
-    # ===== LOAD INPUTS ===== #
-    #with open(argins.inputs_file, "r") as fh:
-    #    input_sequences2 = [torch.tensor(e) for e in json.load(fh)]
 
-    #with open(argins.inputs_file_info, "r") as fh:
-    #    input_sequences_info = json.load(fh)
-
-        # load the word lists in .json files
 
     # ===== INITIATE MODEL AND TOKANIZER CLASS ===== #
 
@@ -809,16 +773,20 @@ def runtime_code(input_args: List = None):
         logging.info(f"Setting attention heads {argins.ablate_heads} in layers {argins.ablate_layers} to 0.")
 
         # now set the selected head in selected layer to 0
-        model = ablate_attn_head(model, 
-                                 layers=literal_eval(argins.ablate_layers),
-                                 heads=literal_eval(argins.ablate_heads),
-                                 head_dim=64)
+        lay = literal_eval(argins.ablate_layers)
+        heads = literal_eval(argins.ablate_heads)
+
+        model = ablate_attn(model, 
+                            layer_head_dict={l: list(heads) for l in lay},
+                            params=tuple(argins.ablate_params.split(",")),
+                            ablation_type="zero")
 
 
     # ===== TOKENIZE AND PREPARE THE VIGNETTES ===== #
 
     # fname = os.path.join(data_dir, argins.input_filename)
     word_lists1, word_lists2 = make_word_lists(argins.noun_list_file, condition=argins.condition)
+
 
     # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== #
 
@@ -836,7 +804,7 @@ def runtime_code(input_args: List = None):
                          "bert-base-uncased": "within",
                          "transfo-xl-wt103": None}
 
-    # this routing loops over prompts and prefixes
+    # this routine loops over prompts and prefixes
     # it keeps track of that in meta_data
     logging.info("Tokenizing and concatenating sequences...")
     input_sequences, input_sequences_info = concat_and_tokenize_inputs(prompt=prompts[argins.scenario][argins.prompt_len],
@@ -855,10 +823,9 @@ def runtime_code(input_args: List = None):
 
     # ===== EXPERIMENT ===== #
 
-    # set to evaluation mode
-    model.eval()
+    model.eval()  # set to evaluation mode
 
-    #initialize experiment class
+    # initialize experiment class
     experiment = Experiment(model=model, ismlm=ismlm,
                             tokenizer=tokenizer,
                             context_len=argins.context_len,
@@ -870,7 +837,9 @@ def runtime_code(input_args: List = None):
     # run experiment
     output_dict = experiment.start(input_sequences = input_sequences)
 
-    # compute perplexity on a WT103 test set
+
+    # ===== WT-103 PERPLEXITY ===== #
+
     test_set_path = '/home/ka2773/project/lm-mem/data/wikitext-103/wiki.test.tokens'
     logging.info(f"Loading {test_set_path}...")
     toks, ids = WikiTextDataset(tokenizer=tokenizer).retokenize_txt(test_set_path)
@@ -885,6 +854,7 @@ def runtime_code(input_args: List = None):
                             device=device)
     
     ppl, _, _ = experiment2.ppl(input_ids=torch.tensor([ids]), context_len=1024, stride=256)
+
 
     # ===== POST PROCESSING ===== #
 
@@ -915,6 +885,7 @@ def runtime_code(input_args: List = None):
     experiment.model.to("cpu")
 
     # ===== SAVING MODEL AND PERPLEXITY ===== #
+
     if argins.model_statedict_filename:
 
         fn = os.path.join(argins.output_dir, argins.model_statedict_filename)

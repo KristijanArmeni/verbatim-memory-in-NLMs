@@ -4,8 +4,10 @@ import torch.nn as nn
 from transformers.models.gpt2.modeling_gpt2 import GPT2Attention
 from typing import List
 import logging
+import transformers
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+
 
 def shuffle_weights(x: torch.Tensor) -> torch.Tensor:
 
@@ -107,5 +109,81 @@ def ablate_attn_module(model, layers, heads, ablation_type):
                                           ablation_type=ablation_type, 
                                           heads=heads, 
                                           config=model.config)
+
+    return model
+
+
+def ablate_attn(model: transformers.PreTrainedModel, 
+                layer_head_dict: Dict,
+                params: List,
+                ablation_type: str) -> transformers.PreTrainedModel:
+
+
+    logging.info(f"Doing {ablation_type} ablation on {params} params in layers and heads:")
+    pprint(layer_head_dict, indent=2)
+
+    for i, layer_idx in enumerate(layer_head_dict.keys()):
+
+        layer = model.transformer.h[layer_idx]
+
+        # split attention params into three equal sized matrices (Q, K, V)
+        split_size = layer.attn.embed_dim                        # weight.shape = (768, 3*768); attn_size = 768
+        Q, K, V = layer.attn.c_attn.weight.detach().split(split_size, dim=1)  # matrices of (768, 768)
+        O = layer.attn.c_proj.weight.detach()
+
+        # every head has a bias term, too, make sure to zero that too
+        Q_bias, K_bias, V_bias = layer.attn.c_attn.bias.detach().split(split_size, dim=0)
+        O_bias = layer.attn.c_proj.bias.detach()
+
+        weights = {"Q": Q, "K": K, "V": V, "O": O}
+        biases = {"Q": Q_bias, "K": K_bias, "V": V_bias, "O": O_bias}
+        
+        # perform ablation on selected params
+        for param_key in params:
+            
+            # get head matrices
+            head_dim = layer.attn.head_dim
+
+            # split tensors and put them back into dict
+            weights[param_key] = weights[param_key].split(head_dim, dim=1)  # list of len = 12
+            biases[param_key] = biases[param_key].split(head_dim, dim=0)   # list of len = 12
+
+            w_heads, b_heads = weights[param_key], biases[param_key] 
+
+            # set the Q, K, and V for the specified head to 0
+            for head_idx in layer_head_dict[layer_idx]:
+
+                if ablation_type == "zero":
+
+                    w_heads[head_idx][:] = 0
+                    b_heads[head_idx][:] = 0
+                
+                elif ablation_type == "shuffle":
+                    
+                    w_heads[head_idx][:] = shuffle_weights(x=w_heads[head_idx])
+                    b_heads[head_idx][:] = shuffle_weights(x=b_heads[head_idx])
+
+                else:
+                    raise ValueError("Please specify ablation method ('zero' or 'shuffle')")
+            
+            # concatenate selected group of parameters back into the dict
+            weights[param_key] = torch.cat(weights[param_key], dim=1)
+            biases[param_key] = torch.cat(biases[param_key], dim=0)
+
+
+        # now put everything back together into a single matrix
+        qkv_weights = torch.cat((weights["Q"], weights["K"], weights["V"]), dim=1)
+        qkv_biases = torch.cat((biases["Q"], biases["K"], biases["V"]), dim=0)
+
+        # now place the ablated (and unablated) parameters back to the right class attribute
+        model.transformer.h[layer_idx].attn.c_attn.weight = torch.nn.parameter.Parameter(qkv_weights,
+                                                                                         requires_grad=False)
+
+        model.transformer.h[layer_idx].attn.c_attn.bias = torch.nn.parameter.Parameter(qkv_biases, 
+                                                                                       requires_grad=False)
+
+        # output projection
+        model.transformer.h[layer_idx].attn.c_proj.weight = torch.nn.parameter.Parameter(weights["O"], requires_grad=False)
+        model.transformer.h[layer_idx].attn.c_proj.bias = torch.nn.parameter.Parameter(biases["O"], requires_grad=False)
 
     return model
