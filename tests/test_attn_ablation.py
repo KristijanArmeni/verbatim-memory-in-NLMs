@@ -59,6 +59,17 @@ heads = list(range(12))
 model0 = ablate_attn_module(model0, layers=[layer], heads=heads, ablation_type="zero")
 model1 = ablate_attn_module(model1, layers=[layer], heads=heads, ablation_type="shuffle")
 
+# test that model parameters are not modified by ablations (only attention activations) etc.
+params1 = model.transformer.h[layer].attn.parameters()
+params2 = model0.transformer.h[layer].attn.parameters()
+params3 = model1.transformer.h[layer].attn.parameters()
+
+for p1, p2 in zip(params1, params2):
+    assert torch.all(p1 == p2)
+for p2, p3 in zip(params2, params3):
+    assert torch.all(p2 == p3)
+
+
 data = []
 for m in (model, model0, model1):
     m.eval()
