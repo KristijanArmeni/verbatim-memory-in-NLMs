@@ -2,7 +2,7 @@
 import torch
 import torch.nn as nn
 from transformers.models.gpt2.modeling_gpt2 import GPT2Attention
-from typing import List
+from typing import List, Dict, Tuple
 import logging
 import transformers
 
