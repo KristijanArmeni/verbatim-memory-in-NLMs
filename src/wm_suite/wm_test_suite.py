@@ -18,10 +18,12 @@ from tqdm import tqdm, trange
 import logging
 from pprint import pprint
 
+# own modules
 sys.path.append("/home/ka2773/project/lm-mem/src")
 from data.wt103.dataset import WikiTextDataset
 from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits, make_word_lists, concat_and_tokenize_inputs
 from wm_suite.io.stimuli import prefixes, prompts
+from wm_suite.wm_ablation import ablate_attn_module
 
 logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
 
@@ -776,10 +778,10 @@ def runtime_code(input_args: List = None):
         lay = literal_eval(argins.ablate_layers)
         heads = literal_eval(argins.ablate_heads)
 
-        model = ablate_attn(model, 
-                            layer_head_dict={l: list(heads) for l in lay},
-                            params=tuple(argins.ablate_params.split(",")),
-                            ablation_type="zero")
+        model = ablate_attn_module(model, 
+                                   layers = list(lay),
+                                   heads = list(heads),
+                                   ablation_type="zero")
 
 
     # ===== TOKENIZE AND PREPARE THE VIGNETTES ===== #
