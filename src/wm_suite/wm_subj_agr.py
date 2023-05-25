@@ -1,6 +1,7 @@
 
 import os
 import json
+import pandas as pd
 from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 from typing import Dict, Tuple
 import torch
@@ -228,13 +229,13 @@ def main(input_args=None):
     dataset_dict = {
         #"linzen2016": {'path': LINZEN2016, 'comment': None}, 
         "lakretz2021_S_A": {'path': LAKRETZ2021_SHORT, 'comment': "singular_singular"},
-        "lakretz2021_S_B": {'path': LAKRETZ2021_SHORT, 'comment': "singular_plural"},
-        "lakretz2021_S_C": {'path': LAKRETZ2021_SHORT, 'comment': "plural_singular"},
+        #"lakretz2021_S_B": {'path': LAKRETZ2021_SHORT, 'comment': "singular_plural"},
+        #"lakretz2021_S_C": {'path': LAKRETZ2021_SHORT, 'comment': "plural_singular"},
         "lakretz2021_S_D": {'path': LAKRETZ2021_SHORT, 'comment': "plural_plural"},
         "lakretz2021_L_A": {'path': LAKRETZ2021_LONG, 'comment': "singular_singular_singular"},
-        "lakretz2021_L_B": {'path': LAKRETZ2021_LONG, 'comment': "singular_singular_plural"},
+        #"lakretz2021_L_B": {'path': LAKRETZ2021_LONG, 'comment': "singular_singular_plural"},
         "lakretz2021_L_C": {'path': LAKRETZ2021_LONG, 'comment': "plural_plural_plural"},
-        "lakretz2021_L_D": {'path': LAKRETZ2021_LONG, 'comment': "plural_plural_singular"},
+        #"lakretz2021_L_D": {'path': LAKRETZ2021_LONG, 'comment': "plural_plural_singular"},
     }
 
     long_deps = ["singular_singular_singular", "singular_singular_plural", "plural_plural_plural", "plural_plural_singular"]
@@ -326,8 +327,8 @@ def main(input_args=None):
         # save outputs
         savename = os.path.join(args.savedir, f"sva_{model_name}_{dataset_key}.json")
         logging.info(f"Saving {savename}\n")
-        #with open(savename, 'w') as fh:
-        #    json.dump(outputs1, fh, indent=4)
+        with open(savename, 'w') as fh:
+            json.dump(outputs1, fh, indent=4)
 
         logging.info(f"Running input masking experiment for: {dataset_key} | combination: {dataset_dict[dataset_key]['comment']}")
         outputs2 = run_experiment(dataset_path=ds_path,
@@ -343,16 +344,16 @@ def main(input_args=None):
         # save outputs
         savename = os.path.join(args.savedir, f"sva_{model_name}_{dataset_key}_input-masking.json")
         logging.info(f"Saving {savename}\n")
-        #with open(savename, 'w') as fh:
-        #    json.dump(outputs2, fh, indent=4)
+        with open(savename, 'w') as fh:
+            json.dump(outputs2, fh, indent=4)
 
         logging.info("\n===== DONE =====\n")
 
-    df = pd.DataFrame(log)
+        df = pd.DataFrame(log)
 
-    savename = os.path.join(args.savedir, f"ablation_sva.csv")
-    logging.info(f"Saving {savename}\n")
-    df.to_csv(savename, sep="\t")
+        savename = os.path.join(args.savedir, f"ablation_sva.csv")
+        logging.info(f"Saving {savename}\n")
+        df.to_csv(savename, sep="\t")
 
     logging.info("===== END OF RUN =====\n")
 
