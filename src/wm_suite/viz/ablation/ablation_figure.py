@@ -17,7 +17,7 @@ from typing import List, Dict, Tuple
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 ABLATION_FILENAME_CODES_SINGLE_LAYER = [str(i) for i in range(12)]
-ABLATION_FILENAME_CODES_MULTILAYER = ["01", "23", "0123", "89", "1011", "891011", "all"]
+ABLATION_FILENAME_CODES_MULTILAYER = ["01", "23", "45", "67", "89", "1011", "0123", "4567", "891011", "all"]
 ABLATION_FILENAME_CODES = ABLATION_FILENAME_CODES_SINGLE_LAYER + ABLATION_FILENAME_CODES_MULTILAYER
 
 
@@ -28,7 +28,7 @@ def load_ablation_files(datadir: str) -> pd.DataFrame:
 
     for l in ABLATION_FILENAME_CODES:
     
-        fn = os.path.join(datadir, f"ablation_gpt2_ablate-{l}-all_sce1_1_10_random_repeat.csv")
+        fn = os.path.join(datadir, f"ablation_gpt2_ablate-{l}-all_sce1_1_3_random_repeat.csv")
         fn2 = os.path.join(datadir, f"gpt2_ablate-{l}-all_ppl.json")
         
         logging.info(f"Loading {fn}")
@@ -54,7 +54,7 @@ def load_ablation_files(datadir: str) -> pd.DataFrame:
 
 def load_intactmodel_files(datadir: str) -> pd.DataFrame:
 
-    fn = os.path.join(datadir, "gpt2_pretrained_sce1_1_10_random_repeat.csv")
+    fn = os.path.join(datadir, "gpt2_pretrained_sce1_1_3_random_repeat.csv")
 
     logging.info(f"Loading {fn}")
 
@@ -75,15 +75,15 @@ def load_intactmodel_files(datadir: str) -> pd.DataFrame:
 
 def load_sva_files(datadir:str, datasetname:str):
 
-    tmp = {"model": [], "acc": [], "svtype": [], "id": [], "ablation_type": []}
+    tmp = {"model": [], "err": [], "svtype": [], "id": [], "ablation_type": []}
 
-    for i, code in enumerate(ABLATION_FILENAME_CODES + ["unablated"]):
+    for i, code in enumerate(ABLATION_FILENAME_CODES + ["unablated", 'rand-init']):
         
         infix =  f"ablate-{code}"
         if code in ["rand-init", "unablated"]:
             infix = code
 
-        fn = os.path.join(datadir, "sva", f"sva_{infix}_{datasetname}.json")
+        fn = os.path.join(datadir, "sva", "zero_attn", f"sva_{infix}_{datasetname}.json")
         logging.info(f"Loading {fn}...")
 
         with open(fn, "r") as fh:
@@ -92,7 +92,7 @@ def load_sva_files(datadir:str, datasetname:str):
         ablation_type = "single-layer" if code in ABLATION_FILENAME_CODES_SINGLE_LAYER else "multi-layer"
 
         tmp['model'].append(f"ablate-{code}")
-        tmp['acc'].append((1 - sva['accuracy'])*100)
+        tmp['err'].append((1 - sva['accuracy'])*100)
         tmp['svtype'].append(sva['type'])
         tmp['id'].append(sva['id'])
         tmp['ablation_type'].append(ablation_type)
@@ -100,69 +100,100 @@ def load_sva_files(datadir:str, datasetname:str):
     return pd.DataFrame(tmp)
 
 
-def plot_sva(ax):
+def plot_sva(ax, svatype:str):
     """
     Plots the results of subject-verb agreement ablation experiments onto two axes.
     """
     
-    d1 = load_sva_files(datadir='C:\\Users\\karmeni1\\project\\lm-mem\\data\\', datasetname="linzen2016")
-    d2 = load_sva_files(datadir='C:\\Users\\karmeni1\\project\\lm-mem\\data\\', datasetname="lakretz2021_A")
-    d1['ds'] = 'Linzen 2016 (corpus)'
-    d2['ds'] = 'Lakretz 2021 (synthetic)'
+    fname = "C:\\Users\\karmeni1\\project\\lm-mem\\data\\sva\\ablation_sva.csv"
+    logging.info(f"Loading {fname}")
+    df = pd.read_csv(fname, sep="\t", index_col=0)
+    
+    selected = (~df.model.isin(["unablated", "rand-init"])) & (df.agr.isin(["SS", "SSS"]))
+    data = df.loc[selected].copy()
+    data.model = data.model.astype(str).str.replace("ablate-", "")
+    df["ablation_type"] = ""
+    data.loc[data.model.isin(ABLATION_FILENAME_CODES_SINGLE_LAYER), "ablation_type"] = "single-layer"
+    data.loc[data.model.isin(ABLATION_FILENAME_CODES_MULTILAYER), "ablation_type"] = "multi-layer"
 
-    # this will be saved along with the figure
-    data = pd.concat([d1, d2])
+    data["err"] = (1- data["acc"])*100
 
-    # store unablated error-rates
-    linzen_unablated = d1.loc[(d1.model == "ablate-unablated"), "acc"].item()
-    lakretz_unablated = d2.loc[(d2.model == "ablate-unablated"), "acc"].item()
-
-    d1 = d1.loc[~d1.model.isin(['ablate-unablated']), :]
-    d2 = d2.loc[~d2.model.isin(['ablate-unablated']), :]
-
-    d1_color = "tab:blue"
-    d2_color = "tab:red"
-    d1_label = "Linzen (2016)\n(corpus)"
-    d2_label = "Lakretz (2021)\n(synthetic)"
+    short_color = "tab:blue"
+    long_color = "tab:red"
+    short_label = "Short"
+    long_label = "Long"
     bar_width = 0.4
 
-    yvals = d1.loc[d1.ablation_type == "multi-layer", "acc"].tolist()
-    xvals = (np.arange(len(yvals))+1)+0.2    
-    ax[0].barh(y=xvals, width=yvals, height=bar_width, color=d1_color, label=d1_label)
+    def plot_bars_data(ax, yvals, offset, bar_width, color, label):
 
-    yvals = d2.loc[d2.ablation_type == "multi-layer", "acc"].tolist()
-    xvals = (np.arange(len(yvals))+1)-0.2    
-    ax[0].barh(y=xvals, width=yvals, height=bar_width, color=d2_color, label=d2_label)
+        xvals = (np.arange(yvals.shape[-1])+1)+offset    
+        ax.barh(y=xvals, width=yvals, height=bar_width, color=color, label=label)
+
+        #yjitter = np.random.uniform(-0.1, 0.1, yvals.shape[0])
+        #markers = ['s', 'v']
+        #for i in range(yvals.shape[-1]):
+        #    ax.scatter(yvals[0:1, i], xvals[i]+yjitter[0], s=10, marker=markers[0], color=color, ec="black", alpha=0.8, zorder=2)
+        #    ax.scatter(yvals[1::, i], xvals[i]+yjitter[1], s=10, marker=markers[1], color=color, ec="black", alpha=0.8, zorder=2)
+
+        return ax
 
 
-    yvals = d1.loc[d1.ablation_type == "single-layer", "acc"].tolist()
-    xvals = (np.arange(len(yvals))+1)+0.2
-    ax[1].barh(y=xvals, width=yvals, height=bar_width, color=d1_color, label=d1_label)
+    def fetch_yvals(df, iv_vals, iv_col, dv_col):
+
+        vals = []
+        for key in iv_vals:
+            vals.append(df.loc[df[iv_col] == key, dv_col].item())
+
+        return vals
+
+    data_sel = data.loc[(data.ablation_type == "multi-layer") & (data.deplen == "short")]
+
+    yvals = fetch_yvals(df=data_sel, iv_vals=ABLATION_FILENAME_CODES_MULTILAYER, iv_col="model", dv_col="err")
+    yvals = np.stack(yvals)  # shape = (n_conditions, n_ablations)
+
+    plot_bars_data(ax[0], yvals, offset=0.2, bar_width=0.4, color=short_color, label=short_label)
+
+    data_sel = data.loc[(data.ablation_type == "multi-layer") & (data.deplen == "long")]
+    yvals = fetch_yvals(df=data_sel, iv_vals=ABLATION_FILENAME_CODES_MULTILAYER, iv_col="model", dv_col="err")
+    yvals = np.stack(yvals)
+
+    plot_bars_data(ax[0], yvals, offset=-0.2, bar_width=0.4, color=long_color, label=long_label)   
+
+    # condition 2 barplot
+    yvals = data.loc[(data.ablation_type == "single-layer") & (data.deplen == "short")].err.tolist()
+    yvals = np.stack(yvals)
+
+    plot_bars_data(ax[1], yvals, offset=0.2, bar_width=0.4, color=short_color, label=short_label)
+
+    yvals = data.loc[(data.ablation_type == "single-layer") & (data.deplen == "long")].err.tolist()
+    yvals = np.stack(yvals)
+    plot_bars_data(ax[1], yvals, offset=-0.2, bar_width=0.4, color=long_color, label=long_label)
+
+    data = df.loc[df.model.isin(["unablated"]) & (df.deplen == "short") & (df.agr == "SS")].copy()
+    unablated1 = (1 - data.acc.item())*100
     
-    yvals = d2.loc[d2.ablation_type == "single-layer", "acc"].tolist()
-    xvals = (np.arange(len(yvals))+1)-0.2
-    ax[1].barh(y=xvals, width=yvals, height=bar_width, color=d2_color, label=d2_label)
-
+    data = df.loc[df.model.isin(["unablated"]) & (df.deplen == "long") & (df.agr == "SSS")].copy()
+    unablated2 = (1 - data.acc.item())*100
 
     for a in ax:
-        a.axvline(x=50, ymin=0, ymax=a.get_ylim()[-1], linestyle="--", color="tab:gray", zorder=0)
-        a.axvline(x=linzen_unablated, ymin=0, ymax=a.get_ylim()[-1], linestyle=":", linewidth=2, color=d1_color)
-        a.axvline(x=lakretz_unablated, ymin=0, ymax=a.get_ylim()[-1], linestyle=":", linewidth=2, color=d2_color)
+        l1 = a.axvline(x=50, ymin=0, ymax=a.get_ylim()[-1], linestyle="--", color="tab:gray", zorder=0)
+        l2 = a.axvline(x=unablated1, ymin=0, ymax=a.get_ylim()[-1], linestyle=":", linewidth=2, color=short_color)
+        l3 = a.axvline(x=unablated2, ymin=0, ymax=a.get_ylim()[-1], linestyle=":", linewidth=2, color=long_color)
 
-    ax[1].text(50.5, 1, "Chance", rotation=-90, fontsize=13)
-    ax[1].annotate(xy=(linzen_unablated, 12.5), xytext=(35, 12.5), text="Unablated", fontsize=13,
-                   arrowprops=dict(facecolor='black', arrowstyle="-|>"))
+    legend1 = plt.legend(handles=[l1, l2, l3], labels=["Chance", "Unablated (short)", "Unablated (long)"], 
+                         title="", loc='lower right', bbox_to_anchor=(1.04, 0.03),
+                         fontsize=13, title_fontsize=13)
+    ax[1].add_artist(legend1)
 
-    ax[1].legend(title="Dataset", 
-                loc="lower right", 
-                bbox_to_anchor=(1.07, 0.34), framealpha=0, facecolor="white", frameon=True,
-                fontsize=11, title_fontsize=11)
+    ax[1].legend(title="Dependency distance",
+                loc="upper right", framealpha=0, facecolor="white", frameon=True,
+                fontsize=13, title_fontsize=13)
 
     # set ticks and axis lable
     ticklabelfs=14
-    ax[0].set_yticks(np.arange(7)+1)
+    ax[0].set_yticks(np.arange(10)+1)
     ax[1].set_yticks(np.arange(12)+1)
-    ax[0].set_yticklabels(["1-2", "3-4", "1-2-3-4", "9-10", "11-12", "9-10-11-12", "All"], fontsize=ticklabelfs)
+    ax[0].set_yticklabels(["1-2", "3-4", "5-6", "7-8", "9-10", "11-12", "1-2-3-4", "5-6-7-8", "9-10-11-12", "All"], fontsize=ticklabelfs)
     ax[1].set_yticklabels([i+1 for i in range(12)], fontsize=ticklabelfs)
 
     ax[1].set_xlabel("Error rate (%)", fontsize=ticklabelfs)
@@ -195,7 +226,7 @@ def ablation_memory_plot(ax, y, y0_m, ci):
     
     # plot shaded vertical line for the unablated model
     for a, d in zip(ax[:], (y_joint, y_ind)):
-        a.vlines(x = y0_m, ymin=0, ymax=len(d)+1, linestyle='--', color='tab:gray', label='Unablated model', zorder=0)
+        a.vlines(x = y0_m, ymin=0, ymax=len(d)+1, linestyle='--', color='tab:gray', label='Unablated\nmodel', zorder=0)
         a.fill_betweenx(y = np.arange(0, len(d)+2), x1=ci[0], x2=ci[1], alpha=0.2, color='tab:gray', zorder=0)
     
     # ticks and tick labels
@@ -204,7 +235,7 @@ def ablation_memory_plot(ax, y, y0_m, ci):
     ax[1].set_ylim([0, len(y_ind)+1])
 
     singlelayer_labels = [i+1 for i in range(12)]
-    multilayer_labels = ["1-2", "3-4", "1-2-3-4", "9-10", "11-12", "9-10-11-12", "All"]
+    multilayer_labels = ["1-2", "3-4", "5-6", "7-8", "9-10", "11-12", "1-2-3-4", "5-6-7-8", "9-10-11-12", "All"]
     ax[0].set_yticklabels(multilayer_labels, fontsize=ticklabelfs)
     ax[1].set_yticklabels(singlelayer_labels, fontsize=ticklabelfs)
 
@@ -225,10 +256,7 @@ def ablation_memory_plot(ax, y, y0_m, ci):
 
     data = pd.concat([pd.DataFrame(lower_pannel_list), 
                       pd.DataFrame(upper_pannel_list),
-                      pd.DataFrame([{"label": "unablated", "median": y0_m, "CI1": ci[0], "CI2": ci[0]}])])
-    
-    print(data)
-    
+                      pd.DataFrame([{"label": "unablated", "median": y0_m, "CI1": ci[0], "CI2": ci[1]}])])
 
     return ax, data
 
@@ -237,61 +265,88 @@ def ablation_perplexity_plot(ax, ppls: List):
 
 
     single_layer_ablations = list(range(12))
-    multi_layer_ablations = ['01', '23', '0123', '89', '1011', '891011', 'all']
+    multi_layer_ablations = ['01', '23', "45", "67", '89', '1011', '0123', "4567", '891011', 'all']
 
-    # plot perplexities
+    # plot single-layer ablations
     y3 = np.array([ppls[str(k)]['wt103_ppl'] for k in single_layer_ablations])
-    ax[1, 0].barh(np.arange(12)+1, width=y3)
+    y3 = np.log(y3)
+    ax[1].barh(np.arange(12)+1, width=y3)
+    #ax[1, 1].barh(np.arange(12)+1, width=y3)
     
-    # plot perplexities as barplots
+    # plot multi-layer ablations
     y4 = np.array([ppls[str(k)]['wt103_ppl'] for k in multi_layer_ablations])
+    y4 = np.log(y4)
 
-    ax[0, 0].barh(np.arange(7)+1, width=y4)
-    ax[0, 1].barh(np.arange(7)+1, width=y4)
-    ax[0, 0].set_xlim(0, 150)
-    ax[0, 0].set_xticks([0, 50, 100, 150])
-    ax[0, 0].set_xticklabels([0, 50, 100, 150])
-    ax[0, 1].set_xlim(350, None)
-    ax[0, 1].set_xticks([350, 500, 1000, 1500])
-    ax[0, 1].set_xticklabels(["", 500, "", 1500])
+    ax[0].barh(np.arange(len(y4))+1, width=y4)
 
-    for a in ax[:, 1]:
+    #ax[1, 0].set_xlim(0, 150)
+    ax[1].set_xticks(np.arange(0, 10, 1))
+    ax[1].set_xticklabels([0, "", 2, "", 4, "", 6, "", 8, ""])
+
+    for a in ax:
         a.spines['left'].set_visible(False)
         a.spines['top'].set_visible(False)
         a.spines['right'].set_visible(False)
         a.tick_params(left=False, labelleft=False)
         
     # plot unablated perplexity as a basline
-    ax[0, 0].vlines(x=ppls["unablated"]["wt103_ppl"], 
+    ax[0].vlines(x=np.log(ppls["unablated"]["wt103_ppl"]), 
                     ymin=0, 
                     ymax=len(multi_layer_ablations)+1, 
                     linestyle="--", 
                     color='tab:orange', 
                     zorder=2)
     
-    ax[1, 0].vlines(x=ppls["unablated"]["wt103_ppl"], 
+    ax[1].vlines(x=np.log(ppls["unablated"]["wt103_ppl"]), 
                     ymin=0, ymax=len(single_layer_ablations)+1,
                     linestyle="--",
                     color='tab:orange',
                     zorder=2,
                     label="Unablated\nmodel")
-        
-    # add the // mark
-    for a in ax[:, 0]:
-        a.text(a.get_xlim()[-1]+20, -0.3, "//", fontsize=13)
-
-        a.spines['top'].set_visible(False)
-        a.spines['right'].set_visible(False)
 
     ticklabelfs=14
-    handles, labels = ax[1, 0].get_legend_handles_labels()
-    ax[1, 1].legend(handles, labels, loc="lower right", fontsize=ticklabelfs-1)
+    handles, labels = ax[1].get_legend_handles_labels()
+    ax[1].legend(handles, labels, loc="upper right", fontsize=ticklabelfs)
 
-    data = pd.DataFrame([{key: str(ppls[key]['wt103_ppl']) for key in ppls.keys()}]).T
-    data.columns = ["ppl"]
-    print(data)
+    ax[1].set_xlabel("Test-set loss", fontsize=ticklabelfs)
+
+    data = pd.DataFrame([{key: str(np.log(ppls[key]['wt103_ppl'])) for key in ppls.keys()}]).T
+    data.columns = ["log(ppl)"]
+
 
     return ax, data
+
+
+def annotate_axes(ax):
+
+    arrows_y = -2.6
+    texts_y = -2.4
+
+    # left panel
+    ax[1, 0].annotate('', xy=(80, arrows_y), xytext=(20, arrows_y),                   
+                arrowprops=dict(arrowstyle='<->'),  
+                annotation_clip=False)                               
+
+    ax[1, 0].text(x=12, y=texts_y, s='Better memory', fontsize=13, color="tab:gray")
+    ax[1, 0].text(x=65, y=texts_y, s='Worse memory', fontsize=13, color="tab:gray")
+
+    # middle panel
+    ax[1, 1].annotate('', xy=(5.5, arrows_y), xytext=(1.5, arrows_y),                   
+                      arrowprops=dict(arrowstyle='<->'),  
+                      annotation_clip=False)
+
+    ax[1, 1].text(x=0, y=texts_y, s='Accurate prediction', fontsize=13, color="tab:gray")
+    ax[1, 1].text(x=4, y=texts_y, s='Inaccurate prediction', fontsize=13, color="tab:gray")
+
+    # middle panel
+    ax[1, -1].annotate('', xy=(12.5, arrows_y), xytext=(80, arrows_y),                   
+                      arrowprops=dict(arrowstyle='<->'),  
+                      annotation_clip=False)
+
+    ax[1, -1].text(x=2, y=texts_y, s='Correct agreement', fontsize=13, color="tab:gray")
+    ax[1, -1].text(x=60, y=texts_y, s='Incorrect agreement', fontsize=13, color="tab:gray")
+
+    return ax
 
 
 def generate_plot(datadir: str, timesteps: str):
@@ -304,20 +359,21 @@ def generate_plot(datadir: str, timesteps: str):
     dfs, ppls = load_ablation_files(datadir=datadir)
     dfs2, ppls2 = load_intactmodel_files(datadir=datadir)
 
+    #print(dfs)
+
     # add this to the existing dict
     ppls["unablated"] = ppls2
 
     # define the timesteps over which the filter_and_aggreagate() should average the surprisals
     if timesteps == "all_tokens":
-        selected_timesteps = list([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        selected_timesteps = list([0, 1, 2])
     elif timesteps == "first_token":
         selected_timesteps = list([0])
     elif timesteps == "second_half":
         selected_timesteps = list([4, 5, 6, 7, 8, 9])
 
-
     # AVERAGE ACROSS TIME STEPS
-    variables = [{"list_len": [10]},
+    variables = [{"list_len": [3]},
                 {"prompt_len": [8]},
                 {"context": ["intact"]},
                 {"marker_pos_rel": selected_timesteps}]
@@ -334,35 +390,38 @@ def generate_plot(datadir: str, timesteps: str):
         
         dats_.append(dat_)
 
-    # take the mean over timesteps for the unablated model
-    dat0_, _ = filter_and_aggregate(dfs2, model="gpt2", model_id="pretrained", groups=variables, aggregating_metric="mean")
 
+    # take the mean over timesteps for the unablated model
+    dat0_, _ = filter_and_aggregate(dfs2, 
+                                    model="gpt2", 
+                                    model_id="pretrained", 
+                                    groups=variables, 
+                                    aggregating_metric="mean")
+
+    
     # get percent reduction
     y1 = [d.x_perc.to_numpy() for d in dats_]  # median surprisal on second list for each ablation
     y = np.stack(y1)
 
-
     y0 = dat0_.x_perc.to_numpy()                 # median surprisal on second list for non-ablated model
     y0_m = np.median(y0)
-    print(y0.shape)
     bs = bootstrap((y0,), axis=0, statistic=np.median, confidence_level=0.95, n_resamples=10000)
 
     ci = (bs.confidence_interval.low, bs.confidence_interval.high)
-    print(y0_m, ci)
 
     with plt.style.context('seaborn-ticks'):
 
-        fig, ax = plt.subplots(2, 4, figsize=(14, 8), sharex="col", sharey="row", 
-                               gridspec_kw={'height_ratios': [1.4, 2.5], 'width_ratios': [1.3, 0.4, 0.4, 0.8]})
+        fig, ax = plt.subplots(2, 3, figsize=(14, 9), sharex="col", sharey="row", 
+                               gridspec_kw={'height_ratios': [1.9, 2.3], 'width_ratios': [1, 0.9, 1]})
 
         # plot memory scores
         _, data1 = ablation_memory_plot(ax[:, 0], y, y0_m, ci)
 
         # plot perplexity values
-        _, data2 = ablation_perplexity_plot(ax[:, 1:4], ppls)
+        _, data2 = ablation_perplexity_plot(ax[:, 1], ppls)
 
         # plot language-modeling task
-        _, data3 = plot_sva(ax[:, 3])
+        _, _ = plot_sva(ax[:, 2], svatype="congruent")
 
         for a in ax[1, :]:
             a.tick_params(axis="x", labelsize=13)
@@ -373,21 +432,15 @@ def generate_plot(datadir: str, timesteps: str):
         if timesteps == "first_token":
             ax[1, 0].set_xlabel("Repeat surprisal on the first token in list (%)", fontsize=13)
 
-        ax[1, 0].annotate('', xy=(90, -3), xytext=(15,-3),                   
-                    arrowprops=dict(arrowstyle='<->'),  
-                    annotation_clip=False)                               
-
-        ax[1, 0].text(x=19, y=-2.8, s='Better memory', fontsize=13)
-        ax[1, 0].text(x=58, y=-2.8, s='Worse memory', fontsize=13)
+        ax = annotate_axes(ax)
 
         titlesfontsize = 14
         ax[0, 0].set_title("Working memory task", fontsize=titlesfontsize)
-        ax[0, 3].set_title("Subject-verb agreement", fontsize=titlesfontsize)
-        fig.text(0.61, 0.06, 'Test-set perplexity', ha='center', fontsize=titlesfontsize)
-        fig.text(0.61, 0.92, 'Language modeling (Wikitext-103)', ha='center', fontsize=titlesfontsize)
+        ax[0, 1].set_title("Language modeling (WT-103)", fontsize=titlesfontsize)
+        ax[0, 2].set_title("Subject-verb agreement (singular verbs)", fontsize=titlesfontsize)
         fig.supylabel('Ablated layer(s)', fontsize=titlesfontsize)
 
-        plt.suptitle("Effect of GPT-2 attention ablation on memory, language modeling, and subject-verb agreement tasks", fontsize=18)
+        plt.suptitle("Effect of attention ablation on memory, language modeling, and subject-verb agreement tasks in GPT-2", fontsize=18)
         
         for a in ax[0, :]:
             a.grid(visible=True, linewidth=0.5)
@@ -396,7 +449,7 @@ def generate_plot(datadir: str, timesteps: str):
 
         plt.tight_layout()
 
-    return fig, (data1, data2, data3)
+    return fig, (data1, data2)
 
 
 def main(input_args=None):
@@ -443,9 +496,9 @@ def main(input_args=None):
             logging.info(f"Saving {fn}")
             d[1].to_csv(fn, sep="\t")
 
-            fn = os.path.join(args.savedir, "ablation_sva.csv")
-            logging.info(f"Saving {fn}")
-            d[2].to_csv(fn, sep="\t")
+            #fn = os.path.join(args.savedir, "ablation_sva.csv")
+            #logging.info(f"Saving {fn}")
+            #d[2].to_csv(fn, sep="\t")
 
     return 0
 
