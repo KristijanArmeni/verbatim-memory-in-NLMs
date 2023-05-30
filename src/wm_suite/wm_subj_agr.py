@@ -19,13 +19,15 @@ LAKRETZ2021_LONG = "/scratch/ka2773/project/lm-mem/sv_agr/lakretz2021/long_neste
 
 # define dicts that hold input arguments to create ablated models
 all_heads = list(range(12))
+single_heads = [[i] for i in list(range(12))]
 single_layers = [[i] for i in list(range(12))]
-layers_dict = {"".join([str(e) for e in a]): a for a in single_layers + [[0,1], [2, 3], [0, 1, 2, 3], [8, 9], [10, 11], [8, 9, 10, 11]]}
+layers_dict = {"".join([str(e) for e in a]): a for a in [[4,5], [6, 7], [4, 5, 6, 7]]}
 
-ablation_dict = {f"ablate-{key}": {"layers": layers_dict[key], "heads": all_heads} for key in layers_dict}
-ablation_dict["ablate-all"] = {'layers': list(range(12)), "heads": all_heads}
-ablation_dict["rand-init"] = "rand-init"
-ablation_dict["unablated"] = "gpt2"
+
+ablation_dict = {f"ablate-{l[0]}-{h[0]}": {"layers": l, "heads": h} for l in single_layers for h in single_heads}
+#ablation_dict["ablate-all"] = {'layers': list(range(12)), "heads": all_heads}
+#ablation_dict["rand-init"] = "rand-init"
+#ablation_dict["unablated"] = "gpt2"
 
 
 def read_json_data(path: str) -> Dict:  
@@ -151,6 +153,7 @@ def mask_inputs(inputs: torch.Tensor, masked_positions: List, masked_value: str)
 
 def run_experiment(dataset_path, model, tokenizer, cfg, comment, experiment_id):
 
+    baseline = cfg["baseline"]
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -172,11 +175,12 @@ def run_experiment(dataset_path, model, tokenizer, cfg, comment, experiment_id):
                                       tokenizer=tokenizer)
 
 
-    logging.info("Collecting baseline agreement scores")
-        
-    mask_positions = [1, 4]  # masking out the first and the second noun caryying grammatical number information
-    if comment in ["singular_singular_singular", "plural_plural_plural", "singular_singular_plural", "plural_plural_singular"]:
-        mask_positions = [1, 4, 7]
+    if baseline:
+        logging.info("Collecting baseline agreement scores")
+            
+        mask_positions = [1, 4]  # masking out the first and the second noun caryying grammatical number information
+        if comment in ["singular_singular_singular", "plural_plural_plural", "singular_singular_plural", "plural_plural_singular"]:
+            mask_positions = [1, 4, 7]
 
 
     if cfg['input_masking']:
@@ -188,17 +192,19 @@ def run_experiment(dataset_path, model, tokenizer, cfg, comment, experiment_id):
         logging.info(f"Example baseline input: {inputs[5]}")
 
 
-    baseline_scores = collect_agreement_scores(model.to(device), 
-                                               inputs=inputs2tensor(inputs, tokenizer).to(device), 
-                                               targets=targets,
-                                               attention_mask_positions=mask_positions,
-                                               tokenizer=tokenizer)
+    if baseline:
+
+        baseline_scores = collect_agreement_scores(model.to(device), 
+                                                   inputs=inputs2tensor(inputs, tokenizer).to(device), 
+                                                   targets=targets,
+                                                   attention_mask_positions=mask_positions,
+                                                   tokenizer=tokenizer)
 
     output = {}
     output["scores"] = scores
     output["accuracy"] = get_accuracy(scores)
-    output["accuracy_baseline"] = get_accuracy(baseline_scores)
-    output["accuracy_adj"] = get_accuracy(scores) - get_accuracy(baseline_scores)
+    output["accuracy_baseline"] = get_accuracy(baseline_scores) if baseline else "none"
+    output["accuracy_adj"] = get_accuracy(scores) - get_accuracy(baseline_scores) if baseline else "none"
     output["dataset"] = dataset_path
     output["type"] = comment
     output['id'] = experiment_id
@@ -207,7 +213,6 @@ def run_experiment(dataset_path, model, tokenizer, cfg, comment, experiment_id):
     logging.info("\nRESULTS")
     logging.info(f"\n{comment}:\naccuracy {output['accuracy']} | baseline {output['accuracy_baseline']} | adjusted {output['accuracy_adj']}\n")
     
-
     return output
 
 
@@ -231,10 +236,10 @@ def main(input_args=None):
         "lakretz2021_S_A": {'path': LAKRETZ2021_SHORT, 'comment': "singular_singular"},
         #"lakretz2021_S_B": {'path': LAKRETZ2021_SHORT, 'comment': "singular_plural"},
         #"lakretz2021_S_C": {'path': LAKRETZ2021_SHORT, 'comment': "plural_singular"},
-        "lakretz2021_S_D": {'path': LAKRETZ2021_SHORT, 'comment': "plural_plural"},
-        "lakretz2021_L_A": {'path': LAKRETZ2021_LONG, 'comment': "singular_singular_singular"},
+        #"lakretz2021_S_D": {'path': LAKRETZ2021_SHORT, 'comment': "plural_plural"},
+        #"lakretz2021_L_A": {'path': LAKRETZ2021_LONG, 'comment': "singular_singular_singular"},
         #"lakretz2021_L_B": {'path': LAKRETZ2021_LONG, 'comment': "singular_singular_plural"},
-        "lakretz2021_L_C": {'path': LAKRETZ2021_LONG, 'comment': "plural_plural_plural"},
+        #"lakretz2021_L_C": {'path': LAKRETZ2021_LONG, 'comment': "plural_plural_plural"},
         #"lakretz2021_L_D": {'path': LAKRETZ2021_LONG, 'comment': "plural_plural_singular"},
     }
 
@@ -262,7 +267,7 @@ def main(input_args=None):
         "model": [],      # unablated etc.
         "acc": [],        # raw accuracy
         "acc0_A": [],     # baseline accuracy (attention masking only)
-        "acc0_B": [],     # baseline accuracy (attention and input masking)
+        #"acc0_B": [],     # baseline accuracy (attention and input masking)
     }
 
     # run every model on both datasets
@@ -314,11 +319,11 @@ def main(input_args=None):
                      f"model: {model_name}")
 
         outputs1 = run_experiment(dataset_path=ds_path,
-                                 model=model,
-                                 tokenizer=tokenizer,
-                                 cfg={"input_masking": False},
-                                 comment=comment,
-                                 experiment_id=f"{model_name}_{dataset_key}"
+                                  model=model,
+                                  tokenizer=tokenizer,
+                                  cfg={"baseline": False, "input_masking": False},
+                                  comment=comment,
+                                  experiment_id=f"{model_name}_{dataset_key}"
                                 )
 
         log['acc'].append(outputs1['accuracy'])
@@ -330,28 +335,28 @@ def main(input_args=None):
         with open(savename, 'w') as fh:
             json.dump(outputs1, fh, indent=4)
 
-        logging.info(f"Running input masking experiment for: {dataset_key} | combination: {dataset_dict[dataset_key]['comment']}")
-        outputs2 = run_experiment(dataset_path=ds_path,
-                                 model=model,
-                                 tokenizer=tokenizer,
-                                 cfg={"input_masking": True},
-                                 comment=comment,
-                                 experiment_id=f"{model_name}_{dataset_key}"
-                                )
+        #logging.info(f"Running input masking experiment for: {dataset_key} | combination: {dataset_dict[dataset_key]['comment']}")
+        #outputs2 = run_experiment(dataset_path=ds_path,
+        #                         model=model,
+        #                         tokenizer=tokenizer,
+        #                         cfg={"input_masking": True},
+        #                         comment=comment,
+        #                         experiment_id=f"{model_name}_{dataset_key}"
+        #                        )
 
-        log['acc0_B'].append(outputs2['accuracy_baseline'])
+        #log['acc0_B'].append(outputs2['accuracy_baseline'] if outputs2 else "none")
 
         # save outputs
-        savename = os.path.join(args.savedir, f"sva_{model_name}_{dataset_key}_input-masking.json")
-        logging.info(f"Saving {savename}\n")
-        with open(savename, 'w') as fh:
-            json.dump(outputs2, fh, indent=4)
+        #savename = os.path.join(args.savedir, f"sva_{model_name}_{dataset_key}_input-masking.json")
+        #logging.info(f"Saving {savename}\n")
+        #with open(savename, 'w') as fh:
+        #    json.dump(outputs2, fh, indent=4)
 
         logging.info("\n===== DONE =====\n")
 
         df = pd.DataFrame(log)
 
-        savename = os.path.join(args.savedir, f"ablation_sva.csv")
+        savename = os.path.join(args.savedir, f"ablation_sva_per_head.csv")
         logging.info(f"Saving {savename}\n")
         df.to_csv(savename, sep="\t")
 
