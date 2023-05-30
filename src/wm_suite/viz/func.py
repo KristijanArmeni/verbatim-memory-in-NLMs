@@ -18,9 +18,6 @@ def set_manuscript_style(style=None):
         except:
             logging.info(f"Couldn't find {style} matplotlib style, using default...")
 
-    # scale font sizes
-    #sns.set_context('paper', font_scale=1.6)
-
     matplotlib.rcParams['font.family'] = 'sans-serif'
     matplotlib.rcParams['font.sans-serif'] = ['Segoe UI']
 
@@ -66,9 +63,9 @@ def filter_and_aggregate(datain, model, model_id, groups, aggregating_metric):
           (datain[var4].isin(d4[var4]))
     
     if sum(sel) == 0:
-        print("No rows selected")
-        logging.info("No rows were selected. Check selection conditions.")
-    
+        logging.info(f"No rows were selected.\nModel id: {model_id}\nmodel: {model}\nCheck selection conditions.")
+        print("This is the input data frame:\n", datain.head())
+
     d = datain.loc[sel].copy()
     
     ## Aggregate
