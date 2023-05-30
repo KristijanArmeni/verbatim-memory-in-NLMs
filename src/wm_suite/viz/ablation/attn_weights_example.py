@@ -3,20 +3,16 @@ sys.path.append(os.environ["PROJ_ROOT"])
 
 import numpy as np
 import pandas as pd
-from scipy.stats import sem
-from scipy.stats import median_abs_deviation
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 import matplotlib.patches as patches
-import matplotlib as mpl
-from src.wm_suite.viz.func import filter_and_aggregate
 from attn_weights_per_layer_figure import get_data, save_png_pdf
+from src.wm_suite.viz.func import set_manuscript_style
 import logging
 from typing import List, Dict, Tuple
-from itertools import product
+
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
-
 
 
 def make_example_plot(ax: np.ndarray, x: np.ndarray, d: Dict, query_id: int, layer: int, sequence:int):
@@ -43,17 +39,16 @@ def make_example_plot(ax: np.ndarray, x: np.ndarray, d: Dict, query_id: int, lay
 
     labelfs = 16  # fontsize of axis and tick labels
 
-    #ax[1].set_xlabel('Token', fontsize=labelfs)
+    ax[1].set_xlabel('Input sequence', fontsize=labelfs)
     ax[1].set_ylabel(f'Head\n(Layer {layer+1})', fontsize=labelfs)
     ax[1].set_xticks(ticks=np.arange(query_id))
 
     # line plot
     m = np.mean(x[i, 0:query_id, :, l], axis=1)
-    #se = sem(x[i, 0:query_id, :, l], axis=1)
 
     ax[0].plot(np.arange(query_id), m, 'o--', markersize=7, mec='white')
-    #ax[0].fill_between(np.arange(query_id), y1=m+se, y2=m-se, alpha=0.3)
-    ax[0].set_ylabel('Avg.\nattn. w.', fontsize=labelfs)
+
+    ax[0].set_ylabel('Avg. attention\nweight', fontsize=labelfs)
     ax[0].tick_params(labelsize=labelfs)
     ax[0].grid(visible=True, linewidth=0.5)
     
@@ -73,23 +68,23 @@ def make_example_plot(ax: np.ndarray, x: np.ndarray, d: Dict, query_id: int, lay
     preceding_window_rect = patches.Rectangle((query_id-4.5, -0.5), 3, 12, linewidth=2, edgecolor='tab:orange', facecolor='none', zorder=1)
     for patch in (cue1, rect, early_window_rect):
         ax[1].add_patch(patch)
- 
-    cue2 = patches.Rectangle((query_id-1.5, 0), 1, 0.25, linewidth=2, edgecolor='tab:red', facecolor='tab:red', alpha=0.2, zorder=2)
-    cue1 = patches.Rectangle((12.5, 0), 1, 0.25, linewidth=2, ec='tab:red', facecolor='tab:red', alpha=0.2, zorder=2)
-    early_window_rect = patches.Rectangle((13.5, 0), 5, 0.25, linewidth=2, edgecolor='tab:blue', facecolor='tab:blue', alpha=0.2, zorder=2)
-    preceding_window_rect = patches.Rectangle((query_id-4.5, 0), 3, 0.25, linewidth=2, edgecolor='tab:orange', facecolor='tab:orange', alpha=0.2, zorder=2)
+    
+    patch_height = 0.29
+    cue2 = patches.Rectangle((query_id-1.5, 0), 1, patch_height, linewidth=2, edgecolor='tab:red', facecolor='tab:red', alpha=0.2, zorder=2)
+    cue1 = patches.Rectangle((12.5, 0), 1, patch_height, linewidth=2, ec='tab:red', facecolor='tab:red', alpha=0.2, zorder=2)
+    early_window_rect = patches.Rectangle((13.5, 0), 5, patch_height, linewidth=2, edgecolor='tab:blue', facecolor='tab:blue', alpha=0.2, zorder=2)
+    preceding_window_rect = patches.Rectangle((query_id-4.5, 0), 3, patch_height, linewidth=2, edgecolor='tab:orange', facecolor='tab:orange', alpha=0.2, zorder=2)
     for patch in (cue1, early_window_rect, cue2):
         ax[0].add_patch(patch)
 
-    ax[0].text(x=12.5, y=0.3, s="C1", fontsize=13, fontweight="bold")
-    ax[0].text(x=16, y=0.3, s="P1", fontsize=13, fontweight="bold")
-    ax[0].text(x=query_id-1.5, y=0.3, s="C2", fontsize=13, fontweight="bold")
+    ax[0].text(x=12.5, y=0.32, s="$c_t$", fontsize=16, fontweight="bold")
+    ax[0].text(x=14, y=0.32, s="$n_{t+1}$", fontsize=16, fontweight="bold")
+    ax[0].text(x=query_id-1.5, y=0.32, s="$c^{\prime}_{t+k}$", fontsize=16, fontweight="bold")
 
-    ax[0].annotate("", xy=(17, 0.33), xytext=(query_id-1.5, 0.33), 
+    ax[0].annotate("", xy=(16, 0.33), xytext=(query_id-1.5, 0.33), 
                   arrowprops={"arrowstyle": "->", 'connectionstyle': "arc3,rad=0.1"})
 
-    ax[0].text(x=19, y=0.55, s="GPT-2 attention from repeated token to past completions", fontsize=16, fontweight="bold")
-
+    ax[0].text(x=22, y=0.33, s="attention towards tokens in repeated sequences", fontsize=14)
 
     cax = ax[1].inset_axes([1.04, 0.15, 0.01, 0.7])
     cbar = plt.colorbar(im, ax=ax[1], cax=cax, shrink=0.5, anchor=(0.5, 1))
@@ -106,7 +101,7 @@ def generate_plot(datadir, layer, sequence):
 
     fn = "attention_weights_gpt2_colon-colon-p1.npz"
     query_idx = 46
-    suptitle = f"GPT-2 attention weights over context (layer {layer+1})"
+    suptitle = f"Transformer attention for short-term memory"
 
     # load the data
     x, d = get_data(os.path.join(datadir, fn))
@@ -117,7 +112,7 @@ def generate_plot(datadir, layer, sequence):
     # plot
     make_example_plot(ax, x=x, d=d, query_id=query_idx, layer=layer, sequence=sequence)
 
-    #plt.suptitle(suptitle, fontsize=18, ha="right")
+    plt.suptitle(suptitle, fontsize=20, fontweight="bold")
     plt.tight_layout()
 
     return fig
@@ -136,13 +131,14 @@ def main(input_args=None):
     else:
         args = parser.parse_args(input_args)
 
+    set_manuscript_style()
 
     with plt.style.context("seaborn-ticks"):
-        lay, seq = 2, 5
-        fig = generate_plot(datadir=args.datadir, layer=lay, sequence=seq)
+        #lay, seq = 2, 5
+        #fig = generate_plot(datadir=args.datadir, layer=lay, sequence=seq)
 
-        if args.savedir:
-            save_png_pdf(fig, savename=os.path.join(args.savedir, f"attn_weights_example_{lay}-{seq}"))
+        #if args.savedir:
+        #    save_png_pdf(fig, savename=os.path.join(args.savedir, f"attn_weights_example_{lay}-{seq}"))
 
         lay, seq = 10, 5
         fig = generate_plot(datadir=args.datadir, layer=lay, sequence=seq)
