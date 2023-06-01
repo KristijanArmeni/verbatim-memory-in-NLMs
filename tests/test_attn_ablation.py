@@ -7,7 +7,6 @@ from typing import Tuple, Dict, List
 from matplotlib import pyplot as plt
 
 
-
 ##### ===== ######
 def plot_attentions(data: List, layer: int, head: int, ticklabels: List):
 
@@ -80,6 +79,15 @@ def test_attn_ablation():
         outputs = m(inputs, output_attentions=True, output_hidden_states=True, return_dict=True)
         hs.append(outputs.hidden_states)
         data.append(outputs.attentions)
+
+    # check that attentions are zeroed as expected
+    ablated_attentions_L11 = data[1][11]     # layer 12
+    ablated_attentions_L5 = data[3][5]       # layer 5
+    nonablated_attentions_L0 = data[1][0]    # layer 1
+
+    assert torch.all(ablated_attentions_L11 == 0)
+    assert torch.all(ablated_attentions_L5 == 0)
+    assert torch.any(nonablated_attentions_L0 != 0)
 
     # check hidden states
     h, h6, h11 = hs[0][1::], hs[3][1::], hs[1][1::]  # grab non-initial elements, the first elements are embeddings
