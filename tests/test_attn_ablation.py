@@ -42,6 +42,29 @@ def plot_attentions(data: List, layer: int, head: int, ticklabels: List):
     return fig
 
 
+def plot_head_attentions(data, layer:int, heads:List, ticklabels:List):
+
+    fig, ax = plt.subplots(1, 3, figsize=(10, 4), sharey="all")
+
+    d = []
+    for head in heads:
+        d.append(data[layer][0, head, :, :].detach().cpu().numpy())
+
+    for i, a in enumerate(ax):
+        im = a.imshow(d[i], aspect="auto")
+        a.set_title(f"Head {heads[i]+1}")
+
+        a.set_xticks(np.arange(len(ticklabels)))
+        a.set_xticklabels(ticklabels, rotation=45)
+        a.set_xlabel(f"Keys (L{layer+1}.H{heads[i]+1})")
+
+    cax = ax[-1].inset_axes([1.02, 0.15, 0.04, 0.7])
+    cbar = fig.colorbar(im, ax=ax, cax=cax)
+    cbar.ax.set_ylabel("Attention weight", rotation=90)
+
+    return fig
+
+
 def test_attn_ablation():
 
     model = GPT2LMHeadModel.from_pretrained("gpt2")
@@ -126,7 +149,10 @@ def test_attn_ablation():
 
     plt.close("all")
 
-    del model, model0, model1
+    del model, model0, model1, model2, data
+
+
+    # ===== TEST INDIVIDUAL HEAD ABLATIONS ===== #
 
     model = GPT2LMHeadModel.from_pretrained("gpt2")
     model2 = GPT2LMHeadModel.from_pretrained("gpt2")
@@ -163,5 +189,34 @@ def test_attn_ablation():
     fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
     plt.tight_layout()
     fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
+
+    plt.close()
+
+    del model, model2, model3, data2
+
+
+    # ===== TEST INDIVIDUAL HEAD ABLATIONS ===== #
+
+    model1 = GPT2LMHeadModel.from_pretrained("gpt2")
+    model2 = GPT2LMHeadModel.from_pretrained("gpt2")
+
+    layer = 0
+    heads = [0]
+    model1 = ablate_attn_module(model1, layers=[layer], heads=heads, ablation_type="zero")
+
+    data3 = []
+    for m in (model1, model2):
+        m.eval()
+        data3.append(m(inputs, output_attentions=True).attentions)
+
+    fig = plot_head_attentions(data3[0], layer=0, heads=[0, 1, 2], ticklabels=ticklabels)
+    fig.suptitle(f"Single head ablation (abl. L.{int(layer)+1}-H.{heads[0]+1})")
+    plt.tight_layout()
+    fig.savefig(os.path.join(savedir, f"attn_head-abl-{int(layer)+1}-{heads[0]}.png"), dpi=300)
+
+    fig = plot_head_attentions(data3[1], layer=0, heads=[0, 1, 2], ticklabels=ticklabels)
+    fig.suptitle(f"Unablated heads")
+    plt.tight_layout()
+    fig.savefig(os.path.join(savedir, f"unablated_heads-{int(layer)+1}-{heads[0]}.png"), dpi=300)
 
     plt.close()
