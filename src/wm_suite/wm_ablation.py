@@ -154,7 +154,7 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: 
         
         ctrl_dict = {l: [] for l in range(array.shape[1])}
         
-        borrow_from_next_col = 0
+        #borrow_from_next_col = 0
         for col in relevant_cols:
 
             num_heads = int(sum(array[:, col]))   # count number of indices for which we need controls for
@@ -168,17 +168,16 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: 
             # make sure we grab some from the ones that are already selected based on the lowest
             # attention score
             if gap > 0:
-
+                
                 #borrow_from_next_col = gap
                 taken_indices = np.where(negative_array[:, col] == True)[0]
                 smallest_values = np.sort(values[taken_indices, col])[0:gap]   # find the heads with <gap> smallest values
                 
                 extra_indices = np.where(np.in1d(values[:, col], smallest_values))[0]
-                print(available_indices, taken_indices, extra_indices)
+
+                print(f"Need {len(extra_indices)} extra indices in layer {col}")
                 available_indices = np.hstack([available_indices, extra_indices])
                 num_heads = len(available_indices)
-
-            #print(col, num_heads, len(available_indices), gap)
             
             ctrl_idx = rng.choice(a=available_indices,
                                   size=num_heads,
