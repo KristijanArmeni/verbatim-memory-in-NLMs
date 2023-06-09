@@ -185,7 +185,7 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: 
 
     topk_control = select_control_heads(arr_indx, top20arr)
 
-    return topk_heads, topk_control
+    return topk_heads, topk_control, attn_toi_avg
 
 
 def ablate_attn_module(model, layer_head_dict, ablation_type):
