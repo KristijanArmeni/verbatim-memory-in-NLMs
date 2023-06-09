@@ -170,7 +170,10 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: 
 
                 #borrow_from_next_col = gap
                 taken_indices = np.where(negative_array[:, col] == True)[0]
-                extra_indices = np.argsort(values[taken_indices, col])[0:gap]   # find the heads with <gap> smallest values
+                smallest_values = np.sort(values[taken_indices, col])[0:gap]   # find the heads with <gap> smallest values
+                
+                extra_indices = np.where(np.in1d(values[:, col], smallest_values))[0]
+                print(available_indices, taken_indices, extra_indices)
                 available_indices = np.hstack([available_indices, extra_indices])
                 num_heads = len(available_indices)
 
