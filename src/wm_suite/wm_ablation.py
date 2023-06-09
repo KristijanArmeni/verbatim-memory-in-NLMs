@@ -132,7 +132,6 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: 
     x = attn_toi_avg.flatten()
     inds = np.argpartition(x, -topk)[-topk:]
 
-
     # now create a boolean which is reshaped back to (heads, layers)
     arr_indx = np.zeros(x.shape)
     arr_indx[inds] = True
@@ -146,7 +145,7 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: 
 
     rng = np.random.RandomState(seed)
 
-    def select_control_heads(array: np.ndarray, negative_array: np.ndarray) -> Dict:
+    def select_control_heads(array: np.ndarray, negative_array: np.ndarray, values) -> Dict:
 
         sel_row, sel_col = np.where(array == True)       # use these to figure out where the control should be
         unsel_row, unsel_col = np.where(negative_array == True)  # the items in these rows should not be selected
@@ -159,19 +158,23 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: 
         for col in relevant_cols:
 
             num_heads = int(sum(array[:, col]))   # count number of indices for which we need controls for
-            num_heads += borrow_from_next_col
+            #num_heads += borrow_from_next_col
 
             # sample from available indices without repetition
             available_indices = np.where(negative_array[:, col] != True)[0]
             gap = int(num_heads - len(available_indices))
 
+            # if there's not enough available indices to sample from
+            # make sure we grab some from the ones that are already selected
             if gap > 0:
-                borrow_from_next_col = gap
-                num_heads = len(available_indices)
-            else:
-                borrow_from_next_col = 0
 
-            print(col, num_heads, len(available_indices), gap)
+                #borrow_from_next_col = gap
+                taken_indices = np.where(negative_array[:, col] == True)[0]
+                extra_indices = np.argsort(values[taken_indices, col])[0:gap]   # find the heads with <gap> smallest values
+                available_indices = np.hstack([available_indices, extra_indices])
+                num_heads = len(available_indices)
+
+            #print(col, num_heads, len(available_indices), gap)
             
             ctrl_idx = rng.choice(a=available_indices,
                                   size=num_heads,
@@ -183,7 +186,7 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: 
             
     topk_heads = {l: np.where(arr_indx[:, l])[0].tolist() for l in range(arr_indx.shape[0])}
 
-    topk_control = select_control_heads(arr_indx, top20arr)
+    topk_control = select_control_heads(arr_indx, top20arr, attn_toi_avg)
 
     return topk_heads, topk_control, attn_toi_avg
 
