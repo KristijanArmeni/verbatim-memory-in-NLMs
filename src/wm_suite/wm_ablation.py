@@ -1,5 +1,7 @@
 
+import json
 import torch
+import numpy as np
 import torch.nn as nn
 from transformers.models.gpt2.modeling_gpt2 import GPT2Attention
 from typing import List, Dict, Tuple
@@ -98,16 +100,115 @@ class GPT2AttentionAblated(GPT2Attention):
         return attn_output, attn_weights
 
 
-def ablate_attn_module(model, layers, heads, ablation_type):
+def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: int) -> Dict:
 
-    logging.info(f"Setting GPT2AttentionAblated({ablation_type}) in layers {layers}, heads {heads}.")
+    """
+    Takes attn.shape = (samples, timesteps, heads, layer) of attention weights and finds <topk> heads across layers
+    that have highest attention scores summed over timesteps <tokens_of_interest> and averaged over samples.
+
+    Parameters:
+    attn : np.ndarray, shape = (samples, timesteps, heads, layer)
+        array of attention weights
+    topk : int
+        top-10 criterion
+
+    Returns:
+    dict : dict
+        A dictionary with every layer as key and selected heads as list entry for each layer key.
+    """
+
+    # aggregate over the select time-window
+    sel = np.zeros(shape=attn.shape[1], dtype=bool)
+
+    logging.info(f"Finding top-{topk} attn heads across sequence positions {tokens_of_interest}")
+    sel[np.array(tokens_of_interest)] = True
+    attn_toi = np.sum(attn[:, sel, ...], 1)
+
+    # take the mean across sequences
+    attn_toi_avg = np.mean(attn_toi, axis=0)  # shape = (heads, layers)
+
+    # flatten from (heads, layers) and find top-k
+    orig_shape = attn_toi_avg.shape
+    x = attn_toi_avg.flatten()
+    inds = np.argpartition(x, -topk)[-topk:]
+
+
+    # now create a boolean which is reshaped back to (heads, layers)
+    arr_indx = np.zeros(x.shape)
+    arr_indx[inds] = True
+    arr_indx = arr_indx.reshape(orig_shape)
+
+    # top 20 heads, use these to check that for control we only select non-top20 heads
+    top20inds = np.argpartition(x, -20)[-20:]   # these are for control
+    top20arr = np.zeros(x.shape)
+    top20arr[top20inds] = True
+    top20arr = top20arr.reshape(orig_shape)
+
+    rng = np.random.RandomState(seed)
+
+    def select_control_heads(array: np.ndarray, negative_array: np.ndarray) -> Dict:
+
+        sel_row, sel_col = np.where(array == True)       # use these to figure out where the control should be
+        unsel_row, unsel_col = np.where(negative_array == True)  # the items in these rows should not be selected
+
+        relevant_cols = np.unique(sel_col)
+        
+        ctrl_dict = {l: [] for l in range(array.shape[1])}
+        
+        borrow_from_next_col = 0
+        for col in relevant_cols:
+
+            num_heads = int(sum(array[:, col]))   # count number of indices for which we need controls for
+            num_heads += borrow_from_next_col
+
+            # sample from available indices without repetition
+            available_indices = np.where(negative_array[:, col] != True)[0]
+            gap = int(num_heads - len(available_indices))
+
+            if gap > 0:
+                borrow_from_next_col = gap
+                num_heads = len(available_indices)
+            else:
+                borrow_from_next_col = 0
+
+            print(col, num_heads, len(available_indices), gap)
+            
+            ctrl_idx = rng.choice(a=available_indices,
+                                  size=num_heads,
+                                  replace=False)  # choose among heads that are not in negative array
+            
+            ctrl_dict[col] = ctrl_idx
+
+        return ctrl_dict
+            
+    topk_heads = {l: np.where(arr_indx[:, l])[0].tolist() for l in range(arr_indx.shape[0])}
+
+    topk_control = select_control_heads(arr_indx, top20arr)
+
+    return topk_heads, topk_control
+
+
+def ablate_attn_module(model, layer_head_dict, ablation_type):
+    """
+    Parameters:
+    ----------
+    model : hugginface model
+    layer_head_dict: dict
+        dict specifying which heads in which layers to ablate, e.g. {0: [0, 1, 2], 1: [], 2: [5, 6, 12]}
+    """
+    
+    # ablate only layers that have certain heads selected
+    layers = [i for i in layer_head_dict.keys() if layer_head_dict[i]]
+
+    print_dict = {i: layer_head_dict[i] for i in layer_head_dict.keys() if layer_head_dict[i]}
+    logging.info(f"Setting GPT2AttentionAblated({ablation_type}) in layers and heads:\n{print_dict}.")
 
     for layer_idx in layers:
 
         layer = model.transformer.h[layer_idx]
         layer.attn = GPT2AttentionAblated(attn_instance=layer.attn, 
                                           ablation_type=ablation_type, 
-                                          heads=heads, 
+                                          heads=layer_head_dict[layer_idx], 
                                           config=model.config)
 
     return model
