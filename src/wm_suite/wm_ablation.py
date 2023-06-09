@@ -165,7 +165,8 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: 
             gap = int(num_heads - len(available_indices))
 
             # if there's not enough available indices to sample from
-            # make sure we grab some from the ones that are already selected
+            # make sure we grab some from the ones that are already selected based on the lowest
+            # attention score
             if gap > 0:
 
                 #borrow_from_next_col = gap
