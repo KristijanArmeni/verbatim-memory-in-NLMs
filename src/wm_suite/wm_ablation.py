@@ -183,7 +183,7 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: 
                                   size=num_heads,
                                   replace=False)  # choose among heads that are not in negative array
             
-            ctrl_dict[col] = ctrl_idx
+            ctrl_dict[col] = ctrl_idx.tolist()
 
         return ctrl_dict
             
