@@ -6,7 +6,6 @@ from itertools import product
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-import transformers
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config, \
                          BertForMaskedLM, TransfoXLLMHeadModel, TransfoXLTokenizer, \
                          AutoTokenizer
@@ -23,7 +22,7 @@ sys.path.append("/home/ka2773/project/lm-mem/src")
 from data.wt103.dataset import WikiTextDataset
 from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits, make_word_lists, concat_and_tokenize_inputs
 from wm_suite.io.stimuli import prefixes, prompts
-from wm_suite.wm_ablation import ablate_attn_module
+from wm_suite.wm_ablation import ablate_attn_module, find_topk_attn
 
 logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
 
@@ -655,8 +654,13 @@ def runtime_code(input_args: List = None):
                         help="length of context window in tokens for transformers")
     parser.add_argument("--model_type", type=str, default="pretrained",
                         help="model label controlling which checkpoint to load")
-    parser.add_argument("--ablate_layers", type=str, default="none")
-    parser.add_argument("--ablate_heads", type=str, default="none")
+    parser.add_argument("--ablate_layers", type=str)
+    parser.add_argument("--ablate_heads", type=str)
+    parser.add_argument("--ablate_topk_heads", type=int)
+    parser.add_argument("--ablate_topk_heads_seed", type=int,
+                        help="Random seed to select random heads for ablation (control experiment)")
+    parser.add_argument("--ablate_topk_heads_toi", type=str,
+                        help="List of position indices over which to aggregate attn for top-k selection")
     parser.add_argument("--ablate_params", type=str, default="Q,K",
                         help="Attention parameters to be ablate. Specify as comma-separated string.")
     parser.add_argument("--ablation_type", type=str, choices=["zero", "shuffle"], default="zero")
@@ -681,19 +685,21 @@ def runtime_code(input_args: List = None):
     #    "--list_type", "random",
     #    "--list_len", "3",
     #    "--prompt_len", "1",
-    #    "--pretokenize_moses",
     #    "--model_type", "ablation",
-    #    "--ablate_layer", "(0,)",
-    #    "--ablate_head", "(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)",
+    #    "--ablate_topk_heads", "10",
+    #    "--ablate_topk_heads_toi", "(14, 16, 18)",
+    #    "--ablate_topk_heads_seed", '11111',
     #    "--ablation_type", "zero",
     #    "--checkpoint", "gpt2",
     #    "--tokenizer", "gpt2",
     #    #"--checkpoint", "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_full_12-768-1024_a_01/checkpoint-27500",
     #    #"--tokenizer", "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer",
     #    "--model_seed", "12345",
-    #    "--output_dir", "/scratch/ka2773/project/lm-mem/output/ablation",
-    #    "--output_file", "surprisal_gpt2_pretrained_sce1_repeat_random.csv",
+    #    "--noun_list_file", "/home/ka2773/project/lm-mem/src/data/noun_lists/random_lists.json",
+    #    "--output_dir", "./",
+    #    "--output_filename", "test.csv",
     #    "--device", "cuda",
+    #    "--output_dir", "/scratch/ka2773/project/lm-mem/output/ablation",
     #]
 
     if input_args:
@@ -772,16 +778,49 @@ def runtime_code(input_args: List = None):
     elif "ablation" in argins.model_type:
 
         logging.info(f"Running ablation experiment")
-        logging.info(f"Setting attention heads {argins.ablate_heads} in layers {argins.ablate_layers} to 0.")
 
-        # now set the selected head in selected layer to 0
-        lay = literal_eval(argins.ablate_layers)
-        heads = literal_eval(argins.ablate_heads)
+        if argins.ablate_heads is not None:
 
-        model = ablate_attn_module(model, 
-                                   layers = list(lay),
-                                   heads = list(heads),
-                                   ablation_type="zero")
+            logging.info(f"Setting attention heads {argins.ablate_heads} in layers {argins.ablate_layers} to 0.")
+            logging.info(f"Setting attention heads {argins.ablate_heads} in layers {argins.ablate_layers} to 0.")
+
+            # now set the selected head in selected layer to 0
+            lay = literal_eval(argins.ablate_layers)
+            heads = literal_eval(argins.ablate_heads)
+        
+        elif argins.ablate_topk_heads:
+
+            # make sure that these arguments are not passed
+            assert argins.ablate_heads is None
+            assert argins.ablate_layers is None
+            
+            attn_dict = dict(np.load("/scratch/ka2773/project/lm-mem/output/wm_attention/attention_weights_gpt2_colon-colon-p1.npz"))
+            toi = list(literal_eval(argins.ablate_topk_heads_toi))
+            
+            if argins.ablate_topk_heads_seed:
+                seed = argins.ablate_topk_heads_seed
+            else:
+                seed = 12345  # use a seed just to find_topk_attn runs
+
+            out_tuple = find_topk_attn(attn_dict["data"], 
+                                       argins.ablate_topk_heads, 
+                                       tokens_of_interest=toi, 
+                                       seed=seed)
+
+            lh_dict, lh_dict_ctrl, _ = out_tuple
+
+            # by default use the non-randomly selected heads
+            layer_head_dict = lh_dict
+
+            # if seed is provided by the user, use random selection of heads instead
+            if argins.ablate_topk_heads_seed:
+                logging.info(f"Ablating {argins.ablate_topk_heads} random heads")
+                layer_head_dict = lh_dict_ctrl
+
+            # ablate heads by setting GPT2Attention() classes in selected layers to GPT2AttentionAblated()
+            model = ablate_attn_module(model, 
+                                       layer_head_dict=layer_head_dict,
+                                       ablation_type="zero")
 
 
     # ===== TOKENIZE AND PREPARE THE VIGNETTES ===== #
