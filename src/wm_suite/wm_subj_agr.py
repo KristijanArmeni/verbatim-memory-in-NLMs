@@ -4,12 +4,14 @@ import json
 import pandas as pd
 from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 from typing import Dict, Tuple
+import numpy as np
 import torch
 import logging
 from typing import List, Tuple, Dict
 from tqdm import tqdm
 from itertools import product
-from wm_suite.wm_ablation import ablate_attn_module
+from wm_suite.wm_ablation import ablate_attn_module, find_topk_attn
+
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -24,10 +26,11 @@ single_layers = [[i] for i in list(range(12))]
 layers_dict = {"".join([str(e) for e in a]): a for a in [[4,5], [6, 7], [4, 5, 6, 7]]}
 
 
-ablation_dict = {f"ablate-{l[0]}-{h[0]}": {"layers": l, "heads": h} for l in single_layers for h in single_heads}
+#ablation_dict = {f"ablate-{l[0]}-{h[0]}": {"layers": l, "heads": h} for l in single_layers for h in single_heads}
 #ablation_dict["ablate-all"] = {'layers': list(range(12)), "heads": all_heads}
 #ablation_dict["rand-init"] = "rand-init"
 #ablation_dict["unablated"] = "gpt2"
+
 
 
 def read_json_data(path: str) -> Dict:  
@@ -221,6 +224,7 @@ def main(input_args=None):
     import argparse
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--outname")
     parser.add_argument("--savedir")
 
     if input_args is None:
@@ -254,6 +258,27 @@ def main(input_args=None):
         "plural_plural_plural": "PPP",
         "plural_plural_singular": "PPS",
     }
+
+    ablation_dict = {}
+    attn = dict(np.load("/scratch/ka2773/project/lm-mem/output/wm_attention/attention_weights_gpt2_colon-colon-p1.npz"))["data"]
+
+    seeds = {54321: 0, 99999: 1, 56789: 2, 98765: 3, 11111: 4}
+    topk = [5, 10, 15, 20]
+
+    combinations = list(product(topk, seeds))
+
+    for comb in combinations:
+        
+        k, seed = comb
+        hl_dict, hl_dict_ctrl, _ = find_topk_attn(attn, topk=k, tokens_of_interest=[14, 16, 18], seed=seed)
+
+        ablation_dict[f"top-{k}-copying"] = {l:hl_dict[l] for l in hl_dict.keys()}
+        ablation_dict[f"top-{k}-copying-ctrl-{seeds[seed]}"] = {l:hl_dict_ctrl[l] for l in hl_dict_ctrl.keys()}
+        
+        hl_dict, hl_dict_ctrl, _ = find_topk_attn(attn, topk=k, tokens_of_interest=[42, 43, 44], seed=seed)
+        
+        ablation_dict[f"top-{k}-previous"] = {l:hl_dict[l] for l in hl_dict.keys()}
+        ablation_dict[f"top-{k}-previous-ctrl-{seeds[seed]}"] = {l:hl_dict_ctrl[l] for l in hl_dict_ctrl.keys()}
 
     datasets = list(dataset_dict.keys())
     model_names = list(ablation_dict.keys())
@@ -303,8 +328,7 @@ def main(input_args=None):
             # ablate the model
             model = GPT2LMHeadModel.from_pretrained("gpt2")
             model = ablate_attn_module(model, 
-                                       layers=ablation_dict[model_name]['layers'],
-                                       heads=ablation_dict[model_name]['heads'],
+                                       layer_head_dict=ablation_dict[model_name],
                                        ablation_type="zero")
 
             tokenizer =  GPT2TokenizerFast.from_pretrained("gpt2")
@@ -356,7 +380,7 @@ def main(input_args=None):
 
         df = pd.DataFrame(log)
 
-        savename = os.path.join(args.savedir, f"ablation_sva_per_head.csv")
+        savename = os.path.join(args.savedir, args.outname)
         logging.info(f"Saving {savename}\n")
         df.to_csv(savename, sep="\t")
 
