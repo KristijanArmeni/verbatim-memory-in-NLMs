@@ -194,6 +194,40 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: 
     return topk_heads, topk_control, attn_toi_avg
 
 
+def from_dict_to_labels(layer_head_dict: Dict) -> List:
+
+    return [f"L{l}.H{h}" for i, l in enumerate(layer_head_dict) for h in layer_head_dict[i] if layer_head_dict[i]]
+
+
+def from_labels_to_dict(labels: List) -> Dict:
+
+    out = {l: [] for l in range(12)}
+
+    for label in labels:
+        l_idx = int(label.split(".")[0][1::])  # split and grab first interger, e.g. 'L2.H11'
+        h_idx = int(label.split(".")[1][1::])  # split and grab first interger, e.g. 'L2.H11'
+        out[l_idx].append(h_idx)
+
+    return out
+
+
+def find_topk_intersection(attn, tois: List, topk: int, seed: int) -> Dict:
+
+    dict1, _, _ = find_topk_attn(attn=attn, topk=topk, tokens_of_interest=tois[0], seed=seed)
+    dict2, _, _ = find_topk_attn(attn=attn, topk=topk, tokens_of_interest=tois[1], seed=seed)
+
+    labels1 = from_dict_to_labels(dict1)
+    labels2 = from_dict_to_labels(dict2)
+
+    intersection = set(labels1) & set(labels2)
+
+    print("Intesection elements: ", intersection)
+
+    layer_head_dict = from_labels_to_dict(list(intersection))
+
+    return layer_head_dict
+
+
 def ablate_attn_module(model, layer_head_dict, ablation_type):
     """
     Parameters:
