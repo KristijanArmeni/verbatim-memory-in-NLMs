@@ -22,7 +22,7 @@ sys.path.append("/home/ka2773/project/lm-mem/src")
 from data.wt103.dataset import WikiTextDataset
 from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits, make_word_lists, concat_and_tokenize_inputs
 from wm_suite.io.stimuli import prefixes, prompts
-from wm_suite.wm_ablation import ablate_attn_module, find_topk_attn
+from wm_suite.wm_ablation import ablate_attn_module, find_topk_attn, find_topk_intersection, from_labels_to_dict, from_dict_to_labels
 
 logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
 
@@ -656,7 +656,7 @@ def runtime_code(input_args: List = None):
                         help="model label controlling which checkpoint to load")
     parser.add_argument("--ablate_layers", type=str)
     parser.add_argument("--ablate_heads", type=str)
-    parser.add_argument("--ablate_topk_heads", type=int)
+    parser.add_argument("--ablate_topk_heads")
     parser.add_argument("--ablate_topk_heads_seed", type=int,
                         help="Random seed to select random heads for ablation (control experiment)")
     parser.add_argument("--ablate_topk_heads_toi", type=str,
@@ -686,9 +686,9 @@ def runtime_code(input_args: List = None):
     #    "--list_len", "3",
     #    "--prompt_len", "1",
     #    "--model_type", "ablation",
-    #    "--ablate_topk_heads", "10",
+    #    "--ablate_topk_heads", "intersect-induction-matching",
     #    "--ablate_topk_heads_toi", "(14, 16, 18)",
-    #    "--ablate_topk_heads_seed", '11111',
+    #    #"--ablate_topk_heads_seed", '11111',
     #    "--ablation_type", "zero",
     #    "--checkpoint", "gpt2",
     #    "--tokenizer", "gpt2",
@@ -795,19 +795,37 @@ def runtime_code(input_args: List = None):
             assert argins.ablate_layers is None
             
             attn_dict = dict(np.load("/scratch/ka2773/project/lm-mem/output/wm_attention/attention_weights_gpt2_colon-colon-p1.npz"))
-            toi = list(literal_eval(argins.ablate_topk_heads_toi))
             
             if argins.ablate_topk_heads_seed:
                 seed = argins.ablate_topk_heads_seed
             else:
                 seed = 12345  # use a seed just to find_topk_attn runs
 
-            out_tuple = find_topk_attn(attn_dict["data"], 
-                                       argins.ablate_topk_heads, 
-                                       tokens_of_interest=toi, 
-                                       seed=seed)
+            # if specified, find heads that fall both in induciton and matching heads
+            if argins.ablate_topk_heads == "induction-matching-intersect":
 
-            lh_dict, lh_dict_ctrl, _ = out_tuple
+                lh_dict = find_topk_intersection(attn_dict["data"], tois=([13], [14, 16, 18]), topk=20, seed=12345)
+
+            elif argins.ablate_topk_heads == "matching-bottom5":
+
+                # find effect of ablation of onlyt the last 5 matching heads (seems to have disproportionaly strong effect)
+                top15_matching, _, _ = find_topk_attn(attn_dict["data"], topk=15, tokens_of_interest=[13], seed=12345)
+                top20_matching, _, _ = find_topk_attn(attn_dict["data"], topk=20, tokens_of_interest=[13], seed=12345)
+                top15labels, top20labels = from_dict_to_labels(top15_matching), from_dict_to_labels(top20_matching)
+                resid_labels = list(set(top20labels) - set(top15labels))
+
+                lh_dict = from_labels_to_dict(resid_labels)
+
+            else:
+
+                argins.ablate_topk_heads = int(argins.ablate_topk_heads)
+                toi = list(literal_eval(argins.ablate_topk_heads_toi))
+                out_tuple = find_topk_attn(attn_dict["data"], 
+                                           argins.ablate_topk_heads, 
+                                           tokens_of_interest=toi, 
+                                           seed=seed)
+
+                lh_dict, lh_dict_ctrl, _ = out_tuple
 
             # by default use the non-randomly selected heads
             layer_head_dict = lh_dict
