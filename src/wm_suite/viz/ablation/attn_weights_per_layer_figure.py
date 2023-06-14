@@ -8,6 +8,7 @@ from scipy.stats import bootstrap, median_abs_deviation
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 import matplotlib as mpl
+from matplotlib.colors import ListedColormap
 from src.wm_suite.viz.func import filter_and_aggregate
 import logging
 from typing import List, Dict, Tuple
@@ -122,12 +123,12 @@ def attn_amplitude_plot(axes, x: np.ndarray, d: Dict, target_id=13, query_id=45,
 
 
     plot_attention(ax1, x, ids1, labels)
-    ax1.set_title("Attention to tokens in first list", fontsize=12)    
+    #ax1.set_title("Attention to tokens in first list", fontsize=12)    
     
     query_ids = (query_id-1, query_id-2, query_id-3)
     labs = [f"{ylabels[q]} (t-{i+1}) [{q}]" for i, q in enumerate(query_ids)]
     plot_attention(ax2, x, query_ids, labs)
-    ax2.set_title("Attention to immediately preceding tokens", fontsize=12)
+    #ax2.set_title("Attention to immediately preceding tokens", fontsize=12)
 
     return ax1, ax2
 
@@ -152,7 +153,7 @@ def attn_amplitude_plot_control_tokens(axes, x: np.ndarray, d: Dict, colors, see
     return axes, img1, data1
 
 
-def plot_schematic(ax, d, colors):
+def plot_schematic(ax, d, colors, squeezed=False):
     
 #    first_list = " ".join([s.strip("Ġ") for s in d['tokens'][0][13:20]])
 #    ctx = " ".join([s.strip("Ġ") for s in d['tokens'][0][20:35]])
@@ -161,32 +162,44 @@ def plot_schematic(ax, d, colors):
     cue1 = d['tokens'][0][13].strip("Ġ")
     cue2 = d['tokens'][0][45].strip("Ġ")
 
-    labels = ["Mary read a list of words", cue1, "$N_1, N_2, N_3$", 
-                "... when she got back she read", "the list again",  cue2]
-    
-    
-    #xpos = [0, 11, 12.5, 20, 33, 39]
-    xmax = 39
-    xpos = [0*xmax, 0.29*xmax, 0.33*xmax, 0.48*xmax, 0.84*xmax, xmax]
+    labels = ["Mary wrote down a list of words", cue1, "$N_1, N_2, N_3$", 
+                "[...] when she got back she read", "the list again",  cue2]
+
+    xmax=39
+    if squeezed:
+        xpos = [0*xmax, 0.346*xmax, 0.37*xmax, 0.50*xmax, 0.85*xmax, xmax]
+        text_fs, annot_fs = 16, 16
+    else:
+        xpos = [0*xmax, 0.33*xmax, 0.37*xmax, 0.51*xmax, 0.85*xmax, xmax]    
+        text_fs, annot_fs = 15, 15
+
     ypos = [0.35, 0.35, 0.35, 0.35, 0.35, 0.35]
     xarrow_from = [39, 39]
-    xarrow_to = [15, 35]
-    fractions = [0.05, 0.2]
+    xarrow_to = [16.5, 35.5]
+
+    if squeezed:
+        fractions = [0.06, 0.2]
+    else:
+        fractions = [0.095, 0.2]
 
     ax.set_axis_off()
 
     for i, tk in enumerate(labels):
 
+        c, fc, fcalpha = "tab:gray", "None", None
         if i in [2, 4]:
-            c = colors[1]
-            if i == 2: 
-                c = colors[0];
-            ax.text(xpos[i], ypos[i], tk, color="black", fontsize=16, ha='left',
-            bbox=dict(facecolor=c, alpha=0.4, edgecolor='gray', boxstyle='round'))
+            c, fc, fcalpha = "black", "tab:gray", 0.3
+        elif i in [1, 5]: 
+            c, fc, fcalpha = "black", "tab:red", 0.3
 
-        else:    
-            ax.text(xpos[i], ypos[i], tk, color="tab:gray", fontsize=16, ha='left',
-            bbox=dict(facecolor='none', edgecolor='gray', boxstyle='round'))
+        if cue1 != cue2:
+            if i in [1]:
+                c, fc, fcalpha = "black", "tab:red", 0.3
+            if i in [5]:
+                c, fc, fcalpha = "black", "tab:green", 0.3
+
+        ax.text(xpos[i], ypos[i], tk, color=c, fontsize=text_fs, ha='left',
+        bbox=dict(facecolor=fc, alpha=fcalpha, edgecolor='gray', boxstyle='round'))
 
     for i in range(len(xarrow_from)):
 
@@ -196,10 +209,19 @@ def plot_schematic(ax, d, colors):
                         va='center', 
                         ha='center',
                         fontsize=14,
-                        arrowprops={'arrowstyle': '->', 'ls':'dashed', 'connectionstyle': f'bar,fraction={fractions[i]}'})
+                        arrowprops={'arrowstyle': '->', 
+                                    'color': f"{colors[i]}",
+                                    "lw": 1.7,
+                                    'ls':'dashed', 
+                                    'connectionstyle': f'bar,fraction={fractions[i]}'})
 
-    #ax.text(14, -0.3, "First list", color="tab:gray", fontsize=13, ha="center")
-    ax.text(39, 1.3, "Query", color="tab:gray", fontsize=13, ha="center")
+    if not squeezed:
+        ax.text(39.2, 0.8, "Query", color="tab:gray", fontsize=annot_fs, ha="left", fontweight="bold")
+        ax.text(39.2, 1.8, "Attention", color="tab:gray", fontsize=annot_fs, ha="left", fontweight="bold")
+        ax.text(28, 1.8, "Copying heads", color=colors[0], fontsize=annot_fs, ha="center", fontweight="bold")
+        ax.text(34.5, 1.15, "Local-context heads", color=colors[1], fontsize=annot_fs, ha="center", fontweight="bold")
+
+    ax.text(-2.5, 0.35, "LM Input", color="tab:gray", fontsize=annot_fs, ha="center", fontweight="bold")
 
     ax.set_xticks(np.arange(0, 40))
 
@@ -208,12 +230,19 @@ def plot_schematic(ax, d, colors):
 
 def plot_imshow_and_average(axes, dat, c):
 
-    m = np.mean(dat, axis=(0, 1))
+    m = np.mean(dat, axis=(0, 1))           # mean across sequences and heads
     se = sem(np.mean(dat, axis=0), axis=0)
     
     axes[0].plot(m, '--o', markersize=8, mec='white', color=c)
     axes[0].fill_between(np.arange(dat.shape[-1]), y1=m+se, y2=m-se, color=c, alpha=0.3)
-    im1 = axes[1].imshow(np.mean(dat, axis=0), aspect='auto', vmin=0, vmax=1)
+
+    if c == "#1f77b4":
+        cmap = plt.cm.Blues
+    elif c == "#ff7f0e":
+        cmap = plt.cm.Oranges
+    elif c == "#000000":
+        cmap = plt.cm.Greys
+    im1 = axes[1].imshow(np.mean(dat, axis=0), cmap=cmap, aspect='auto', vmin=0, vmax=1)
 
     return axes, im1, (m, se)
 
@@ -242,7 +271,7 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, query_id: int, 
         a.spines['top'].set_visible(False)
         a.spines['right'].set_visible(False)
 
-    return ax, img2, (d1, d2)
+    return ax, (img1, img2), (d1, d2)
 
 
 def generate_plot2(datadir, query):
@@ -250,19 +279,19 @@ def generate_plot2(datadir, query):
     if query == "colon-colon-p1":
         fn = "attention_weights_gpt2_colon-colon-p1.npz"
         query_idx = 45
-        suptitle = "GPT-2 attention patterns over past context"
+        suptitle = ""
         n_tokens_per_window = 3
 
     elif query == "colon-semicolon-p1":
         fn = "attention_weights_gpt2_colon-semicolon-p1.npz"
         query_idx = 45
-        suptitle = "GPT-2 attention patterns over past context"
+        suptitle = ""
         n_tokens_per_window = 3
     
     elif query == "comma-comma-p1":
         fn = "attention_weights_gpt2_comma-comma-p1.npz"
         query_idx = 45  # this is first noun in the list
-        suptitle = "GPT-2 attention patterns over past context"
+        suptitle = ""
         n_tokens_per_window = 3
 
     elif query == "colon-colon-p1-ablate-11":
@@ -271,10 +300,10 @@ def generate_plot2(datadir, query):
         suptitle = "GPT-2 attention patterns over past context (ablated layer 11)"
         n_tokens_per_window = 3
 
-    elif query == "colon-colon-p1-ablate-0":
-        fn = "attention_weights_gpt2-ablate-0-all_colon-colon-p1-ctxlen1.npz"  # this is 0 indexing
+    elif query == "colon-colon-p1-ablate-2":
+        fn = "attention_weights_gpt2-ablate-2-all_colon-colon-p1-ctxlen1.npz"  # this is 0 indexing
         query_idx = 45
-        suptitle = "GPT-2 attention patterns over past context (ablated layer 1)"
+        suptitle = "GPT-2 attention patterns over past context (ablated layer 3)"
         n_tokens_per_window = 3
 
     elif query == "colon-colon-p1-ctxlen3":
@@ -292,7 +321,7 @@ def generate_plot2(datadir, query):
     elif query == "colon-colon-p1-n1":
         fn = "attention_weights_gpt2_colon-colon-p1.npz"
         query_idx = 45
-        suptitle = "GPT-2 attention patterns over past context (single-token window)"
+        suptitle = "Copy and previous-token attention heads in GPT-2 (single-token window)"
         n_tokens_per_window = 1
 
     elif query == "colon-colon-n2":
@@ -309,16 +338,13 @@ def generate_plot2(datadir, query):
 
     clrs = plt.rcParams['axes.prop_cycle'].by_key()['color'][0:2]
 
-    # this is the key figure, plot the schematic with it
+    # ===== PLOT ===== #
+
     if query in ["colon-colon-p1", 'colon-semicolon-p1', 'comma-comma-p1']:
 
         fig = plt.figure(figsize=(12, 6.5))
 
         gs = GridSpec(3, 2, height_ratios=[0.6, 1.2, 2.2], figure=fig)
-
-        #fig, ax = plt.subplots(3, 2, figsize=(7, 4), sharex="all", sharey="row", 
-        #                       gridspec_kw={'height_ratios': [1, 1, 2], 'width_ratios': [2, 1]},
-        #                       )
 
         ax1 = fig.add_subplot(gs[0, :])
         ax2 = fig.add_subplot(gs[1, 0])
@@ -331,8 +357,11 @@ def generate_plot2(datadir, query):
         for a in (ax2, ax3):
             plt.setp(a.get_xticklabels(), visible=False)
 
-
-        plot_schematic(ax1, d1, colors=clrs)
+        # for the main figure, font can remain smaller (as the figure itself is lareger), 
+        if query in ["colon-colon-p1"]:
+            plot_schematic(ax1, d1, colors=clrs, squeezed=False)
+        else:
+            plot_schematic(ax1, d1, colors=clrs, squeezed=True)
 
         axes = np.array([[ax2, ax3], [ax4, ax5]])
 
@@ -342,19 +371,23 @@ def generate_plot2(datadir, query):
                                gridspec_kw={'height_ratios': [1, 2]},
                                )
 
-    ax, img2, data1 = attn_weights_per_head_layer(ax=axes, x=x1, colors=clrs, 
-                                                 target_id=13, 
-                                                 query_id=query_idx,
-                                                 n_tokens_per_window=n_tokens_per_window)
+    ax, imgs, data1 = attn_weights_per_head_layer(ax=axes, x=x1, colors=clrs, 
+                                                  target_id=13, 
+                                                  query_id=query_idx,
+                                                  n_tokens_per_window=n_tokens_per_window)
 
-    lfs = 20
+    lfs = 18
+    titlefs = 19
+    if query in ["comma-comma-p1", "colon-semicolon-p1", "colon-colon-p1-n1"]:
+        lfs = 22
+        titlefs = 23
 
     ax[1, 0].set_ylabel("Head", fontsize=lfs)
-    ax[0, 0].set_ylabel("Avg. attn.\nweight", fontsize=lfs)
+    ax[0, 0].set_ylabel("Avg. attention\nweight", fontsize=lfs)
 
     # suptitles
-    ax[0, 0].set_title("Attention to tokens in first list", fontsize=16)
-    ax[0, 1].set_title("Attention to preceeding tokens", fontsize=16)
+    #ax[0, 0].set_title("Attention to tokens in first list", fontsize=16)
+    #ax[0, 1].set_title("Attention to previous tokens", fontsize=16)
 
     for a in ax[0, :]:
         a.set_ylim([0, 0.5])
@@ -372,13 +405,21 @@ def generate_plot2(datadir, query):
     ax[1, 0].set_yticklabels(np.arange(1, 12, 2), fontsize=lfs)
 
     # colorbar
-    cax = ax[1, 1].inset_axes([1.04, 0.15, 0.04, 0.7])
-    cbar = fig.colorbar(img2, ax=ax[1, :], cax=cax)
-    cbar.ax.set_ylabel("Attention weight", rotation=90, fontsize=lfs)
-    cbar.ax.tick_params(labelsize=lfs)
+    cax = ax[1, 0].inset_axes([1.03, 0, 0.03, 1])
+    cbar = fig.colorbar(imgs[0], ax=ax[1, 0], cax=cax, ticks=[0, 0.5, 1])
+    #cbar.ax.set_ylabel("Attention weight", fontsize=lfs-3)
+
+    cbar.ax.set_yticklabels([0, 0.5, 1])
+    cbar.ax.tick_params(labelsize=lfs-3)
+
+    cax = ax[1, 1].inset_axes([1.03, 0, 0.03, 1])
+    cbar = fig.colorbar(imgs[1], ax=ax[1, 1], cax=cax, ticks=[0, 0.5, 1])
+    cbar.ax.set_yticklabels([0, 0.5, 1])
+    cbar.ax.set_ylabel("Attention weight", fontsize=lfs-3)
+    cbar.ax.tick_params(labelsize=lfs-3)
 
     fig.supxlabel("Layer", fontsize=lfs)
-    fig.suptitle(suptitle, fontsize=21)
+    fig.suptitle(suptitle, fontsize=titlefs)
     fig.tight_layout()
 
     # ===== CONTROL FIGURE ===== #
@@ -386,10 +427,10 @@ def generate_plot2(datadir, query):
     fig_, axes2 = plt.subplots(2, 1, figsize=(6, 4.5), sharex="col",
                                gridspec_kw={"height_ratios": [1, 2]})
 
-    axes2, img2_, data2 = attn_amplitude_plot_control_tokens(axes2, x1, d1, colors=clrs, seed=12345)
+    axes2, img2_, data2 = attn_amplitude_plot_control_tokens(axes2, x1, d1, colors=["#000000"], seed=12345)
     #axes2.legend(title="Target token", fontsize=12, title_fontsize=12)
 
-    lfs=14
+    lfs=16
 
     axes2[0].set_ylim([0, 0.5])
     axes2[0].set_yticks([0, 0.25, 0.5])
@@ -397,6 +438,10 @@ def generate_plot2(datadir, query):
 
     axes2[1].set_yticks(np.arange(0, 12, 2))
     axes2[1].set_yticklabels(np.arange(1, 12, 2), fontsize=lfs)
+
+    fig_.supxlabel("Layer", fontsize=lfs)
+    axes2[0].set_ylabel("Avg. attention\nweight", fontsize=lfs)
+    axes2[1].set_ylabel("Head", fontsize=lfs)
 
     for a in axes2:
         a.tick_params(axis="y", labelsize=lfs)
@@ -410,14 +455,13 @@ def generate_plot2(datadir, query):
     axes2[0].spines['top'].set_visible(False)
     axes2[0].spines['right'].set_visible(False)
 
-    cax = axes2[1].inset_axes([1.04, 0.15, 0.04, 0.7])
+    cax = axes2[1].inset_axes([1.04, 0.1, 0.04, 0.8])
     cbar = fig_.colorbar(img2_, ax=axes2[1], cax=cax)
     cbar.ax.set_ylabel("Attention weight", rotation=90, fontsize=lfs)
     cbar.ax.tick_params(labelsize=lfs)
 
-    qt = d1['tokens'][0][query_idx].strip()
     
-    fig_.suptitle(suptitle, fontsize=15)
+    fig_.suptitle("GPT-2 attention over random tokens in intervening context", fontsize=15)
     fig_.tight_layout()
 
     # format data in a csv
@@ -475,7 +519,7 @@ def main(input_args=None):
         if args.savedir:
 
             savename = "gpt2_attn_colon-semicolon-p1"
-            save_png_pdf(fig2, os.path.join(args.savedir, ))
+            save_png_pdf(fig2, os.path.join(args.savedir, savename))
 
             fn = os.path.join(args.savedir, savename + ".csv")
             logging.info(f"Saving {fn}")
@@ -493,28 +537,28 @@ def main(input_args=None):
             data.to_csv(fn, sep='\t')
 
         # single token plot
-        #fig4, fig4_ = generate_plot2(datadir=datadir, query="colon-colon-p1-n1")
+        #fig4, fig4_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-n1")
         #if args.savedir:
         #    save_png_pdf(fig4, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1-n1"))
 
         # ===== CONTROL FIGURES: ABLATED MODEL ==== #
-        fig5, fig5_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-ablate-11")
-        if args.savedir:
-            save_png_pdf(fig5, os.path.join(args.savedir, "gpt2-ablate-11_attn_colon-colon-p1"))
-            save_png_pdf(fig5_, os.path.join(args.savedir, "gpt2-ablate-11_attn_colon-colon-p1_control"))
+        #fig5, fig5_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-ablate-11")
+        #if args.savedir:
+        #    save_png_pdf(fig5, os.path.join(args.savedir, "gpt2-ablate-11_attn_colon-colon-p1"))
+        #    save_png_pdf(fig5_, os.path.join(args.savedir, "gpt2-ablate-11_attn_colon-colon-p1_control"))
 
-            fn = os.path.join(args.savedir, "gpt2-ablate-11_attn_colon-colon-p1")
-            logging.info(f"Saving {fn}")
-            data.to_csv(fn, sep='\t')
+        #    fn = os.path.join(args.savedir, "gpt2-ablate-11_attn_colon-colon-p1")
+        #    logging.info(f"Saving {fn}")
+        #    data.to_csv(fn, sep='\t')
 
-        fig6, fig6_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-ablate-0")
-        if args.savedir:
-            save_png_pdf(fig6, os.path.join(args.savedir, "gpt2-ablate-0_attn_colon-colon-p1"))
-            save_png_pdf(fig6_, os.path.join(args.savedir, "gpt2-ablate-0_attn_colon-colon-p1_control"))
+        #fig6, fig6_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-ablate-2")
+        #if args.savedir:
+        #    save_png_pdf(fig6, os.path.join(args.savedir, "gpt2-ablate-2_attn_colon-colon-p1"))
+        #    save_png_pdf(fig6_, os.path.join(args.savedir, "gpt2-ablate-2_attn_colon-colon-p1_control"))
 
-            fn = os.path.join(args.savedir, "gpt2-ablate-0_attn_colon-colon-p1")
-            logging.info(f"Saving {fn}")
-            data.to_csv(fn, sep='\t')
+        #    fn = os.path.join(args.savedir, "gpt2-ablate-2_attn_colon-colon-p1")
+        #    logging.info(f"Saving {fn}")
+        #    data.to_csv(fn, sep='\t')
 
 
         # ===== CONTROL FIGURES: LONG CONTEXT ==== #
