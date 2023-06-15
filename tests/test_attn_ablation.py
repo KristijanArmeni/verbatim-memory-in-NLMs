@@ -2,7 +2,7 @@ import os
 import torch
 from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 import numpy as np
-from src.wm_suite.wm_ablation import ablate_attn_module
+from wm_suite.wm_ablation import ablate_attn_module
 from typing import Tuple, Dict, List
 from matplotlib import pyplot as plt
 
@@ -79,9 +79,12 @@ def test_attn_ablation():
 
     layer = 11
     heads = list(range(12))
-    model0 = ablate_attn_module(model0, layers=[layer], heads=heads, ablation_type="zero")
-    model1 = ablate_attn_module(model1, layers=[layer], heads=heads, ablation_type="shuffle")
-    model2 = ablate_attn_module(model2, layers=[5], heads=heads, ablation_type="zero")
+    lh_dict = {layer: heads}
+    model0 = ablate_attn_module(model0, layer_head_dict=lh_dict, ablation_type="zero")
+    model1 = ablate_attn_module(model1, layer_head_dict=lh_dict, ablation_type="shuffle")
+    
+    lh_dict = {5: heads}
+    model2 = ablate_attn_module(model2, layer_head_dict=lh_dict, ablation_type="zero")
 
     # test that model parameters are not modified by ablations (only attention activations) etc.
     params1 = model.transformer.h[layer].attn.parameters()
@@ -158,10 +161,11 @@ def test_attn_ablation():
     model2 = GPT2LMHeadModel.from_pretrained("gpt2")
     model3 = GPT2LMHeadModel.from_pretrained("gpt2")
 
+
     layer = 1
-    heads = list(range(12))
-    model2 = ablate_attn_module(model2, layers=[layer], heads=heads, ablation_type="zero")
-    model3 = ablate_attn_module(model3, layers=[layer], heads=heads, ablation_type="shuffle")
+    lh_dict = {layer: list(range(12))}
+    model2 = ablate_attn_module(model2, layer_head_dict=lh_dict, ablation_type="zero")
+    model3 = ablate_attn_module(model3, layer_head_dict=lh_dict, ablation_type="shuffle")
 
     data2 = []
     for m in (model, model2, model3):
@@ -201,8 +205,8 @@ def test_attn_ablation():
     model2 = GPT2LMHeadModel.from_pretrained("gpt2")
 
     layer = 0
-    heads = [0]
-    model1 = ablate_attn_module(model1, layers=[layer], heads=heads, ablation_type="zero")
+    lh_dict = {layer: [0]}
+    model1 = ablate_attn_module(model1, layer_head_dict=lh_dict, ablation_type="zero")
 
     data3 = []
     for m in (model1, model2):
