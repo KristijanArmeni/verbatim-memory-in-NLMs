@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel
 from test_data import transformer_test_data
-from src.wm_suite.wm_test_suite import Experiment
+from wm_suite.wm_test_suite import Experiment
 from models.transformer.train_gpt2_ import compute_perplexity
 import logging
 
