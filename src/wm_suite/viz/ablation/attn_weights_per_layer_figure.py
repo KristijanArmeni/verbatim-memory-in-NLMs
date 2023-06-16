@@ -493,6 +493,7 @@ def main(input_args=None):
     import argparse
     
     parser = argparse.ArgumentParser()
+    parser.add_argument("--which", type=str, choices=["all", "main_fig", "control_fig", "single_token_fig"])
     parser.add_argument("--datadir", type=str)
     parser.add_argument("--savedir", type=str)
 
@@ -503,43 +504,67 @@ def main(input_args=None):
 
     datadir = check_datadir(args.datadir)
 
+
+    if args.which is None:
+        raise ValueError("Please specify which figures to make by providing '--which' argument")
+
+    if args.which == "all":
+        
+        main_fig = True
+        control_fig = True
+        single_token_fig = True
+    
+    else:
+
+        main_fig = True if args.which == "main_fig" else False
+        control_fig = True if args.which == "control_fig" else False
+        single_token_fig = True if args.which == "single_token_fig" else False
+
+
     with plt.style.context("seaborn-ticks"):
 
-        fig1, fig1_, data = generate_plot2(datadir=datadir, query="colon-colon-p1")
-        if args.savedir:
-            save_png_pdf(fig1, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1"))
-            save_png_pdf(fig1_, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1_control"))
+        if main_fig:
 
-            fn = os.path.join(args.savedir, "gpt2_attn_colon-colon-p1" + ".csv")
-            logging.info(f"Saving {fn}")
-            data.to_csv(fn, sep='\t')
+            fig1, fig1_, data = generate_plot2(datadir=datadir, query="colon-colon-p1")
+
+            if args.savedir:
+                save_png_pdf(fig1, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1"))
+                save_png_pdf(fig1_, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1_control"))
+
+                fn = os.path.join(args.savedir, "gpt2_attn_colon-colon-p1" + ".csv")
+                logging.info(f"Saving {fn}")
+                data.to_csv(fn, sep='\t')
 
         # ===== CONTROL FIGURES: SWAP QUERY TOKENS ==== #
-        fig2, _, data = generate_plot2(datadir=datadir, query="colon-semicolon-p1")
-        if args.savedir:
+        if control_fig:
 
-            savename = "gpt2_attn_colon-semicolon-p1"
-            save_png_pdf(fig2, os.path.join(args.savedir, savename))
+            fig2, _, data = generate_plot2(datadir=datadir, query="colon-semicolon-p1")
 
-            fn = os.path.join(args.savedir, savename + ".csv")
-            logging.info(f"Saving {fn}")
-            data.to_csv(fn, sep='\t')
+            if args.savedir:
+
+                savename = "gpt2_attn_colon-semicolon-p1"
+                save_png_pdf(fig2, os.path.join(args.savedir, savename))
+
+                fn = os.path.join(args.savedir, savename + ".csv")
+                logging.info(f"Saving {fn}")
+                data.to_csv(fn, sep='\t')
 
 
-        fig3, _, data = generate_plot2(datadir=datadir, query="comma-comma-p1")
-        if args.savedir:
+            fig3, _, data = generate_plot2(datadir=datadir, query="comma-comma-p1")
+            if args.savedir:
 
-            savename = "gpt2_attn_comma-comma-p1"
-            save_png_pdf(fig3, os.path.join(args.savedir, savename))
-            
-            fn = os.path.join(args.savedir, savename + ".csv")
-            logging.info(f"Saving {fn}")
-            data.to_csv(fn, sep='\t')
+                savename = "gpt2_attn_comma-comma-p1"
+                save_png_pdf(fig3, os.path.join(args.savedir, savename))
+                
+                fn = os.path.join(args.savedir, savename + ".csv")
+                logging.info(f"Saving {fn}")
+                data.to_csv(fn, sep='\t')
 
         # single token plot
-        #fig4, fig4_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-n1")
-        #if args.savedir:
-        #    save_png_pdf(fig4, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1-n1"))
+        if single_token_fig:
+            fig4, fig4_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-n1")
+            if args.savedir:
+                save_png_pdf(fig4, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1-n1"))
 
         # ===== CONTROL FIGURES: ABLATED MODEL ==== #
         #fig5, fig5_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-ablate-11")
