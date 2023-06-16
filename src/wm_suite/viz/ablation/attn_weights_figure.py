@@ -9,6 +9,9 @@ from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 import matplotlib as mpl
 from matplotlib.colors import ListedColormap
+from matplotlib.ticker import AutoMinorLocator
+import matplotlib.patches as patches
+from src.wm_suite.wm_ablation import find_topk_attn
 from src.wm_suite.viz.func import filter_and_aggregate
 import logging
 from typing import List, Dict, Tuple
@@ -174,13 +177,13 @@ def plot_schematic(ax, d, colors, squeezed=False):
         text_fs, annot_fs = 15, 15
 
     ypos = [0.35, 0.35, 0.35, 0.35, 0.35, 0.35]
-    xarrow_from = [39, 39]
-    xarrow_to = [16.5, 35.5]
+    xarrow_from = [39, 39, 39]
+    xarrow_to = [16.5, 35.5, 13]
 
     if squeezed:
-        fractions = [0.06, 0.2]
+        fractions = [0.03, 0.06, 0.2]
     else:
-        fractions = [0.095, 0.2]
+        fractions = [0.1, 0.26, 0.15]
 
     ax.set_axis_off()
 
@@ -216,10 +219,12 @@ def plot_schematic(ax, d, colors, squeezed=False):
                                     'connectionstyle': f'bar,fraction={fractions[i]}'})
 
     if not squeezed:
-        ax.text(39.2, 0.8, "Query", color="tab:gray", fontsize=annot_fs, ha="left", fontweight="bold")
-        ax.text(39.2, 1.8, "Attention", color="tab:gray", fontsize=annot_fs, ha="left", fontweight="bold")
-        ax.text(28, 1.8, "Copying heads", color=colors[0], fontsize=annot_fs, ha="center", fontweight="bold")
-        ax.text(34.5, 1.15, "Local-context heads", color=colors[1], fontsize=annot_fs, ha="center", fontweight="bold")
+        ax.text(39.3, 0.8, "Query", color="tab:gray", fontsize=annot_fs, ha="left", fontweight="bold")
+        ax.text(39.3, 1.8, "Attention", color="tab:gray", fontsize=annot_fs, ha="left", fontweight="bold")
+
+        ax.text(26, 2, "Post-matching heads", color=colors[0], fontsize=annot_fs, ha="center", fontweight="bold")
+        ax.text(34.5, 1.3, "Recent-tokens heads", color=colors[1], fontsize=annot_fs, ha="center", fontweight="bold")
+        ax.text(18, 2.9, "Matching heads", color=colors[2], fontsize=annot_fs, ha="center", fontweight="bold")
 
     ax.text(-2.5, 0.35, "LM Input", color="tab:gray", fontsize=annot_fs, ha="center", fontweight="bold")
 
@@ -228,11 +233,11 @@ def plot_schematic(ax, d, colors, squeezed=False):
     return ax
 
 
-def plot_imshow_and_average(axes, dat, c):
+def plot_imshow_and_average(axes, dat:np.ndarray, selection: Dict=None, c: List="#000000"):
 
     m = np.mean(dat, axis=(0, 1))           # mean across sequences and heads
-    se = sem(np.mean(dat, axis=0), axis=0)
-    
+    se = sem(np.mean(dat, axis=0), axis=0)  # SE over head means
+
     axes[0].plot(m, '--o', markersize=8, mec='white', color=c)
     axes[0].fill_between(np.arange(dat.shape[-1]), y1=m+se, y2=m-se, color=c, alpha=0.3)
 
@@ -240,14 +245,45 @@ def plot_imshow_and_average(axes, dat, c):
         cmap = plt.cm.Blues
     elif c == "#ff7f0e":
         cmap = plt.cm.Oranges
+    elif c == "#2ca02c":
+        cmap = plt.cm.Greens
     elif c == "#000000":
         cmap = plt.cm.Greys
     im1 = axes[1].imshow(np.mean(dat, axis=0), cmap=cmap, aspect='auto', vmin=0, vmax=1)
+
+    if selection:
+        lays = [(i-0.45, h-0.5) for i in selection.keys() if selection[i] for h in selection[i]]
+        for xy in lays:
+            rect = patches.Rectangle(xy, 0.99, 0.99, linewidth=1.3, edgecolor="black", facecolor="none")
+            axes[1].add_patch(rect) 
+
+        textc = "white"
+        if c == "#2ca02c":
+            textc = "black"
+        xycoord = [(i, h+0.1) for i in selection.keys() if selection[i] for h in selection[i]]
+        xyinds = [(i, h) for i in selection.keys() if selection[i] for h in selection[i]]
+        for xy, xyind in zip(xycoord, xyinds):
+
+            value = round(np.mean(dat, axis=0)[xyind[1], xyind[0]], 2)
+            texts = f"{value:.2f}".lstrip("0")
+            if value == 1.0:
+                texts = f"{value:.0f}"
+            
+            axes[1].text(x=xy[0], y=xy[1], s=texts, ha="center", va="center", c=textc, fontweight="semibold")
+
 
     return axes, im1, (m, se)
 
 
 def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, query_id: int, target_id: int, n_tokens_per_window: int):
+    """"
+    plots 3-by-3 figure with line plots and images
+
+    Parameters:
+    ----------
+    x : np.ndarray, shape = (samples, timesteps, n_heads, n_layers)
+
+    """
 
     # token indices from nearest to furthest
     first_list = [target_id + i for i in np.arange(1, n_tokens_per_window*2, 2)]
@@ -256,22 +292,35 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, query_id: int, 
     logging.info(f"Summing attn weights over early tokens: {np.array(first_list)}")
     logging.info(f"Summing attn weights over late tokens: {np.array(preceding)}")
 
+    # sum over selected positions and plot image
+    sel = target_id
+    xtmp = x[:, sel, ...]
+
+    selection, _, _ = find_topk_attn(x, topk=10, tokens_of_interest=[target_id], seed=12345)
+    _, img1, d1 = plot_imshow_and_average(ax[:, 0], xtmp, selection=selection, c=colors[2])
+
+    # sum over selected positions and plot image
     sel = np.zeros(shape=x.shape[1], dtype=bool)
     sel[np.array(first_list)] = True
     xtmp = np.sum(x[:, sel, ...], 1)
-    _, img1, d1 = plot_imshow_and_average(ax[:, 0], xtmp, c=colors[0])
 
+    selection, _, _ = find_topk_attn(x, topk=10, tokens_of_interest=first_list, seed=12345)  # to mark top-10 cells
+    _, img2, d2 = plot_imshow_and_average(ax[:, 1], xtmp, selection=selection, c=colors[0])
+
+    # sum over selected positions and plot image
     sel = np.zeros(shape=x.shape[1], dtype=bool)
     sel[np.array(preceding)] = True
     xtmp = np.sum(x[:, sel, ...], 1)
-    _, img2, d2 = plot_imshow_and_average(ax[:, 1], xtmp, c=colors[1])
+
+    selection, _, _ = find_topk_attn(x, topk=10, tokens_of_interest=preceding, seed=12345)  # to mark top-10 cells
+    _, img3, d3 = plot_imshow_and_average(ax[:, 2], xtmp, selection=selection, c=colors[1])
 
     for a in ax[0, :]:
         a.grid(visible=True, linewidth=0.5)
         a.spines['top'].set_visible(False)
         a.spines['right'].set_visible(False)
 
-    return ax, (img1, img2), (d1, d2)
+    return ax, (img1, img2, img3), (d1, d2, d3)
 
 
 def generate_plot2(datadir, query):
@@ -336,7 +385,7 @@ def generate_plot2(datadir, query):
 
     x1, d1 = get_data(os.path.join(datadir, fn))
 
-    clrs = plt.rcParams['axes.prop_cycle'].by_key()['color'][0:2]
+    clrs = plt.rcParams['axes.prop_cycle'].by_key()['color'][0:3]
 
     # ===== PLOT ===== #
 
@@ -344,18 +393,19 @@ def generate_plot2(datadir, query):
 
         fig = plt.figure(figsize=(12, 6.5))
 
-        gs = GridSpec(3, 2, height_ratios=[0.6, 1.2, 2.2], figure=fig)
+        gs = GridSpec(3, 3, height_ratios=[0.6, 1, 2.5], figure=fig)
 
         ax1 = fig.add_subplot(gs[0, :])
+
+        # first row axes
         ax2 = fig.add_subplot(gs[1, 0])
         ax3 = fig.add_subplot(gs[1, 1], sharey=ax2)
-        ax4 = fig.add_subplot(gs[2, 0], sharex=ax2)
-        ax5 = fig.add_subplot(gs[2, 1], sharex=ax3, sharey=ax4)
+        ax4 = fig.add_subplot(gs[1, 2], sharey=ax2)
 
-        for a in (ax3, ax5):
-            plt.setp(a.get_yticklabels(), visible=False)
-        for a in (ax2, ax3):
-            plt.setp(a.get_xticklabels(), visible=False)
+        # second row axes
+        ax5 = fig.add_subplot(gs[2, 0], sharex=ax2)
+        ax6 = fig.add_subplot(gs[2, 1], sharex=ax3, sharey=ax5)
+        ax7 = fig.add_subplot(gs[2, 2], sharex=ax4, sharey=ax5)
 
         # for the main figure, font can remain smaller (as the figure itself is lareger), 
         if query in ["colon-colon-p1"]:
@@ -363,14 +413,29 @@ def generate_plot2(datadir, query):
         else:
             plot_schematic(ax1, d1, colors=clrs, squeezed=True)
 
-        axes = np.array([[ax2, ax3], [ax4, ax5]])
+        axes = np.array([[ax2, ax3, ax4], [ax5, ax6, ax7]])
+
+        for a in (ax3, ax4, ax6, ax7):
+            plt.setp(a.get_yticklabels(), visible=False)
+        for a in (ax2, ax3, ax4):
+            plt.setp(a.get_xticklabels(), visible=False)
+
+        #axes[0, 0].set_title("1")
+        #axes[0, 1].set_title("2")
+        #axes[0, 2].set_title("3")
+        #axes[1, 0].set_title("3")
+        #axes[1, 1].set_title("4")
+        #axes[1, 2].set_title("5")
+
+        #plt.show()
 
     else:
 
-        fig, axes = plt.subplots(2, 2, figsize=(12, 5.5), sharex="all", sharey="row", 
+        fig, axes = plt.subplots(2, 2, figsize=(11, 5.5), sharex="all", sharey="row", 
                                gridspec_kw={'height_ratios': [1, 2]},
                                )
 
+    # ==== PLOT FIGURE ===== #
     ax, imgs, data1 = attn_weights_per_head_layer(ax=axes, x=x1, colors=clrs, 
                                                   target_id=13, 
                                                   query_id=query_idx,
@@ -391,13 +456,16 @@ def generate_plot2(datadir, query):
 
     for a in ax[0, :]:
         a.set_ylim([0, 0.5])
-        a.set_yticks([0, 0.25, 0.5])
-        a.set_yticklabels([0, '', 0.5])
+        a.set_yticks([0, 0.5])
+        a.yaxis.set_minor_locator(AutoMinorLocator())
+        a.grid(visible=True, which="both", linewidth=0.5)
 
     # ticks and ticklabels
     for a in ax[1, :]:
         a.set_xticks(np.arange(0, 11, 2))
         a.set_xticklabels(np.arange(1, 12, 2), fontsize=lfs)
+        a.yaxis.set_minor_locator(AutoMinorLocator(2))
+        a.xaxis.set_minor_locator(AutoMinorLocator(2))
 
  
     ax[0, 0].tick_params(axis="y", labelsize=lfs)
@@ -407,13 +475,14 @@ def generate_plot2(datadir, query):
     # colorbar
     cax = ax[1, 0].inset_axes([1.03, 0, 0.03, 1])
     cbar = fig.colorbar(imgs[0], ax=ax[1, 0], cax=cax, ticks=[0, 0.5, 1])
-    #cbar.ax.set_ylabel("Attention weight", fontsize=lfs-3)
-
-    cbar.ax.set_yticklabels([0, 0.5, 1])
-    cbar.ax.tick_params(labelsize=lfs-3)
+    cbar.ax.set_yticklabels(["", "", ""])
 
     cax = ax[1, 1].inset_axes([1.03, 0, 0.03, 1])
     cbar = fig.colorbar(imgs[1], ax=ax[1, 1], cax=cax, ticks=[0, 0.5, 1])
+    cbar.ax.set_yticklabels(["", "", ""])
+
+    cax = ax[1, 2].inset_axes([1.03, 0, 0.03, 1])
+    cbar = fig.colorbar(imgs[2], ax=ax[1, 2], cax=cax, ticks=[0, 0.5, 1])
     cbar.ax.set_yticklabels([0, 0.5, 1])
     cbar.ax.set_ylabel("Attention weight", fontsize=lfs-3)
     cbar.ax.tick_params(labelsize=lfs-3)
