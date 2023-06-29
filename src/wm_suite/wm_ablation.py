@@ -100,7 +100,7 @@ class GPT2AttentionAblated(GPT2Attention):
         return attn_output, attn_weights
 
 
-def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: int) -> Dict:
+def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List[int], seed: int) -> Dict:
 
     """
     Takes attn.shape = (samples, timesteps, heads, layer) of attention weights and finds <topk> heads across layers
@@ -111,6 +111,10 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List, seed: 
         array of attention weights
     topk : int
         top-10 criterion
+    tokens_of_interest: list
+        a list of indices representing token positions to sum the attention weights over
+    seed : int
+        random seed for choosing heads in control ablations
 
     Returns:
     dict : dict
