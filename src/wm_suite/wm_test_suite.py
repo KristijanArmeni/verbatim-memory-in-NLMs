@@ -2,20 +2,16 @@
 import json
 import sys, os
 import argparse
-from itertools import product
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config, \
-                         BertForMaskedLM, TransfoXLLMHeadModel, TransfoXLTokenizer, \
-                         AutoTokenizer
+from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config
 import torch
 from torch.utils.data import Dataset, DataLoader
 from tqdm import trange
-from typing import List, Dict, Tuple, Any, Sequence
+from typing import List, Dict, Tuple, Any
 from tqdm import tqdm, trange
 import logging
-from pprint import pprint
 
 # own modules
 sys.path.append("/home/ka2773/project/lm-mem/src")
@@ -729,18 +725,11 @@ def runtime_code(input_args: List = None):
     model = GPT2LMHeadModel.from_pretrained(argins.checkpoint)
 
     ismlm = False
-    if argins.checkpoint == "bert-base-uncased":
-        model = BertForMaskedLM.from_pretrained(argins.checkpoint)
-        tokenizer = AutoTokenizer.from_pretrained(argins.tokenizer)
-        ismlm = True
 
-    elif argins.checkpoint == "gpt2":
+    if argins.checkpoint == "gpt2":
         model = GPT2LMHeadModel.from_pretrained("gpt2")
         tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
 
-    elif argins.checkpoint == "transfo-xl-wt103":
-        model = TransfoXLLMHeadModel.from_pretrained(argins.checkpoint)
-        tokenizer = TransfoXLTokenizer.from_pretrained(argins.tokenizer)
 
     # or initialize a random model
     if argins.model_type == "random":
@@ -901,7 +890,7 @@ def runtime_code(input_args: List = None):
 
     test_set_path = '/home/ka2773/project/lm-mem/data/wikitext-103/wiki.test.tokens'
     logging.info(f"Loading {test_set_path}...")
-    toks, ids = WikiTextDataset(tokenizer=tokenizer).retokenize_txt(test_set_path)
+    _, ids = WikiTextDataset(tokenizer=tokenizer).retokenize_txt(test_set_path)
 
     #initialize experiment class
     experiment2 = Experiment(model=model, ismlm=ismlm,
@@ -943,6 +932,7 @@ def runtime_code(input_args: List = None):
 
     experiment.model.to("cpu")
 
+
     # ===== SAVING MODEL AND PERPLEXITY ===== #
 
     if argins.model_statedict_filename:
@@ -958,6 +948,7 @@ def runtime_code(input_args: List = None):
         fn = os.path.join(argins.output_dir, argins.model_statedict_filename.replace(".pt", "_ppl.json"))
         with open(fn, 'w') as fh:
             json.dump(ppl_dict, fh)
+
 
     # ===== FORMAT AND SAVE OUTPUT FILES ===== #
 
@@ -994,6 +985,7 @@ def runtime_code(input_args: List = None):
     outpath = os.path.join(argins.output_dir, argins.output_filename)
     logging.info("Saving {}".format(os.path.join(outpath)))
     output_df.to_csv(outpath, sep="\t")
+
 
 # ===== RUN ===== #
 if __name__ == "__main__":
