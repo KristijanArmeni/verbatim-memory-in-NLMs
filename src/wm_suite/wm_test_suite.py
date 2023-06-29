@@ -19,6 +19,8 @@ from data.wt103.dataset import WikiTextDataset
 from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits, make_word_lists, concat_and_tokenize_inputs
 from wm_suite.io.stimuli import prefixes, prompts
 from wm_suite.wm_ablation import ablate_attn_module, find_topk_attn, find_topk_intersection, from_labels_to_dict, from_dict_to_labels
+from wm_suite.io.test_ds import get_test_data
+
 
 logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
 
@@ -76,6 +78,7 @@ def code_relative_markers(markers: npt.ArrayLike) -> Tuple[np.ndarray, np.ndarra
 
     return np.hstack(marker_pos), np.hstack(marker_pos_rel)
 
+
 def merge_states(x:np.ndarray, bpe_split_indices:np.ndarray, tokens:np.ndarray, mergefun=np.mean):
     """
     finds repeated indices marked by bpe_split_indices() then loops
@@ -112,6 +115,7 @@ def merge_states(x:np.ndarray, bpe_split_indices:np.ndarray, tokens:np.ndarray, 
             new_tokens[sel[1::]] = ''
 
     return x, new_tokens, tokens_orig
+
 
 # ===== EXPERIMENT CLASS ===== #
 
@@ -625,8 +629,9 @@ def setup():
 
     return 0
 
+
 # ===== RUNTIME CODE WRAPPER ===== #
-def runtime_code(input_args: List = None):
+def main(input_args: List = None):
 
     from ast import literal_eval
     from string import punctuation
@@ -637,6 +642,7 @@ def runtime_code(input_args: List = None):
 
     parser.add_argument("--setup", action="store_true",
                         help="downloads and places nltk model and Tokenizer")
+    parser.add_argument("--test_run", action="store_true")
     parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3", "sce4", "sce5", "sce6", "sce7"],
                         help="str, which scenario to use")
     parser.add_argument("--condition", type=str, choices=["repeat", "permute", "control"])
@@ -645,7 +651,7 @@ def runtime_code(input_args: List = None):
     parser.add_argument("--list_type", type=str, choices=["random", "categorized"])
     parser.add_argument("--pretokenize_moses", action="store_true")
     parser.add_argument("--noun_list_file", type=str, help="json file with noun lists")
-    parser.add_argument("--tokenizer", type=str)
+    parser.add_argument("--tokenizer", type=str, default="gpt2")
     parser.add_argument("--context_len", type=int, default=1024,
                         help="length of context window in tokens for transformers")
     parser.add_argument("--model_type", type=str, default="pretrained",
@@ -665,7 +671,7 @@ def runtime_code(input_args: List = None):
     parser.add_argument("--model_seed", type=int, default=12345,
                         help="seed value to be used in torch.manual_seed() prior to calling GPT2Model()")
     parser.add_argument("--batch_size", type=int, default=1)
-    parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
+    parser.add_argument("--device", type=str, choices=["cpu", "cuda"], default="cpu",
                         help="whether to run on cpu or cuda")
     parser.add_argument("--model_statedict_filename", type=str, default="")
     parser.add_argument("--output_dir", type=str,
@@ -706,6 +712,14 @@ def runtime_code(input_args: List = None):
 
     if argins.setup:
         setup()
+
+    # if test run, populate input arguments manually (these are corresponding to choices in wm_suite.io.test_ds.get_test_data())
+    if argins.test_run:
+        
+        logging.info("Doing a test run...")
+        argins.scenario = "sce1"
+        argins.list_len = 3
+        argins.prompt_len = "1"
 
     sys.path.append("/home/ka2773/project/lm-mem/src/data/")
 
@@ -832,39 +846,44 @@ def runtime_code(input_args: List = None):
 
     # ===== TOKENIZE AND PREPARE THE VIGNETTES ===== #
 
-    # fname = os.path.join(data_dir, argins.input_filename)
-    word_lists1, word_lists2 = make_word_lists(argins.noun_list_file, condition=argins.condition)
+    if argins.test_run:
+
+        input_sequences, input_sequences_info = get_test_data()
+
+    else:
+        # fname = os.path.join(data_dir, argins.input_filename)
+        word_lists1, word_lists2 = make_word_lists(argins.noun_list_file, condition=argins.condition)
 
 
-    # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== #
+        # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== #
 
-    # this tells the bpe split counter what symbol to look for and how it codes for splits
-    bpe_split_marker_dict = {"gpt2": "Ġ",
-                             "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
-                             "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "Ġ",
-                             "bert-base-uncased": "##",
-                             "transfo-xl-wt103": None}
+        # this tells the bpe split counter what symbol to look for and how it codes for splits
+        bpe_split_marker_dict = {"gpt2": "Ġ",
+                                "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
+                                "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "Ġ",
+                                "bert-base-uncased": "##",
+                                "transfo-xl-wt103": None}
 
-    # this tells the bpe split counter how these symbols are used
-    marker_logic_dict = {"gpt2": "outside",
-                         "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
-                         "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "outside",
-                         "bert-base-uncased": "within",
-                         "transfo-xl-wt103": None}
+        # this tells the bpe split counter how these symbols are used
+        marker_logic_dict = {"gpt2": "outside",
+                            "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
+                            "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "outside",
+                            "bert-base-uncased": "within",
+                            "transfo-xl-wt103": None}
 
-    # this routine loops over prompts and prefixes
-    # it keeps track of that in meta_data
-    logging.info("Tokenizing and concatenating sequences...")
-    input_sequences, input_sequences_info = concat_and_tokenize_inputs(prompt=prompts[argins.scenario][argins.prompt_len],
-                                                                       prefix=prefixes[argins.scenario]["1"],
-                                                                       word_list1=word_lists1[f"n{argins.list_len}"],
-                                                                       word_list2=word_lists2[f"n{argins.list_len}"],
-                                                                       ngram_size=str(argins.list_len),
-                                                                       pretokenize_moses=argins.pretokenize_moses,
-                                                                       tokenizer=tokenizer,
-                                                                       bpe_split_marker=bpe_split_marker_dict[argins.tokenizer],
-                                                                       marker_logic=marker_logic_dict[argins.tokenizer],
-                                                                       ismlm=ismlm)
+        # this routine loops over prompts and prefixes
+        # it keeps track of that in meta_data
+        logging.info("Tokenizing and concatenating sequences...")
+        input_sequences, input_sequences_info = concat_and_tokenize_inputs(prompt=prompts[argins.scenario][argins.prompt_len],
+                                                                        prefix=prefixes[argins.scenario]["1"],
+                                                                        word_list1=word_lists1[f"n{argins.list_len}"],
+                                                                        word_list2=word_lists2[f"n{argins.list_len}"],
+                                                                        ngram_size=str(argins.list_len),
+                                                                        pretokenize_moses=argins.pretokenize_moses,
+                                                                        tokenizer=tokenizer,
+                                                                        bpe_split_marker=bpe_split_marker_dict[argins.tokenizer],
+                                                                        marker_logic=marker_logic_dict[argins.tokenizer],
+                                                                        ismlm=ismlm)
 
     input_sequences_info["prompt"] = [argins.prompt_len for _ in input_sequences_info['list_len']]
 
@@ -990,4 +1009,4 @@ def runtime_code(input_args: List = None):
 # ===== RUN ===== #
 if __name__ == "__main__":
 
-    runtime_code()
+    main()
