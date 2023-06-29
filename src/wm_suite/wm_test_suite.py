@@ -162,7 +162,7 @@ class Experiment(object):
         self.loss_fct_batched = torch.nn.CrossEntropyLoss(reduction="none")
 
         self.model.to(device)
-        
+
 
     # loop over input list
     def ppl(self, 
@@ -365,44 +365,7 @@ class Experiment(object):
             )
         return ppls, final_llhs
 
-    def start_sequential(self, input_sequences_ids:List[torch.tensor]=None) -> List:
-        """
-        Parameters:
-        ---------
-        input_sequences_ids: list of tensors
-        
-        Returns:
-        -------
-        outputs : dict
-            with fields: 
-                "sequence_ppl": List,
-                "surp": List
-                "token" List: 
-
-        """
-
-        # output dict
-        outputs = {
-            "sequence_ppl": [],
-            "surp": [],
-            "token": [],
-            }
-
-        # loop over trials (input sequences)
-        for _, input_ids in enumerate(input_sequences_ids):
-
-            # this returns surprisal (neg log ll)
-            ppl, surp, toks = self.ppl(input_ids=input_ids.to(self.device),
-                                       context_len=self.context_len,
-                                       stride=1)
-
-            # store the output tuple and
-            outputs["sequence_ppl"].append(ppl)
-            outputs["surp"].append(surp)
-            outputs["token"].append(toks)
-
-        return outputs
-
+    
 
     def get_batch(self, sequence_list: List[torch.Tensor]) -> Tuple[torch.Tensor]:
         """Converts list of sequences into a padded torch Tensor and its lengths"""
@@ -475,7 +438,7 @@ class Experiment(object):
 
     def start(self, input_sequences: List[torch.Tensor]) -> Dict[str, List[any]]:
         """
-        experiment.start() will loop over prefaces, prompts, and word_lists and run the .ppl() method on them
+        experiment.start() will loop over prefaces, prompts, and word_lists and run the .start_batched() method on them
         
         Returns:
         ========
@@ -485,12 +448,9 @@ class Experiment(object):
         }
         """
 
-        #if self.batch_size > 1:
         logging.info(f"Batch size = {self.batch_size}, calling self.start_batched()")
         return self.start_batched(input_sequences)
 
-        #logging.info(f"Batch size = {self.batch_size}, calling self.start_sequential()")
-        #return self.start_sequential(input_sequences)
 
     def merge_bpe_splits(self, outputs: Dict) -> Dict:
 
@@ -715,7 +675,7 @@ def main(input_args: List = None):
 
     # if test run, populate input arguments manually (these are corresponding to choices in wm_suite.io.test_ds.get_test_data())
     if argins.test_run:
-        
+
         logging.info("Doing a test run...")
         argins.scenario = "sce1"
         argins.list_len = 3
