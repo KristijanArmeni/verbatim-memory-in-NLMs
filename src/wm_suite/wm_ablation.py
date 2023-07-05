@@ -1,12 +1,12 @@
 
 import json
+from ast import literal_eval
 import torch
 import numpy as np
 import torch.nn as nn
 from transformers.models.gpt2.modeling_gpt2 import GPT2Attention
 from typing import List, Dict, Tuple
 import logging
-import transformers
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -256,3 +256,117 @@ def ablate_attn_module(model, layer_head_dict, ablation_type):
                                           config=model.config)
 
     return model
+
+
+def get_pairs(lh_dict):
+
+    # enumerate all pairs
+    all_pairs = [(l, h) for l in lh_dict.keys() for h in lh_dict[l]]
+
+    n_el = len(all_pairs)
+
+    # populate a square matrix of all pair combinations with string formatted as list
+    b = np.zeros((n_el, n_el), dtype=object)
+    for i in range(n_el):
+        for j in range(n_el):
+            b[i, j] = "[" + str(all_pairs[i]) + ", " + str(all_pairs[j]) + "]"  # a dict as str
+
+    # get the lower triangular values (without the diagonal)
+    low_trig = np.tril(b, -1)
+    rows, cols = low_trig.nonzero()  # find non-zero rows and column indices
+
+
+    def string2dict(instr: str) -> List:
+        """
+        Helper function to convert string formated as alist into a python dict
+        """
+        tup1 = literal_eval(instr)[0]   
+        tup2 = literal_eval(instr)[1]
+
+        # if the two heads are from the same layer, only one key in the dict is needed
+        if tup1[0] == tup2[0]:
+            out = {tup1[0]: [tup1[1], tup2[1]]}
+        # if across layers, just do a normal list comprehension, with a separate key for each layer
+        else:
+            out = {tup[0]: [tup[1]] for tup in literal_eval(instr)}
+
+        return out
+
+    pairs = []
+    for i in range(len(rows)):
+        pairs.append(string2dict(low_trig[rows[i], cols[i]]))
+
+    return pairs
+
+
+def get_lh_dict(attn, which: str, seed=None) -> Tuple:
+    """
+    Helper function defining the possible ablation combinations in wm_test_suite based on attention pattenrs in attn_dict
+    Parameters:
+    ----------
+    """
+
+    lh_dict = None
+
+    if seed is None:
+        seed = 12345  # a dummy seed, find_topk_attn expects it
+        return_random = False
+    elif seed is not None:
+        return_random = True
+        logging.info("Seed argument provided to get_lh_dict, returning random selection...")
+
+    if which in ["top-5-postmatching", "top-10-postmatching", "top-15-postmatching", "top-20-postmatching"]:
+
+        k = int(which.split("-")[1])  # extract the k value from the string
+        out_tuple = find_topk_attn(attn, 
+                                   topk=k, 
+                                   tokens_of_interest=[14, 16, 18], 
+                                   seed=seed)
+
+        lh_dict = out_tuple[0]
+        if return_random:
+            lh_dict = out_tuple[1]
+
+    elif which in ["top-5-matching", "top-10-matching", "top-15-matching", "top-20-matching"]:
+        
+        k = int(which.split("-")[1])  # extract the k value from the string
+        out_tuple = find_topk_attn(attn, 
+                                   topk=k, 
+                                   tokens_of_interest=[13], 
+                                   seed=seed)
+        
+        lh_dict = out_tuple[0]
+        if return_random:
+            lh_dict = out_tuple[1]
+
+    elif which in ["top-5-recent", "top-10-recent", "top-15-recent", "top-20-recent"]:
+
+        k = int(which.split("-")[1])  # extract the k value from the string
+        out_tuple = find_topk_attn(attn, 
+                                   topk=k, 
+                                   tokens_of_interest=[44, 43, 42], 
+                                   seed=seed)
+
+        lh_dict = out_tuple[0]
+        if return_random:
+            lh_dict = out_tuple[1]
+
+    elif which in ["induction-matching-intersect"]:
+
+        lh_dict = find_topk_intersection(attn, tois=([13], [14, 16, 18]), topk=20, seed=12345)
+
+
+    elif which == "matching-bottom5":
+
+            # find effect of ablation of onlyt the last 5 matching heads (seems to have disproportionaly strong effect)
+            top15_matching, _, _ = find_topk_attn(attn, topk=15, tokens_of_interest=[13], seed=12345)
+            top20_matching, _, _ = find_topk_attn(attn, topk=20, tokens_of_interest=[13], seed=12345)
+
+            top15labels, top20labels = from_dict_to_labels(top15_matching), from_dict_to_labels(top20_matching)
+            
+            resid_labels = list(set(top20labels) - set(top15labels))
+
+            lh_dict = from_labels_to_dict(resid_labels)
+
+
+    return lh_dict
