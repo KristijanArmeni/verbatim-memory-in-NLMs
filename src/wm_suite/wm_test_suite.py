@@ -616,8 +616,10 @@ def main(input_args: List = None):
                         help="length of context window in tokens for transformers")
     parser.add_argument("--model_type", type=str, default="pretrained",
                         help="model label controlling which checkpoint to load")
-    parser.add_argument("--ablate_layers", type=str)
-    parser.add_argument("--ablate_heads", type=str)
+    parser.add_argument("--ablate_layer_head_dict", type=str,
+                        help="A string formated as dict, specifying which layers and heads to ablate (assuming 0-indexing)." 
+                        "E.g. to ablate heads 0, 1, 2 in layer 1 and heads 5, 6 in layer 5, you type:" 
+                        "'{1:, [0, 1, 2], 5: [5, 6]}'")
     parser.add_argument("--ablate_topk_heads")
     parser.add_argument("--ablate_topk_heads_seed", type=int,
                         help="Random seed to select random heads for ablation (control experiment)")
@@ -742,14 +744,12 @@ def main(input_args: List = None):
 
         logging.info(f"Running ablation experiment")
 
-        if argins.ablate_heads is not None:
+        if argins.ablate_layer_head_dict is not None:
 
-            logging.info(f"Setting attention heads {argins.ablate_heads} in layers {argins.ablate_layers} to 0.")
-            logging.info(f"Setting attention heads {argins.ablate_heads} in layers {argins.ablate_layers} to 0.")
+            logging.info(f"Using the following ablation dict:\n{argins.ablate_layer_head_dict}")
 
             # now set the selected head in selected layer to 0
-            lay = literal_eval(argins.ablate_layers)
-            heads = literal_eval(argins.ablate_heads)
+            lh_dict = literal_eval(argins.ablate_layer_head_dict)
         
         elif argins.ablate_topk_heads:
 
@@ -790,18 +790,16 @@ def main(input_args: List = None):
 
                 lh_dict, lh_dict_ctrl, _ = out_tuple
 
-            # by default use the non-randomly selected heads
-            layer_head_dict = lh_dict
+        # by default use the non-randomly selected heads
+        layer_head_dict = lh_dict
 
-            # if seed is provided by the user, use random selection of heads instead
-            if argins.ablate_topk_heads_seed:
-                logging.info(f"Ablating {argins.ablate_topk_heads} random heads")
-                layer_head_dict = lh_dict_ctrl
+        # if seed is provided by the user, use random selection of heads instead
+        if argins.ablate_topk_heads_seed:
+            logging.info(f"Ablating {argins.ablate_topk_heads} random heads")
+            layer_head_dict = lh_dict_ctrl
 
-            # ablate heads by setting GPT2Attention() classes in selected layers to GPT2AttentionAblated()
-            model = ablate_attn_module(model, 
-                                       layer_head_dict=layer_head_dict,
-                                       ablation_type="zero")
+        # ablate heads by setting GPT2Attention() classes in selected layers to GPT2AttentionAblated()
+        model = ablate_attn_module(model, layer_head_dict=layer_head_dict, ablation_type="zero")
 
 
     # ===== TOKENIZE AND PREPARE THE VIGNETTES ===== #
@@ -917,8 +915,8 @@ def main(input_args: List = None):
     if argins.model_statedict_filename:
 
         fn = os.path.join(argins.output_dir, argins.model_statedict_filename)
-        logging.info(f"Saving {fn}")
-        torch.save(experiment.model.state_dict(), fn)
+        #logging.info(f"Saving {fn}")
+        #torch.save(experiment.model.state_dict(), fn)
 
             # store wikitext-103 perplexity
         ppl_dict = {"wt103_ppl": round(ppl.cpu().item(), 2),
