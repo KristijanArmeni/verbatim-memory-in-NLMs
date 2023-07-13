@@ -233,7 +233,7 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List[int], s
 
 def from_dict_to_labels(layer_head_dict: Dict) -> List:
 
-    return [f"L{l}.H{h}" for i, l in enumerate(layer_head_dict) for h in layer_head_dict[i] if layer_head_dict[i]]
+    return [f"L{l}.H{h}" for i, l in enumerate(layer_head_dict) for h in layer_head_dict[l] if layer_head_dict[l]]
 
 
 def from_labels_to_dict(labels: List) -> Dict:
