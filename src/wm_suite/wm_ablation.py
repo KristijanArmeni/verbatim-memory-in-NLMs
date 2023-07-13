@@ -32,8 +32,39 @@ def shuffle_weights(x: torch.Tensor) -> torch.Tensor:
 
 
 class GPT2AttentionAblated(GPT2Attention):
-
+    """
+    A subclass of GPT2Attention class for ablating attention heads.
+    """
     def __init__(self, attn_instance, ablation_type:str, heads: List, *args, **kwargs):
+
+        """
+        Parameters
+        ----------
+        attn_instance : GPT2Attention
+            The instance of GPTAttention class whos parameters are coppied.
+            The GPT2Attention._attn method will be overriden to 0 attention weights.
+        ablation_type : str
+            "zero" or "shuffle", whether or not to zero the weights or shuffle them.
+        heads : List[int]
+            Zero-indexed list of integers, indicating which heads to ablate (0 to 11).
+        
+        
+        Examples
+        --------
+        ```python
+        from transformers import GPT2LMHeadModel
+        model = GPT2LMHeadModel.from_pretrained("gpt2")
+        
+        # select a layer to perform ablations on
+        layer_idx = 2    # ablate layer 3
+        layer = model.transformer.h[layer_idx]
+        
+        # override the .attn attribute with the GPT2AttentionAblated class
+        layer.attn = GPT2AttentionAblated(attn_instance=layer.attn,
+                                          ablation_type="zero",
+                                          heads=[1, 2, 3]) 
+        ```
+        """
 
         super(GPT2AttentionAblated, self).__init__(*args, **kwargs)
 
@@ -106,9 +137,10 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List[int], s
     Takes attn.shape = (samples, timesteps, heads, layer) of attention weights and finds <topk> heads across layers
     that have highest attention scores summed over timesteps <tokens_of_interest> and averaged over samples.
 
-    Parameters:
-    attn : np.ndarray, shape = (samples, timesteps, heads, layer)
-        array of attention weights
+    Parameters
+    ----------
+    attn : np.ndarray
+        array of attention weights (shape = (samples, timesteps, heads, layer))
     topk : int
         top-10 criterion
     tokens_of_interest: list
@@ -116,7 +148,8 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List[int], s
     seed : int
         random seed for choosing heads in control ablations
 
-    Returns:
+    Returns
+    -------
     dict : dict
         A dictionary with every layer as key and selected heads as list entry for each layer key.
     """
@@ -234,11 +267,30 @@ def find_topk_intersection(attn, tois: List, topk: int, seed: int) -> Dict:
 
 def ablate_attn_module(model, layer_head_dict, ablation_type):
     """
-    Parameters:
+    Parameters
     ----------
-    model : hugginface model
+    model : GPT2LMHeadModel
+        instance of the transformers.GPT@LMHeadModel class whose GPT2Attention classes
+        will be overriden with GPT2AttentionAblated class.
     layer_head_dict: dict
-        dict specifying which heads in which layers to ablate, e.g. {0: [0, 1, 2], 1: [], 2: [5, 6, 12]}
+        A dict specifying which heads in which layers to ablate, e.g. {0: [0, 1, 2], 1: [], 2: [5, 6, 12]}
+
+    Returns
+    -------
+    GPT2LMHeadModel
+        Instance of GPT2LMHeadModel with GPT2AttentionAblation module assigned to the specified layers.
+    
+    Examples
+    --------
+    from transformers import GPT2LMHeadModel
+    
+    # initiate a gpt2 model instance
+    model = GPT2LMHeadModel.from_pretrained("gpt2")
+    # inititate a model with ablated heads 0, 1, 2 in layer 0 and heads 10, 11, 12 in layer 1
+    model_ablated = ablate_attn_module(model, 
+                                      layer_head_dict={0: [0, 1, 2], 1: [10, 11, 12]}, 
+                                      ablation_type="zero")
+    
     """
     
     # ablate only layers that have certain heads selected

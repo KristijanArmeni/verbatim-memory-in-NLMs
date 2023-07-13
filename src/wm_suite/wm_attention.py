@@ -21,23 +21,23 @@ def load_json_file(fname: str) -> Dict:
     return d
 
 
-def get_attention_weights(model, sequences: List[int], query_tokens_ids: List[int], device: str) -> List[torch.Tensor]:
-
+def get_attention_weights(model: GPT2LMHeadModel, sequences: List[int], query_tokens_ids: List[int], device: str) -> List[torch.Tensor]:
     """
     get_attention_weigts() loops over <sequences> and extracts attention weights (o.attentions field in GPT2LMHeadModel output)
 
-    Parameters:
+    Parameters
     ----------
     model : transformers.GPT2LMHeadModel
+        The model to extract attention weights from.
     sequences : List[List[int]]
         tensors with tokens converted to indices fed as inputs to model
     query_token_ids : List[int]
         for every sequence in <sequences>, it contains an int indexing the position of the query token (the token model is attending from)
 
-    Returns:
+    Returns
     -------
-    attn : list, len(attn) - number of sequences
-        list of tensors (shape = (layers, heads, sequence_len)) conatining attention weights from query token to past context in sequence
+    list
+        list of tensors (shape = (layers, heads, sequence_len)) conatining attention weights from query token to past context in sequence.
     """
 
 
@@ -84,14 +84,14 @@ def find_cue_token_ids(markers: np.ndarray) -> Tuple[int, int]:
 
 def find_list_punctuation_index(markers, subtok_markers):
     """
-    Parameters:
+    Parameters
     ----------
     markers : np.array
         array containing indices marking subparts of the string (index 3 indicates second list)
     subtok_markers : np.array
         array containing indices marking whether or not a token was split into BPE subwords (-1 markes punctuation)
 
-    Returns:
+    Returns
     -------
     a : np.array
         array containing indices of punctuation symbols in the second list
@@ -108,12 +108,12 @@ def replace_cue_symbols(sequences: List, tokens: List, markers: List, symbols: T
     A helper function that loops over all the lists in the experiment, finds indices of cue symbols (symbols that
     introduce list1 and list2) and replaces them with tokens stored in <symbols>
     
-    Parameters:
+    Parameters
     ----------
     symbols : Tuple
         a tuple, containing tokens introducing the first and the second list respectively
     
-    Returns:
+    Returns
     -------
     output_tuple : Tuple[List, List]
     """

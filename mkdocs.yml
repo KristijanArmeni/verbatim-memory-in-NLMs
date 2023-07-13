@@ -1,12 +1,19 @@
 site_name: LM Working Memory Test Suite
 nav:
   - "Home": index.md
-  - "API": api.md
+  - "Documentation": api.md
+theme:
+  name : material
 plugins:
   mkdocstrings:
     handlers:
       python:
-        paths: [src]  # search packages in the src folder
+        paths: [src/wm_suite]  # search packages in the src folder
         options:
-          show_root_heading: false
+          show_root_heading: true
+          show_category_heading: false
+          show_root_full_path: false
+          heading_level: 3
           docstring_style: numpy
+    watch:
+      - src/wm_suite

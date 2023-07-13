@@ -52,13 +52,14 @@ def code_relative_markers(markers: npt.ArrayLike) -> Tuple[np.ndarray, np.ndarra
     Helper function to code the position of timesteps relative to lists of nouns within each sequences.
     These markers are used for aggregating prior to visualization.
 
-    Parameters:
+    Parameters
     ----------
     markers : np.ndarray or array-like
 
-    Returns:
-    tuple of arrays containing the marker positions and relative marker positions
+    Returns
     -------
+    Tuple[np.ndarray, np.ndarray]
+    
     """
     marker_pos, marker_pos_rel = [], []
 
@@ -81,8 +82,15 @@ def code_relative_markers(markers: npt.ArrayLike) -> Tuple[np.ndarray, np.ndarra
 
 def merge_states(x:np.ndarray, bpe_split_indices:np.ndarray, tokens:np.ndarray, mergefun=np.mean):
     """
-    finds repeated indices marked by bpe_split_indices() then loops
+    Finds repeated indices marked by bpe_split_indices() then loops
     and merges over these indices by applying <mergefun> to axis 0
+    
+    Parameters
+    ----------
+
+    Returns
+    -------
+    
     """
 
     # find which tokens where split by looking at indices that occur more than once (i.e. for each BPE subword)
@@ -122,13 +130,13 @@ def merge_states(x:np.ndarray, bpe_split_indices:np.ndarray, tokens:np.ndarray, 
 class Experiment(object):
 
     """
-    Exp() class contains wrapper methods to run experiments with transformer models.
+    Experiment() class contains wrapper methods to run experiments with transformer models.
 
-    Attributes:
+    Attributes
     ----------
-    model (required) : nn.Module
+    model : nn.Module
         pytorch module representing the model
-    ismlm (optional) : boolean
+    ismlm : bool
         whether the model is a masked language model or not (default = False)
     device : str
         'cuda' or 'cpu' what compute device to use for running the models
@@ -140,15 +148,30 @@ class Experiment(object):
         the number of sequences evaluated in parallel
     use_cache : bool
         whether or not to reuse key-value matrices from previous time-steps in transformers
-
-
-    Methods:
-    -------
-
+    loss_fct_batched : instace of `torch.nn.CrossEntropyLoss(reduction="none")`
 
     """
 
     def __init__(self, model, ismlm, tokenizer, context_len, batch_size, stride, use_cache, device):
+        """
+        Parameters
+        ----------
+        model (required) : nn.Module
+            pytorch module representing the model (is moved to self.device upon initialization)
+        ismlm (optional) : bool
+            whether the model is a masked language model or not (default = False)
+        device : str
+            'cuda' or 'cpu' what compute device to use for running the models
+        tokenizer (required) : PreTrainedTokenizer()
+            tokenizer class from HuggingFace (https://huggingface.co/transformers/v4.6.0/main_classes/tokenizer.html#transformers.PreTrainedTokenizer) 
+        context_len : int
+            the length of context window for computing transformer surprisal (default = 1024)
+        batch_size : int
+            the number of sequences evaluated in parallel
+        use_cache : bool
+            whether or not to reuse key-value matrices from previous time-steps in transformers
+
+        """
 
         self.model = model
         self.ismlm = ismlm
@@ -171,10 +194,10 @@ class Experiment(object):
             stride: int) -> Tuple[List[float], List[float], List[str]]:
 
         """
-        method for computing token-by-token negative log likelihood on input_ids
+        Method for computing token-by-token negative log likelihood on input_ids
         taken from: https://huggingface.co/transformers/perplexity.html
 
-        Parameters:
+        Parameters
         ----------
         input_ids (required) : torch.tensor
             indices representing tokens to be fed as input to model
@@ -183,8 +206,8 @@ class Experiment(object):
         stride (required) : int
             the step (in number of tokens) in between two subsequent loops for computing perplexity
 
-        Returns:
-        ------
+        Returns
+        -------
         ppl : 
         llh :
         tokens : 
@@ -388,17 +411,18 @@ class Experiment(object):
 
     def start_batched(self, input_sequences: List[List[torch.Tensor]]) -> Dict:
         """
-        Parameters:
+        Parameters
         ----------
-        input_sequences : list of sequence lists
+        input_sequences : List[List[torch.Tensor]]
 
-        Returns:
+        Returns
         -------
-        output_dict : dict
-            dict with keys:
-            'surp': surprisals for each token in the sequence
-            'sequence_ppl': perplexity (in bits) for every sequence
-            'token': token strings for each time step (if self.stride == 1)
+        dict
+            dict with keys:  
+
+                - 'surp' surprisals for each token in the sequence  
+                - 'sequence_ppl': perplexity (in bits) for every sequence  
+                - 'token': token strings for each time step (if self.stride == 1)
         """
 
         # initiate dataset class and data loader
@@ -438,14 +462,8 @@ class Experiment(object):
 
     def start(self, input_sequences: List[torch.Tensor]) -> Dict[str, List[any]]:
         """
-        experiment.start() will loop over prefaces, prompts, and word_lists and run the .start_batched() method on them
-        
-        Returns:
-        ========
-        outputs = {
-            "sequence_ppls": [],
-            "surprisals": [],
-        }
+        experiment.start() will call the [wm_suite.Experiment][] method on `input_sequences`
+
         """
 
         logging.info(f"Batch size = {self.batch_size}, calling self.start_batched()")
