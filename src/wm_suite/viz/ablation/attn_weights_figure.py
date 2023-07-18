@@ -178,12 +178,14 @@ def plot_schematic(ax, d, colors, squeezed=False):
 
     ypos = [0.35, 0.35, 0.35, 0.35, 0.35, 0.35]
     xarrow_from = [39, 39, 39]
-    xarrow_to = [16.5, 35.5, 13]
+    xarrow_to = [16.5, 35.5, 13.5]
 
     if squeezed:
-        fractions = [0.03, 0.06, 0.2]
+        fractions = [0.08, 0.26, 0.1]
+        lw = 2
     else:
         fractions = [0.1, 0.26, 0.15]
+        lw = 1.7
 
     ax.set_axis_off()
 
@@ -214,7 +216,7 @@ def plot_schematic(ax, d, colors, squeezed=False):
                         fontsize=14,
                         arrowprops={'arrowstyle': '->', 
                                     'color': f"{colors[i]}",
-                                    "lw": 1.7,
+                                    "lw": lw,
                                     'ls':'dashed', 
                                     'connectionstyle': f'bar,fraction={fractions[i]}'})
 
@@ -227,13 +229,12 @@ def plot_schematic(ax, d, colors, squeezed=False):
         ax.text(18, 2.9, "Matching heads", color=colors[2], fontsize=annot_fs, ha="center", fontweight="bold")
 
     ax.text(-2.5, 0.35, "LM Input", color="tab:gray", fontsize=annot_fs, ha="center", fontweight="bold")
-
     ax.set_xticks(np.arange(0, 40))
 
     return ax
 
 
-def plot_imshow_and_average(axes, dat:np.ndarray, selection: Dict=None, c: List="#000000"):
+def plot_imshow_and_average(axes, dat:np.ndarray, selection: Dict=None, c:str="#000000", img_txt_c="white"):
 
     m = np.mean(dat, axis=(0, 1))           # mean across sequences and heads
     se = sem(np.mean(dat, axis=0), axis=0)  # SE over head means
@@ -269,13 +270,13 @@ def plot_imshow_and_average(axes, dat:np.ndarray, selection: Dict=None, c: List=
             if value == 1.0:
                 texts = f"{value:.0f}"
             
-            axes[1].text(x=xy[0], y=xy[1], s=texts, ha="center", va="center", c=textc, fontweight="semibold")
+            axes[1].text(x=xy[0], y=xy[1], s=texts, ha="center", va="center", c=img_txt_c, fontweight="semibold")
 
 
     return axes, im1, (m, se)
 
 
-def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, query_id: int, target_id: int, n_tokens_per_window: int):
+def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors: List, query_id: int, target_id: int, n_tokens_per_window: int):
     """"
     plots 3-by-3 figure with line plots and images
 
@@ -297,7 +298,7 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, query_id: int, 
     xtmp = x[:, sel, ...]
 
     selection, _, _ = find_topk_attn(x, topk=10, tokens_of_interest=[target_id], seed=12345)
-    _, img1, d1 = plot_imshow_and_average(ax[:, 0], xtmp, selection=selection, c=colors[2])
+    _, img1, d1 = plot_imshow_and_average(ax[:, 0], xtmp, selection=selection, c=colors[2], img_txt_c=img_text_colors[0])
 
     # sum over selected positions and plot image
     sel = np.zeros(shape=x.shape[1], dtype=bool)
@@ -305,7 +306,7 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, query_id: int, 
     xtmp = np.sum(x[:, sel, ...], 1)
 
     selection, _, _ = find_topk_attn(x, topk=10, tokens_of_interest=first_list, seed=12345)  # to mark top-10 cells
-    _, img2, d2 = plot_imshow_and_average(ax[:, 1], xtmp, selection=selection, c=colors[0])
+    _, img2, d2 = plot_imshow_and_average(ax[:, 1], xtmp, selection=selection, c=colors[0], img_txt_c=img_text_colors[1])
 
     # sum over selected positions and plot image
     sel = np.zeros(shape=x.shape[1], dtype=bool)
@@ -313,7 +314,7 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, query_id: int, 
     xtmp = np.sum(x[:, sel, ...], 1)
 
     selection, _, _ = find_topk_attn(x, topk=10, tokens_of_interest=preceding, seed=12345)  # to mark top-10 cells
-    _, img3, d3 = plot_imshow_and_average(ax[:, 2], xtmp, selection=selection, c=colors[1])
+    _, img3, d3 = plot_imshow_and_average(ax[:, 2], xtmp, selection=selection, c=colors[1], img_txt_c=img_text_colors[2])
 
     for a in ax[0, :]:
         a.grid(visible=True, linewidth=0.5)
@@ -436,7 +437,11 @@ def generate_plot2(datadir, query):
                                )
 
     # ==== PLOT FIGURE ===== #
-    ax, imgs, data1 = attn_weights_per_head_layer(ax=axes, x=x1, colors=clrs, 
+    if query in ["colon-colon-p1"]:
+        img_txt_clrs = ["black", "white", "white"]
+    else:
+        img_txt_clrs = ["black", "black", "white"]
+    ax, imgs, data1 = attn_weights_per_head_layer(ax=axes, x=x1, colors=clrs, img_text_colors=img_txt_clrs,
                                                   target_id=13, 
                                                   query_id=query_idx,
                                                   n_tokens_per_window=n_tokens_per_window)
