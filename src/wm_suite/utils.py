@@ -4,10 +4,14 @@ import argparse
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
+# Armeni et al, 2022
 OSF_FILES_URL = "https://osf.io/5gy7x/files/osfstorage"
 GPT2_RESULTS_OSF_URL = "https://osf.io/download/s3zv9/"
 WT103_TRANSFORMER_OSF_URL = "https://osf.io/download/ejwug/"
 AWD_LSTM_RESULTS_OSF_URL = "https://osf.io/download/yu7m3/"
+
+# Armeni et al, 2023
+OSF_URL_ATTN_WEIGHTS_ZIP = "https://osf.io/download/uye56/"
 
 
 def download_raw_data_zip(zipurl: str, path: str):
@@ -24,31 +28,60 @@ def download_raw_data_zip(zipurl: str, path: str):
     return 0
 
 
-def get_data(model: str, path: str):
+def download_raw_data_nonzip(url: str, path: str):
 
-    logging.info(f"Downloading .zip for {model} from {OSF_FILES_URL}")
+    myfile = requests.get(url)
+    
 
-    if model == "wt103_transformer":
+def get_data(which: str, path: str):
+
+    logging.info(f"Downloading .zip containing {which} data...")
+
+    if which == "wt103_transformer":
 
         download_raw_data_zip(zipurl=WT103_TRANSFORMER_OSF_URL, path=path)
 
-    elif model == "gpt2":
+    elif which == "gpt2":
 
         download_raw_data_zip(zipurl=GPT2_RESULTS_OSF_URL, path=path)
 
-    elif model == "awd_lstm":
+    elif which == "awd_lstm":
 
         download_raw_data_zip(zipurl=AWD_LSTM_RESULTS_OSF_URL, path=path)
+
+    elif which == "attention_weights":
+
+        download_raw_data_zip(zipurl=OSF_URL_ATTN_WEIGHTS_ZIP, path=path)
 
 
 def download_data():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, choices=["gpt2", "awd_lstm", "wt103_transformer"])
+    parser.add_argument("--which", type=str, choices=["all", "gpt2", "awd_lstm", "wt103_transformer"])
     parser.add_argument("--path", type=str)
 
     args = parser.parse_args()
 
-    get_data(model=args.model, path=args.path)
+    # download a single model or download all if no flag is provided
+    if args.which:
+        get_data(which=args.which, path=args.path)
+    else:
+        get_data(which="gpt2", path=path)
+        get_data(which="awd_lstm", path=path)
+        get_data(which="wt103_transformer", path=path)
 
-    return 0
+    return None
+
+
+# download the data for Armeni et al, 2023
+def download_data2():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--which", type=str, choices=["attention_weights", "ablation_experiment"])
+    parser.add_argument("--path", type=str)
+
+    args = parser.parse_args()
+
+    get_data(which=args.which, path=args.path)
+
+    return None

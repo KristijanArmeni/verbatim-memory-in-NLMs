@@ -25,6 +25,7 @@ wms_test_install = "wm_suite.cli.test:test_install"
 wms_reproduce_set-size = "wm_suite.cli.reproduce_set_size:reproduce_set_size_experiment"
 wms_preprocess_output = "wm_suite.preprocess_and_merge_csvfiles:main"
 wms_download_data = "wm_suite.utils:download_data"
+wms_download_data2 = "wm_suite.utils:download_data2"
 wms_reproduce_figs_conll2022 = "wm_suite.viz.make_figures:main"
 
 # this will build wheel as part of installation
