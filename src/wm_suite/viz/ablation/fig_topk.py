@@ -1,27 +1,28 @@
-# %%
-import os, json, sys
 
-os.environ["PROJ_ROOT"] = "C:\\users\\karmeni1\\project\\lm-mem\\src"
-sys.path.append(os.environ['PROJ_ROOT'])
-sys.path.append("/home/ka2773/project/lm-mem/src")
-
+# run `python proj_paths.py in the project roots to set paths
+#%%
+# utilities
+import os, json
 from itertools import product
+import logging
+from typing import List, Dict, Tuple
 
+# main modules
 import numpy as np
 import pandas as pd
-from scipy.stats import sem
-from scipy.stats import median_abs_deviation, bootstrap
+from scipy.stats import bootstrap
 from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.ticker import AutoMinorLocator
 import seaborn as sns
+
+# own modules
 from src.wm_suite.viz.func import filter_and_aggregate, set_manuscript_style
-from src.wm_suite.viz.utils import save_png_pdf
+from src.wm_suite.viz.utils import save_png_pdf, clrs
 from src.wm_suite.wm_ablation import find_topk_attn, from_dict_to_labels, from_labels_to_dict
-import logging
-from typing import List, Dict, Tuple
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+
 
 # %%
 def construct_filnames():
@@ -56,8 +57,12 @@ def construct_filnames():
 
 # %%
 def read_csv_add_columns(fullfile:str, model_id_string: str) -> pd.DataFrame:
-    
+    """
+    Read a .csv file into a dataframe and add a few columns such that it can work with 
+    viz.func.filter_and_aggregate
+    """
     tmp = pd.read_csv(fullfile, sep="\t")
+
     tmp['model'] = "gpt2"
     tmp['second_list'] = "repeat"
     tmp['list'] = "random"
@@ -91,51 +96,21 @@ def load_memory_ppl_files(datadir: str, csvfiles: Dict, jsonfiles: Dict) -> List
         with open(os.path.join(datadir, fn2), "r") as fh:
             dftmp["wt103_ppl"] = json.load(fh)["wt103_ppl"]
 
-
-    # read three extra files with different naming convetions
-    #fn3 = os.path.join(datadir, "ablation_gpt2_pretrained_sce1_1_3_random_repeat.csv")
-    #dftmp3 = read_csv_add_columns(fullfile=fn3, model_id_string="matching-bottom5")
-
-    #fn3_ = os.path.join(datadir, f"gpt2_ablate-matching-bottom5_ppl.json")
-    #logging.info(f"Loading {fn3_}")
-
-    #with open(os.path.join(datadir, fn3_), "r") as fh:
-    #    dftmp3["wt103_ppl"] = json.load(fh)["wt103_ppl"]
-
-
-    #fn2 = os.path.join(datadir, "ablation_gpt2_ablate-induction-matching-intersect_sce1_1_3_random_repeat.csv")
-    #dftmp2 = read_csv_add_columns(fullfile=fn2, model_id_string="induction-matching-intersect")
-    
-    #fn2_ = os.path.join(datadir, f"gpt2_ablate-induction-matching-intersect_ppl.json")
-    #logging.info(f"Loading {fn2_}")
-
-    #with open(os.path.join(datadir, fn2_), "r") as fh:
-    #    dftmp2["wt103_ppl"] = json.load(fh)["wt103_ppl"]
-
-
-    #fn3 = os.path.join(datadir, "ablation_gpt2_ablate-matching-bottom5_sce1_1_3_random_repeat.csv")
-    #dftmp3 = read_csv_add_columns(fullfile=fn3, model_id_string="matching-bottom5")
-
-    #fn3_ = os.path.join(datadir, f"gpt2_ablate-matching-bottom5_ppl.json")
-    #logging.info(f"Loading {fn3_}")
-
-    #with open(os.path.join(datadir, fn3_), "r") as fh:
-    #    dftmp3["wt103_ppl"] = json.load(fh)["wt103_ppl"]
-
-    #dfs.append(dftmp2)
-    #dfs.append(dftmp3)
-
     return dfs
 
 
 # %%
-def load_sva_files(datadir):
+def load_sva_files(datadir: str):
 
     return pd.read_csv(os.path.join(datadir, "ablate_top-k_sva.csv"), sep="\t")
 
 
 # %%
 def compute_repeat_surprisals(dataframes: List[pd.DataFrame]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    A wrapper around filter_and_aggregate(). Loops over data frames in <dataframes> and
+    and computes repeat surprisals on them. It also extracts wt103 perplexity from them.
+    """
 
     # AVERAGE ACROSS TIME STEPS
     variables = [{"list_len": [3]},
@@ -178,9 +153,9 @@ def get_sva_arrays_from_df(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
 
     return y_sva, sva_labels
 
-# %%
-# get percent reduction
-def select_conditions(labels: np.ndarray, substring: str, match:str="substring"):
+
+# %% get percent reduction
+def select_conditions(labels: np.ndarray, substring: str, match:str="substring") -> np.ndarray:
     
     if match == "substring":
         ids = np.stack([i for i, l in enumerate(labels) if substring in l])
@@ -192,9 +167,14 @@ def select_conditions(labels: np.ndarray, substring: str, match:str="substring")
 
     return ids
 
+
 # %%
 def aggregate_over(array: np.ndarray, labels: np.ndarray, substring: str, match: str, agg_func):
-    
+    """
+    Finds indices in `array` by matching `substring` in `labels` and applies `agg_func`
+    across the first dimenion of `array`: `agg_func(array[sel_indx, ...])`
+    """
+
     inds = select_conditions(labels, substring, match)
 
     array_agg = agg_func(array[inds, ...], axis=0)
@@ -336,7 +316,7 @@ def make_memory_plot(axes0, data1, data2, data3, data4, fs):
 
     unablated = data4
 
-    clrs = list(sns.color_palette("deep").as_hex())
+    clrs_deep = list(sns.color_palette("deep").as_hex())
 
     offset = 0.17
     for i, k in enumerate([1, 2, 3, 4]):
@@ -346,13 +326,13 @@ def make_memory_plot(axes0, data1, data2, data3, data4, fs):
             l2 = "Targeted ablation"
 
         #
-        plot_box_data(axes0[0], k-offset, y1_mem[i, :], horizontal=False, c=clrs[2], a=0.2,)
+        plot_box_data(axes0[0], k-offset, y1_mem[i, :], horizontal=False, c=clrs_deep[2], a=0.2,)
         ax = plot_box_data(axes0[0], k+offset, y1_mem_ctrl[i, :], m='^', c="silver", horizontal=False, a=0.4)
 
-        plot_box_data(axes0[1], k-offset, y2_mem[i, :], horizontal=False, c=clrs[0], a=0.2, label=l2)
+        plot_box_data(axes0[1], k-offset, y2_mem[i, :], horizontal=False, c=clrs_deep[0], a=0.2, label=l2)
         plot_box_data(axes0[1], k+offset, y2_mem_ctrl[i, :], m='^', c="silver", horizontal=False, a=0.4, label=l)
 
-        plot_box_data(axes0[2], k-offset, y3_mem[i, :], horizontal=False, c=clrs[1], a=0.3)
+        plot_box_data(axes0[2], k-offset, y3_mem[i, :], horizontal=False, c=clrs_deep[1], a=0.3)
         plot_box_data(axes0[2], k+offset, y3_mem_ctrl[i, :], m='^', c="silver", horizontal=False, a=0.4)
 
 
@@ -361,13 +341,13 @@ def make_memory_plot(axes0, data1, data2, data3, data4, fs):
 
 
     for a in axes0:
-        a.hlines(y=100, xmin=a.get_xlim()[0], xmax=a.get_xlim()[1], linestyle="--", color="black", label="No memory")
-        a.hlines(y=np.median(unablated), xmin=a.get_xlim()[0], xmax=a.get_xlim()[1], linestyle="-.", color="black", label="Unablated")
+        a.hlines(y=100, xmin=a.get_xlim()[0], xmax=a.get_xlim()[1], linestyle="--", color="black", label="Score indicating\nno memory")
+        a.hlines(y=np.median(unablated), xmin=a.get_xlim()[0], xmax=a.get_xlim()[1], linestyle="-.", color="black", label="Unablated model")
         a.fill_between(x=np.arange(a.get_xlim()[0], a.get_xlim()[1]), y1=ci[0], y2=ci[1], alpha=0.2, color='black', zorder=0)
 
-    axes0[0].set_title("Matching heads", fontweight="semibold")
-    axes0[1].set_title("Post-matching heads", fontweight="semibold")
-    axes0[2].set_title("Recent-tokens heads", fontweight="semibold")
+    axes0[0].set_title("Matching heads", fontweight="semibold", color=clrs.green)
+    axes0[1].set_title("Post-match heads", fontweight="semibold", color=clrs.blue)
+    axes0[2].set_title("Recent-tokens heads", fontweight="semibold", color=clrs.orange)
 
     for a in axes0:
         a.set_xticks(range(1, 5))
@@ -445,14 +425,15 @@ def generate_plot(datadir, which):
 
         fig0, axes0 = plt.subplots(1, 3, figsize=(8, 3.5), sharey="all")
 
+        fs=14
         _ = make_memory_plot(axes0, 
                                 (y1_mem, y1_mem_ctrl), 
                                 (y2_mem, y2_mem_ctrl), 
                                 (y3_mem, y3_mem_ctrl),
                                 unabl_mem,
-                                fs=12)
+                                fs=fs)
 
-        fig0.supxlabel("Number of ablated attention heads (top-k)", fontsize=12)
+        fig0.supxlabel("Number of heads ablated (top-k)", fontsize=fs)
         #fig0.suptitle("Effect of targeted attention head ablations on short-term memory")
         plt.tight_layout()
 
