@@ -1,6 +1,5 @@
 import os
 import numpy as np
-from scipy.stats import sem, median_absolute_deviation
 import seaborn as sns
 from matplotlib import pyplot as plt
 import matplotlib
