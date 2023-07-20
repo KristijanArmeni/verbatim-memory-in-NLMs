@@ -243,7 +243,7 @@ def plot_data_points(ax, y):
 
     for i in range(y.shape[-1]):
         yjitter = np.random.RandomState(1234*i).uniform(-0.08, 0.08, len(y))
-        ax.scatter(((np.arange(len(y))+1)+xoffset)+yjitter, y[:, i], s=20, color="tab:gray", ec="white", zorder=2)
+        ax.scatter(((np.arange(len(y))+1)+xoffset)+yjitter, y[:, i], s=40, color="tab:gray", ec="white", zorder=2)
 
     return ax
 
@@ -366,8 +366,6 @@ def make_memory_plot(axes0, data1, data2, data3, data4, fs):
     leg.legendHandles[1].set_alpha(1)
     leg.legendHandles[1].set_color("gray")
 
-
-
     despine_axes_set_grid(axes0)
 
     axes0[0].annotate('', xy=(-1.1, 20), xytext=(-1.1, 100),                   
@@ -377,6 +375,57 @@ def make_memory_plot(axes0, data1, data2, data3, data4, fs):
     axes0[0].text(x=-1.5, y=60, s='Worse memory', fontsize=13, color="tab:gray", rotation=90, va="center")
 
     return axes0
+
+
+# %% make_ppl_plot
+def make_ppl_plot(axes, data1:Tuple, data2: Tuple, data3: Tuple, data4: np.ndarray, fs: int):
+
+    y1_ppl, y1_ppl_ctrl = data1   # matching heads
+    y2_ppl, y2_ppl_ctrl = data2   # postmatching heads
+    y3_ppl, y3_ppl_ctrl = data3   # recent-tokens heads
+
+    ppl_unabl = data4
+
+    agg_func2 = np.mean
+
+    y1_ppl_ctrl_m = agg_func2(y1_ppl_ctrl, axis=1)  # average over k-seeds
+    ax = plot_bar(axes[0], y=y1_ppl-ppl_unabl, xoffset=0.2, color=clrs.green, barwidth=0.4, label=None)
+    ax = plot_bar(axes[0], y=y1_ppl_ctrl_m-ppl_unabl, xoffset=-0.2, barwidth=0.4, color=clrs.green, hatch="//", label="Random heads")
+    ax = plot_data_points(axes[0], y1_ppl_ctrl-ppl_unabl)
+
+    y2_ppl_ctrl_m = agg_func2(y2_ppl_ctrl, axis=1)  # average over k-seeds
+    ax = plot_bar(axes[1], y=y2_ppl-ppl_unabl, xoffset=0.2, color=clrs.blue, barwidth=0.4, label=None)
+    ax = plot_bar(axes[1], y=y2_ppl_ctrl_m-ppl_unabl, xoffset=-0.2, color=clrs.blue, barwidth=0.4, hatch="//", label="Random heads")
+    ax = plot_data_points(axes[1], y2_ppl_ctrl-ppl_unabl)
+    
+    y3_ppl_ctrl_m = agg_func2(y3_ppl_ctrl, axis=1)  # average over k-seeds
+    ax = plot_bar(axes[2], y=y3_ppl-ppl_unabl, xoffset=0.2, color=clrs.orange, barwidth=0.4, label=None)
+    ax = plot_bar(axes[2], y=y3_ppl_ctrl_m-ppl_unabl, xoffset=-0.2, color=clrs.orange, barwidth=0.4, hatch="//", label="Random heads")
+    ax = plot_data_points(axes[2], y3_ppl_ctrl-ppl_unabl)
+
+    #for a in axes:
+    #    a.hlines(y=ppl_unabl, xmin=a.get_xlim()[0], xmax=a.get_xlim()[1], linestyle="-.", color="black", label="Unablated model")
+        
+    leg = axes[1].legend(fontsize=fs-3)
+    leg.legendHandles[0].set_fc("none")
+    leg.legendHandles[0].set_ec("darkgray")
+    leg.legendHandles[0].set_ec("darkgray")
+
+    axes[0].set_ylabel("Test set loss\n(change from unablated)", fontsize=fs)
+    axes[0].set_yticks([0, 1, 2, 3])
+    axes[0].set_yticklabels([0, 1, 2, 3], fontsize=fs)
+
+    for a in axes:
+        a.set_xticks([1, 2, 3, 4])
+        a.set_xticklabels([5, 10, 15, 20], fontsize=fs)
+
+    axes[0].set_title("Matching heads", fontweight="semibold", color=clrs.green, fontsize=fs)
+    axes[1].set_title("Post-match heads", fontweight="semibold", color=clrs.blue, fontsize=fs)
+    axes[2].set_title("Recent-tokens heads", fontweight="semibold", color=clrs.orange, fontsize=fs)
+
+    despine_axes_set_grid(axes)
+
+    return axes
 
 # %%
 def generate_plot(datadir, which):
@@ -406,11 +455,8 @@ def generate_plot(datadir, which):
     y6_ppl= y_ppl[y6_ids], 
     y6_sva = y_sva[y6_sva_ids]
 
-
-    # ===== PLOT ==== # 
-    #savedir = args.savedir
-
-    agg_func2 = np.mean
+    # common attributes
+    fs = 14
 
     # ===== FIGURE 1 ===== #
     # top row
@@ -423,7 +469,7 @@ def generate_plot(datadir, which):
         unabl_ids = select_conditions(xlabels, "unablated", match="exact").tolist()[0]
         unabl_mem = y_mem[unabl_ids]
 
-        fig0, axes0 = plt.subplots(1, 3, figsize=(8, 3.5), sharey="all")
+        fig, axes0 = plt.subplots(1, 3, figsize=(8, 3.5), sharey="all")
 
         fs=14
         _ = make_memory_plot(axes0, 
@@ -433,13 +479,68 @@ def generate_plot(datadir, which):
                                 unabl_mem,
                                 fs=fs)
 
-        fig0.supxlabel("Number of heads ablated (top-k)", fontsize=fs)
-        #fig0.suptitle("Effect of targeted attention head ablations on short-term memory")
-        plt.tight_layout()
-
-    return fig0
+        fig.supxlabel("Number of heads ablated (top-k)", fontsize=fs)
 
 
+    elif which == "ppl_fig":
+
+
+        _, _, y1_ppl, y1_ppl_ctrl, _, _ = prepare_data(y_mem, y_ppl, y_sva, xlabels, "matching", sva_xlabels, "matching")
+        _, _, y2_ppl, y2_ppl_ctrl, _, _ = prepare_data(y_mem, y_ppl, y_sva, xlabels, "copying", sva_xlabels, "copying")
+        _, _, y3_ppl, y3_ppl_ctrl, _, _ = prepare_data(y_mem, y_ppl, y_sva, xlabels, "previous", sva_xlabels, "previous")
+
+        unabl_ids = select_conditions(xlabels, "unablated", match="exact").tolist()[0]
+        unabl_ppl = y_ppl[unabl_ids]
+
+        fig, axes = plt.subplots(1, 3, figsize=(8, 3.5), sharey="all")
+
+        fs = 16
+        _ = make_ppl_plot(axes, 
+                          (y1_ppl, y1_ppl_ctrl),
+                          (y2_ppl, y2_ppl_ctrl),
+                          (y3_ppl, y3_ppl_ctrl),
+                          unabl_ppl,
+                          fs=fs
+
+        )
+
+        fig.supxlabel("Number of heads ablated (top-k)", fontsize=fs)
+
+    plt.tight_layout()
+
+    return fig
+
+
+def make_sva_plot():
+
+    fig, axes2 = plt.subplots(1, 3, figsize=(8, 3.5), sharey="all")
+
+    y1_sva_ctrl_m = agg_func2(y1_sva_ctrl, axis=1)  # average over k-seeds
+    ax = plot_bar(axes2[0], y=y1_sva, xoffset=0.2, color="tab:blue", barwidth=0.4, label=None)
+    ax = plot_bar(axes2[0], y=y1_sva_ctrl_m, xoffset=-0.2, barwidth=0.4, color="tab:blue", hatch="//", label="Random heads")
+    ax = plot_data_points(axes2[0], y1_sva_ctrl)
+
+    y2_sva_ctrl_m = agg_func2(y2_sva_ctrl, axis=1)  # average over k-seeds
+    ax = plot_bar(axes2[1], y=y2_sva, xoffset=0.2, barwidth=0.4, color="tab:orange", label=None)
+    ax = plot_bar(axes2[1], y=y2_sva_ctrl_m, xoffset=-0.2, barwidth=0.4, color="tab:orange", hatch="//", label="Random heads")
+    ax = plot_data_points(axes2[1], y2_sva_ctrl)
+    
+    y3_sva_ctrl_m = agg_func2(y3_sva_ctrl, axis=1)  # average over k-seeds
+    ax = plot_bar(axes2[2], y=y3_sva, xoffset=0.2, barwidth=0.4, color="tab:green", label=None)
+    ax = plot_bar(axes2[2], y=y3_sva_ctrl_m, xoffset=-0.2, barwidth=0.4, color="tab:green", hatch="//", label="Random heads")
+    ax = plot_data_points(axes2[2], y3_sva_ctrl)
+
+    axes2[0].set_ylabel("Error rate (%)")
+    axes2[0].legend()
+    fig4.supxlabel("Ablated heads", fontsize=10)
+    fig4.suptitle("Subject-verb agreement")
+
+    despine_axes_set_grid(axes2)
+
+    plt.tight_layout()
+    fig4.savefig(os.path.join(savedir, "copying-vs-previous_sva.png"), dpi=300)
+
+    return fig
 
 # %%
 def main(input_args=None):
@@ -453,7 +554,7 @@ def main(input_args=None):
 
     # for testing
     input_args = ["--datadir", "C:\\users\\karmeni1\\project\\lm-mem\\data\\ablation\\zero_attn\\topk",
-                   "--which", "memory_fig",
+                   "--which", "ppl_fig",
                    "--savedir", "C:\\users\\karmeni1\\project\\lm-mem\\fig\\ablation\\topk"]
 
     if input_args:
@@ -467,9 +568,19 @@ def main(input_args=None):
 
         fig = generate_plot(datadir=args.datadir, which="memory_fig")
         plt.show()
-        if args.savedir:
-            fn = os.path.join(args.savedir, "targeted_ablation_memory")
 
+        if args.savedir:
+
+            fn = os.path.join(args.savedir, "targeted_ablation_memory")
+            save_png_pdf(fig, fn)
+
+    elif args.which == "ppl_fig":
+
+        fig = generate_plot(datadir=args.datadir, which=args.which)
+        plt.show()
+
+        if args.savedir:
+            fn = os.path.join(args.savedir, "targeted_ablation_ppl")
             save_png_pdf(fig, fn)
 
     else:
@@ -503,60 +614,10 @@ def main(input_args=None):
         fig2.savefig(os.path.join(savedir, "matching_and_post-matching_memory.png"), dpi=300)
 
 
-        fig3, axes1 = plt.subplots(1, 3, figsize=figsize, sharey="all")
-
-        y1_ppl_ctrl_m = agg_func2(y1_ppl_ctrl, axis=1)  # average over k-seeds
-        ax = plot_bar(axes1[0], y=y1_ppl, xoffset=0.2, color="tab:blue", barwidth=0.4, label=None)
-        ax = plot_bar(axes1[0], y=y1_ppl_ctrl_m, xoffset=-0.2, barwidth=0.4, color="tab:blue", hatch="//", label="Random heads")
-        ax = plot_data_points(axes1[0], y1_ppl_ctrl)
-
-        y2_ppl_ctrl_m = agg_func2(y2_ppl_ctrl, axis=1)  # average over k-seeds
-        ax = plot_bar(axes1[1], y=y2_ppl, xoffset=0.2, color="tab:orange", barwidth=0.4, label=None)
-        ax = plot_bar(axes1[1], y=y2_ppl_ctrl_m, xoffset=-0.2, color="tab:orange", barwidth=0.4, hatch="//", label="Random heads")
-        ax = plot_data_points(axes1[1], y2_ppl_ctrl)
-        
-        y3_ppl_ctrl_m = agg_func2(y3_ppl_ctrl, axis=1)  # average over k-seeds
-        ax = plot_bar(axes1[2], y=y3_ppl, xoffset=0.2, color="tab:green", barwidth=0.4, label=None)
-        ax = plot_bar(axes1[2], y=y3_ppl_ctrl_m, xoffset=-0.2, color="tab:green", barwidth=0.4, hatch="//", label="Random heads")
-        ax = plot_data_points(axes1[2], y3_ppl_ctrl)
-
-        axes1[0].legend()
-        axes1[0].set_ylabel("Test-set loss")
-        fig3.supxlabel("Ablated heads", fontsize=10)
-        fig3.suptitle("Language modeling")
-
-        despine_axes_set_grid(axes1)
-
-        plt.tight_layout()
-        fig3.savefig(os.path.join(savedir, "copying-vs-previous_ppl.png"), dpi=300)
 
 
-        fig4, axes2 = plt.subplots(1, 3, figsize=figsize, sharey="all")
 
-        y1_sva_ctrl_m = agg_func2(y1_sva_ctrl, axis=1)  # average over k-seeds
-        ax = plot_bar(axes2[0], y=y1_sva, xoffset=0.2, color="tab:blue", barwidth=0.4, label=None)
-        ax = plot_bar(axes2[0], y=y1_sva_ctrl_m, xoffset=-0.2, barwidth=0.4, color="tab:blue", hatch="//", label="Random heads")
-        ax = plot_data_points(axes2[0], y1_sva_ctrl)
 
-        y2_sva_ctrl_m = agg_func2(y2_sva_ctrl, axis=1)  # average over k-seeds
-        ax = plot_bar(axes2[1], y=y2_sva, xoffset=0.2, barwidth=0.4, color="tab:orange", label=None)
-        ax = plot_bar(axes2[1], y=y2_sva_ctrl_m, xoffset=-0.2, barwidth=0.4, color="tab:orange", hatch="//", label="Random heads")
-        ax = plot_data_points(axes2[1], y2_sva_ctrl)
-        
-        y3_sva_ctrl_m = agg_func2(y3_sva_ctrl, axis=1)  # average over k-seeds
-        ax = plot_bar(axes2[2], y=y3_sva, xoffset=0.2, barwidth=0.4, color="tab:green", label=None)
-        ax = plot_bar(axes2[2], y=y3_sva_ctrl_m, xoffset=-0.2, barwidth=0.4, color="tab:green", hatch="//", label="Random heads")
-        ax = plot_data_points(axes2[2], y3_sva_ctrl)
-
-        axes2[0].set_ylabel("Error rate (%)")
-        axes2[0].legend()
-        fig4.supxlabel("Ablated heads", fontsize=10)
-        fig4.suptitle("Subject-verb agreement")
-
-        despine_axes_set_grid(axes2)
-
-        plt.tight_layout()
-        fig4.savefig(os.path.join(savedir, "copying-vs-previous_sva.png"), dpi=300)
 
         plt.show()
 
@@ -732,7 +793,7 @@ def main(input_args=None):
     #fig.savefig(os.path.join(savedir, "head_distribution.png"), dpi=300)
 
 
-    return 0
+    return None
 
 # %%
 if __name__ == "__main__":
