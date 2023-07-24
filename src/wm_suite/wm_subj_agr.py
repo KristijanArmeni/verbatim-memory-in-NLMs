@@ -10,7 +10,16 @@ import logging
 from typing import List, Tuple, Dict
 from tqdm import tqdm
 from itertools import product
-from wm_suite.wm_ablation import ablate_attn_module, find_topk_attn
+
+# own modules
+from wm_suite.wm_ablation import  (ablate_attn_module, 
+                                   find_topk_attn, 
+                                   find_topk_intersection, 
+                                   get_pairs,
+                                   from_dict_to_labels, 
+                                   from_labels_to_dict)
+
+from paths import PATHS as p
 
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -218,14 +227,32 @@ def run_experiment(dataset_path, model, tokenizer, cfg, comment, experiment_id):
     
     return output
 
+def get_test_input_args():
 
-def main(input_args=None):
+    logging.warning("Using test input_args, not collected through script!")
+
+    input_args = ["--outname", "svatest.csv", 
+                 "--savedir", "./",
+                 "--head_type", "matching",
+                 "--experiment", "pairs"]
+
+    return input_args
+
+
+def main(input_args=None, devtesting=False):
 
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--outname")
+    parser.add_argument("--head_type", choices=["matching", "post-match", "recent"])
+    parser.add_argument("--experiment", choices=["single_head", "pairs", "group"])
     parser.add_argument("--savedir")
+
+    # this defaults to false if called as a script
+    # override it if doing interactive development
+    if devtesting:
+        input_args = get_test_input_args()
 
     if input_args is None:
         args = parser.parse_args()
@@ -259,30 +286,71 @@ def main(input_args=None):
         "plural_plural_singular": "PPS",
     }
 
-    ablation_dict = {}
-    attn = dict(np.load("/scratch/ka2773/project/lm-mem/output/wm_attention/attention_weights_gpt2_colon-colon-p1.npz"))["data"]
+    
+    attn = dict(np.load(p.attn_w))["data"]
 
-    seeds = {54321: 0, 99999: 1, 56789: 2, 98765: 3, 11111: 4}
-    topk = [5, 10, 15, 20]
+    if args.experiment == "group":
 
-    combinations = list(product(topk, seeds))
+        ablation_dict = {}
 
-    for comb in combinations:
+        seeds = {54321: 0, 99999: 1, 56789: 2, 98765: 3, 11111: 4}
+        topk = [5, 10, 15, 20]
+
+        combinations = list(product(topk, seeds))
+
+        for comb in combinations:
+            
+            k, seed = comb
+            #hl_dict, hl_dict_ctrl, _ = find_topk_attn(attn, topk=k, tokens_of_interest=[14, 16, 18], seed=seed)
+
+            #ablation_dict[f"top-{k}-copying"] = {l:hl_dict[l] for l in hl_dict.keys()}
+            #ablation_dict[f"top-{k}-copying-ctrl-{seeds[seed]}"] = {l:hl_dict_ctrl[l] for l in hl_dict_ctrl.keys()}
+            
+            #hl_dict, hl_dict_ctrl, _ = find_topk_attn(attn, topk=k, tokens_of_interest=[42, 43, 44], seed=seed)
+            
+            #ablation_dict[f"top-{k}-previous"] = {l:hl_dict[l] for l in hl_dict.keys()}
+            #ablation_dict[f"top-{k}-previous-ctrl-{seeds[seed]}"] = {l:hl_dict_ctrl[l] for l in hl_dict_ctrl.keys()}
+
+            #hl_dict_matching, hl_dict_matching_ctrl, _ = find_topk_attn(attn, topk=k, tokens_of_interest=[13], seed=seed)
+            #ablation_dict[f"top-{k}-matching"] = {l:hl_dict_matching[l] for l in hl_dict_matching.keys()}
+            #ablation_dict[f"top-{k}-matching-ctrl-{seeds[seed]}"] = {l:hl_dict_matching_ctrl[l] for l in hl_dict_matching_ctrl.keys()}
+            
+            ablation_dict[f"top{k}-copying-and-matching"] = find_topk_attn(attn, tokens_of_interest=([13, 14]), topk=k, seed=seed)[0]
+            ablation_dict[f"top{k}-copying-and-matching-ctrl{seeds[seed]}"] = find_topk_attn(attn, tokens_of_interest=([13, 14]), topk=k, seed=seed)[1]
+
+        ablation_dict["induction-matching-intersect"] = find_topk_intersection(attn, tois=([13], [14, 16, 18]), topk=20, seed=12345)
         
-        k, seed = comb
-        hl_dict, hl_dict_ctrl, _ = find_topk_attn(attn, topk=k, tokens_of_interest=[14, 16, 18], seed=seed)
+        # find effect of ablation of onlyt the last 5 matching heads (seems to have disproportionaly strong effect)
+        top15_matching, _, _ = find_topk_attn(attn, topk=15, tokens_of_interest=[13], seed=12345)
+        top20_matching, _, _ = find_topk_attn(attn, topk=20, tokens_of_interest=[13], seed=12345)
+        top15labels, top20labels = from_dict_to_labels(top15_matching), from_dict_to_labels(top20_matching)
+        resid_labels = list(set(top20labels) - set(top15labels))
+        ablation_dict[f"matching-bottom5"] = from_labels_to_dict(resid_labels)
 
-        ablation_dict[f"top-{k}-copying"] = {l:hl_dict[l] for l in hl_dict.keys()}
-        ablation_dict[f"top-{k}-copying-ctrl-{seeds[seed]}"] = {l:hl_dict_ctrl[l] for l in hl_dict_ctrl.keys()}
+    if args.experiment == "pairs":
         
-        hl_dict, hl_dict_ctrl, _ = find_topk_attn(attn, topk=k, tokens_of_interest=[42, 43, 44], seed=seed)
-        
-        ablation_dict[f"top-{k}-previous"] = {l:hl_dict[l] for l in hl_dict.keys()}
-        ablation_dict[f"top-{k}-previous-ctrl-{seeds[seed]}"] = {l:hl_dict_ctrl[l] for l in hl_dict_ctrl.keys()}
+        seed = 12345
+
+        if args.head_type == "matching":
+
+            lh_dict, _, _ = find_topk_attn(attn, topk=20, tokens_of_interest=[13], seed=seed)
+            dicts = get_pairs(lh_dict)
+
+        elif args.head_type == "post-match":
+
+            lh_dict, _, _ = find_topk_attn(attn, topk=20, tokens_of_interest=[14, 16, 18], seed=seed)
+            dicts = get_pairs(lh_dict)
+
+        elif args.head_type == "recent":
+
+            lh_dict, _, _ = find_topk_attn(attn, topk=20, tokens_of_interest=[42, 43, 44], seed=seed)
+            dicts = get_pairs(lh_dict)
+
+        make_label = lambda x: "-".join(x)
+        ablation_dict = {f"{args.head_type}_"+make_label(from_dict_to_labels(d)): d for d in dicts}
 
     datasets = list(dataset_dict.keys())
     model_names = list(ablation_dict.keys())
-
     combinations = list(product(datasets, model_names))
 
     # this log will go into a dataframe for compact storing of main results
@@ -358,23 +426,6 @@ def main(input_args=None):
         logging.info(f"Saving {savename}\n")
         with open(savename, 'w') as fh:
             json.dump(outputs1, fh, indent=4)
-
-        #logging.info(f"Running input masking experiment for: {dataset_key} | combination: {dataset_dict[dataset_key]['comment']}")
-        #outputs2 = run_experiment(dataset_path=ds_path,
-        #                         model=model,
-        #                         tokenizer=tokenizer,
-        #                         cfg={"input_masking": True},
-        #                         comment=comment,
-        #                         experiment_id=f"{model_name}_{dataset_key}"
-        #                        )
-
-        #log['acc0_B'].append(outputs2['accuracy_baseline'] if outputs2 else "none")
-
-        # save outputs
-        #savename = os.path.join(args.savedir, f"sva_{model_name}_{dataset_key}_input-masking.json")
-        #logging.info(f"Saving {savename}\n")
-        #with open(savename, 'w') as fh:
-        #    json.dump(outputs2, fh, indent=4)
 
         logging.info("\n===== DONE =====\n")
 
