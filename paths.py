@@ -25,15 +25,24 @@ PATHS.src  # evaluates to /path/to/project/root/src
 import configparser
 import logging
 import sys
+import os
 from types import SimpleNamespace
 
 logging.basicConfig(level=logging.INFO)
 
-config = configparser.ConfigParser()
-config.read("./config.toml")
+if "PATHSCONFIG" not in os.environ:
 
+    path_to_config_toml = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pathsconfig.toml")
+
+    logging.info(f"Adding {path_to_config_toml} to os.environ['PATHSCONFIG'] variable")
+    os.environ['PATHSCONFIG'] = path_to_config_toml
+
+config = configparser.ConfigParser()
+config.read(os.environ['PATHSCONFIG'])
 PATHS = SimpleNamespace(**config["paths"])
 
+
 if __name__ == "__main__":
+
     logging.info(f"Adding {PATHS.src} to pythonpath")
     sys.path.append(PATHS.src)
