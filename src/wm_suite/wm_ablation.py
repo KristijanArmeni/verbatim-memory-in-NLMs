@@ -6,6 +6,7 @@ import numpy as np
 import torch.nn as nn
 from transformers.models.gpt2.modeling_gpt2 import GPT2Attention
 from typing import List, Dict, Tuple
+from itertools import product
 import logging
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -245,7 +246,10 @@ def from_labels_to_dict(labels: List) -> Dict:
         h_idx = int(label.split(".")[1][1::])  # split and grab first interger, e.g. 'L2.H11'
         out[l_idx].append(h_idx)
 
-    return out
+    # filter empty fields
+    out2 = {l: out[l] for l in out.keys() if out[l]}
+
+    return out2
 
 
 def find_topk_intersection(attn, tois: List, topk: int, seed: int) -> Dict:
@@ -351,7 +355,32 @@ def get_pairs(lh_dict):
     return pairs
 
 
-def get_lh_dict(attn, which: str, seed=None) -> Tuple:
+def get_triplets(lh_dict:Dict, pair:List) -> List[Tuple]:
+    """
+    Parameters
+    ----------
+    lh_dict : Dict
+        a dictionary (output of get_lh_dict()) specifying heads and layers to be ablated
+    pair : List
+        specifying the selected pair of heads to combine with the rest in top-20
+
+    Returns
+    -------
+    List[Tuple]
+        a list containing all triplet pairs
+    """
+
+    logging.info(f"Finding {len([(l, h) for l in lh_dict.keys() for h in lh_dict[l] if lh_dict[l]])} triplets for pair {pair}")
+
+    heads = from_dict_to_labels(lh_dict)
+
+    # combine all heads with the selected pair
+    triplets = [(e, pair[0], pair[1]) for e in heads if e not in pair]
+
+    return triplets
+
+
+def get_lh_dict(attn, which: str, seed=None) -> List:
     """
     Helper function defining the possible ablation combinations in wm_test_suite based on attention pattenrs in attn_dict
     Parameters:
@@ -367,7 +396,60 @@ def get_lh_dict(attn, which: str, seed=None) -> Tuple:
         return_random = True
         logging.info("Seed argument provided to get_lh_dict, returning random selection...")
 
-    if which in ["top-5-postmatching", "top-10-postmatching", "top-15-postmatching", "top-20-postmatching"]:
+
+    # ===== PAIRED ABLATIONS ===== #
+    if which == "top-20-matching-pairs":
+        
+        lh_dict, _, _ = find_topk_attn(attn, topk=20, tokens_of_interest=[13], seed=seed)
+        dicts = get_pairs(lh_dict)
+
+    elif which == "top-20-postmatching-pairs":
+
+        lh_dict, _, _ = find_topk_attn(attn, topk=20, tokens_of_interest=[14, 16, 18], seed=seed)
+        dicts = get_pairs(lh_dict)
+
+    elif which == "top-20-recent-pairs":
+
+        lh_dict, _, _ = find_topk_attn(attn, topk=20, tokens_of_interest=[42, 43, 44], seed=seed)
+        dicts = get_pairs(lh_dict)
+
+    elif which == "top-20-matching-triplets":
+
+        # get maximum pair (0-indexing)
+        max_pair = ["L0.H10", "L1.H11"]
+        
+        lh_dict, _, _ = find_topk_attn(attn, topk=20, tokens_of_interest=[13], seed=seed)
+
+        combs = get_triplets(lh_dict, max_pair)
+
+        dicts = [from_labels_to_dict(l) for l in combs]
+
+    elif which == "top-20-postmatching-triplets":
+
+        # get maximum pair (0-indexing)
+        max_pair = ["L10.H11", "L10.H0"]
+        
+        lh_dict, _, _ = find_topk_attn(attn, topk=20, tokens_of_interest=[14, 16, 18], seed=seed)
+
+        combs = get_triplets(lh_dict, max_pair)
+
+        dicts = [from_labels_to_dict(l) for l in combs]
+
+
+    elif which == "top-20-recent-triplets":
+
+        # get maximum pair (0-indexing)
+        max_pair = ["L3.H2", "L2.H3"]
+        
+        lh_dict, _, _ = find_topk_attn(attn, topk=20, tokens_of_interest=[42, 43, 44], seed=seed)
+
+        combs = get_triplets(lh_dict, max_pair)
+
+        dicts = [from_labels_to_dict(l) for l in combs]
+
+    # ==== MULTI-HEAD ABLATIONS ===== #
+
+    elif which in ["top-5-postmatching", "top-10-postmatching", "top-15-postmatching", "top-20-postmatching"]:
 
         k = int(which.split("-")[1])  # extract the k value from the string
         out_tuple = find_topk_attn(attn, 
@@ -378,6 +460,8 @@ def get_lh_dict(attn, which: str, seed=None) -> Tuple:
         lh_dict = out_tuple[0]
         if return_random:
             lh_dict = out_tuple[1]
+
+        dicts = [lh_dict]
 
     elif which in ["top-5-matching", "top-10-matching", "top-15-matching", "top-20-matching"]:
         
@@ -391,6 +475,8 @@ def get_lh_dict(attn, which: str, seed=None) -> Tuple:
         if return_random:
             lh_dict = out_tuple[1]
 
+        dicts = [lh_dict]
+
     elif which in ["top-5-recent", "top-10-recent", "top-15-recent", "top-20-recent"]:
 
         k = int(which.split("-")[1])  # extract the k value from the string
@@ -403,9 +489,13 @@ def get_lh_dict(attn, which: str, seed=None) -> Tuple:
         if return_random:
             lh_dict = out_tuple[1]
 
+        dicts = [lh_dict]
+
     elif which in ["induction-matching-intersect"]:
 
         lh_dict = find_topk_intersection(attn, tois=([13], [14, 16, 18]), topk=20, seed=12345)
+
+        dicts = [lh_dict]
 
 
     elif which == "matching-bottom5":
@@ -420,5 +510,7 @@ def get_lh_dict(attn, which: str, seed=None) -> Tuple:
 
             lh_dict = from_labels_to_dict(resid_labels)
 
+            dicts = [lh_dict]
 
-    return lh_dict
+
+    return dicts
