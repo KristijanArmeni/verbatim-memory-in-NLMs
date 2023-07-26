@@ -1,7 +1,7 @@
 # %%
 import os, json, sys
 
-from proj_paths import PATHS
+from paths import PATHS
 
 import numpy as np
 import pandas as pd
