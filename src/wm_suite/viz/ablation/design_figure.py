@@ -16,19 +16,27 @@ from itertools import product
 
 
 
-def generate_plot(datadir):
+def plot_schematic(d, ax):
 
     #load data
-    x, d = get_data(os.path.join(datadir, "gpt2_attn.npz"))
+    _, d = get_data(os.path.join(datadir, "gpt2_attn.npz"))
     
-    labels = [s.strip("Ġ") for s in d['tokens'][0][0:20]]
-    yvalues = np.zeros(len(labels))
-    yvalues[0:10] = 0.4
-    yvalues[10::] = 0.2
-    xvalues = np.tile(np.arange(10), 2)
-    
+    first_list = " ".join([s.strip("Ġ") for s in d['tokens'][0][13:20]])
+    ctx = " ".join([s.strip("Ġ") for s in d['tokens'][0][20:35]])
+    second_list = " ".join([s.strip("Ġ") for s in d['tokens'][0][-11:-1]])
 
-    fig, ax = plt.subplots(figsize=(10, 4))
+    #print(prefix)
+    #print(ctx)
+    #print(second_list)
+
+    labels = ["PREFIX", "... " + first_list, "INTERVENING TEXT", "... " + second_list]
+    xpos = [1, 4, 15, 22.5]
+    ypos = [0.4, 0.4, 0.4, 0.4]
+    xarrow_from = [27.9, 27.9]
+    xarrow_to = [9, 25]
+    fractions = [0.07, 0.2]
+
+    fig, ax = plt.subplots(figsize=(15, 3))
 
     spacing = 4
 
@@ -37,9 +45,25 @@ def generate_plot(datadir):
 
     for i, tk in enumerate(labels):
 
-        ax.text(xvalues[i]*spacing, yvalues[i], tk, color="black", fontsize=14, ha='left')
+        if i in [0, 2]:
+            ax.text(xpos[i], ypos[i], tk, color="black", fontsize=14, ha='left',
+            bbox=dict(facecolor='none', edgecolor='black', boxstyle='round,pad=1'))
 
-    ax.set_xticks(np.arange(0, 40, spacing))
+        else:    
+            ax.text(xpos[i], ypos[i], tk, color="black", fontsize=14, ha='left')
+
+    for i in range(len(xarrow_from)):
+
+            ax.annotate('', 
+                        xy=(xarrow_to[i], 0.5),
+                        xytext=(xarrow_from[i], 0.5), 
+                        va='center', 
+                        ha='center',
+                        fontsize=14,
+                        arrowprops={'arrowstyle': '->', 'ls':'dashed', 'connectionstyle': f'bar,fraction={fractions[i]}'})
+
+
+    ax.set_xticks(np.arange(0, 40))
 
     return fig
 
