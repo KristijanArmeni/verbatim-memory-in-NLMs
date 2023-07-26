@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from proj_paths import PATHS
+from paths import PATHS
 from src.wm_suite.wm_ablation import find_topk_attn, get_pairs, from_dict_to_labels
 from src.wm_suite.viz.func import filter_and_aggregate
 from src.wm_suite.viz.utils import save_png_pdf
@@ -92,11 +92,11 @@ def load_files(datadir, pairlabels, which: str):
     return f
 
 #%%
-datadir = "C:\\users\\karmeni1\\project\\lm-mem\\data\\ablation\\zero_attn\\topk\\pairs"
+#datadir = "C:\\users\\karmeni1\\project\\lm-mem\\data\\ablation\\zero_attn\\topk\\pairs"
 
-with open("C:\\users\\karmeni1\project\\lm-mem\\data\\attn\\postmatching-top20-pairs.json") as fh:
-    pairs_postmatching = json.load(fh)
-dfs = load_files(datadir, pairlabels=pairs_postmatching, which="postmatching")
+#with open("C:\\users\\karmeni1\project\\lm-mem\\data\\attn\\postmatching-top20-pairs.json") as fh:
+#    pairs_postmatching = json.load(fh)
+#dfs = load_files(datadir, pairlabels=pairs_postmatching, which="postmatching")
 
 
 # %% COMPUTE REPEAT SURPRISALS
