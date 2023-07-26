@@ -1,6 +1,4 @@
 import os, sys
-sys.path.append(os.environ["PROJ_ROOT"])
-
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
