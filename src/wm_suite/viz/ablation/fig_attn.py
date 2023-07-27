@@ -1,6 +1,4 @@
 import os, sys
-sys.path.append(os.environ["PROJ_ROOT"])
-
 import numpy as np
 import pandas as pd
 from scipy.stats import sem
@@ -8,7 +6,6 @@ from scipy.stats import bootstrap, median_abs_deviation
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 import matplotlib as mpl
-from matplotlib.colors import ListedColormap
 from matplotlib.ticker import AutoMinorLocator
 import matplotlib.patches as patches
 from src.wm_suite.wm_ablation import find_topk_attn

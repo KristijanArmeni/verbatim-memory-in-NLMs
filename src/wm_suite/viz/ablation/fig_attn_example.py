@@ -4,8 +4,9 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 import matplotlib.patches as patches
-from attn_weights_figure import get_data, save_png_pdf
+from src.wm_suite.viz.ablation.fig_attn import get_data
 from src.wm_suite.viz.func import set_manuscript_style
+from src.wm_suite.viz.utils import save_png_pdf
 import logging
 from typing import List, Dict, Tuple
 
