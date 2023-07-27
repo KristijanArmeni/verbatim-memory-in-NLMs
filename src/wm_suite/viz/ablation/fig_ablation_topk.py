@@ -106,41 +106,6 @@ def load_sva_files(datadir: str):
 
 
 # %%
-def compute_repeat_surprisals(dataframes: List[pd.DataFrame]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    A wrapper around filter_and_aggregate(). Loops over data frames in <dataframes> and
-    and computes repeat surprisals on them. It also extracts wt103 perplexity from them.
-    """
-
-    # AVERAGE ACROSS TIME STEPS
-    variables = [{"list_len": [3]},
-                {"prompt_len": [8]},
-                {"context": ["intact"]},
-                {"marker_pos_rel": [0]}]
-
-    # loop over data and average over time-points
-    dats_ = []
-    labs = []
-    wt103_ppls = []
-    for l in range(len(dataframes)):
-
-        dat_, _ = filter_and_aggregate(dataframes[l], 
-                                    model="gpt2", 
-                                    model_id=dataframes[l].model_id.unique().item(), 
-                                    groups=variables, 
-                                    aggregating_metric="mean")
-        
-        dats_.append(dat_)
-        wt103_ppls.append(dataframes[l].wt103_ppl.unique().item())
-        labs.append(dataframes[l].model_id.unique().item())
-
-    xlabels = np.array(labs)
-    y = np.stack([d.x_perc.to_numpy() for d in dats_])
-    y_ppl = np.log(np.stack(wt103_ppls))
-
-    return y, y_ppl, xlabels
-
-# %%
 def get_sva_arrays_from_df(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
 
     df.model = df.model.str.replace("top-", "top")
