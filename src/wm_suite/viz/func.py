@@ -1,3 +1,7 @@
+"""
+A module with functions used across several scripts. Mostly to prepare data prior to plotting and the plotting functions
+themselves.
+"""
 import os
 import numpy as np
 import seaborn as sns
@@ -5,6 +9,7 @@ from matplotlib import pyplot as plt
 import matplotlib
 import pandas as pd
 import logging
+from typing import List, Dict, Tuple
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -26,9 +31,9 @@ def set_manuscript_style(style=None):
     return 0
 
 
-def filter_and_aggregate(datain, model, model_id, groups, aggregating_metric):
+def filter_and_aggregate(datain: pd.DataFrame, model: str, model_id: str, groups:List[Dict], aggregating_metric: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Parameters:
+    Parameters
     ----------
     datain : dataframe
         dataframe which is filtered and aggregated over
@@ -40,6 +45,14 @@ def filter_and_aggregate(datain, model, model_id, groups, aggregating_metric):
         each element is a dict with column name as key and a list of row values as dict value, 
         the first dict should be the variable that's manipulated (e.g. list length),
         the rest are the ones that are held fixed
+    aggregating_metric : string
+        the metric to aggregate with, e.g. 'mean', 'median', etc.
+
+    Returns
+    -------
+    Tuple[pd.Dataframe, pd.DataFrame]
+        the first element is the dataframe with aggregated surprisal values, the second is the dataframe with
+
     """
     # unpack the dictionaries for each variable
     d1, d2, d3, d4 = groups
@@ -98,11 +111,28 @@ def filter_and_aggregate(datain, model, model_id, groups, aggregating_metric):
     return dataout, dagg
 
 
-def get_relative_change(x1=None, x2=None, labels1=None, labels2=None):
-    
+def get_relative_change(x1:np.ndarray=None, x2:np.ndarray=None, labels1:np.ndarray=None, labels2:np.ndarray=None) -> Tuple[np.ndarray, np.ndarray]:
     """
-    computes relative change across data in x1 and x2. Sizes of arrays x1 and x2
+    get_relative_change() computes relative change across data in x1 and x2. Sizes of arrays x1 and x2
     should match.
+
+    Parameters
+    ----------
+    x1 : np.ndarray
+        array with values to compare agains (in the denominator)
+    x2 : np.ndarray
+        array with values to compare (in the numerator)
+    labels1 : np.ndarray
+        array with labels for x1
+    labels2 : np.ndarray
+        array with labels for x2
+
+    Returns
+    -------
+    x_del : np.ndarray
+        array with relative change values computed as (x2-x1)/(x1+x2)
+    x_perc : np.ndarray
+        array with relative change values computed as (x2/x1)*100
     """
     
     # check that any labels match
@@ -114,8 +144,23 @@ def get_relative_change(x1=None, x2=None, labels1=None, labels2=None):
     return x_del, x_perc
 
 
-def relative_change_wrapper(df_agg, groups, compared_col):
-    
+def relative_change_wrapper(df_agg: pd.DataFrame, groups: List[Dict], compared_col: str) -> pd.DataFrame:
+    """
+    Computes relative change across data df_agg (in filter_and_aggregate()). It finds all sentences and 
+    computes `(x2/x1)*100` for each sentences. Where x1 and x2 are the aggreagted surprisal values for first list and second list, respectively, for that input sequence.
+
+    Parameters
+    ----------
+    df_agg : dataframe
+        dataframe with aggregated surprisal values
+    groups : list of dicts
+    compared_col : string
+
+    Returns
+    -------
+    pd.DataFrame 
+        dataframe with relative change values. Has columns 'x1', 'x2', 'x_del', 'x_perc'.
+    """
     # unpack the dicts
     g1, g2, g3, g4 = groups
     
@@ -147,7 +192,7 @@ def relative_change_wrapper(df_agg, groups, compared_col):
                     # get vectors with aggregated surprisal values from first and second list
                     x1=tmp.loc[tmp.marker==1, compared_col].to_numpy()           # average per sentence surprisal on first list
                     x2=tmp.loc[tmp.marker==3, compared_col].to_numpy()           # average per sentence surprisal on second list
-                    labels1 = tmp.loc[tmp.marker==1].stimid.to_numpy()  # use sentence id for check
+                    labels1 = tmp.loc[tmp.marker==1].stimid.to_numpy()           # use sentence id for checking that we are comparing the same sentences
                     labels2 = tmp.loc[tmp.marker==3].stimid.to_numpy()
 
                     # compute change and populate output dfs
@@ -159,6 +204,59 @@ def relative_change_wrapper(df_agg, groups, compared_col):
                     df_list.append(df)
     
     return pd.concat(df_list)
+
+
+def compute_repeat_surprisals_intact(dataframes: List[pd.DataFrame], list_positions: List, list_len: int, prompt_len: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    A wrapper around filter_and_aggregate(). Loops over data frames in <dataframes> and
+    and computes repeat surprisals on them. It also extracts wt103 perplexity from them.
+
+    Parameters
+    ----------
+    dataframes : list of dataframes
+        list of dataframes with surprisal values
+    list_positions : list
+        list of list positions in second list to extract surprisal values from (e.g. [0, 1] extract surprisals from first two positions in the list)
+    list_len : int
+        length of the list in each sequence
+    prompt_len : int
+        length of the prompt in each sequence
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray, np.ndarray]
+        tuple with three elements: 1) array with surprisal values, 2) array with wt103 perplexity values, 3) array with model ids
+    
+    """
+
+    # AVERAGE ACROSS TIME STEPS
+    variables = [{"list_len": [list_len]},
+                {"prompt_len": [prompt_len]},
+                {"context": ["intact"]},
+                {"marker_pos_rel": list_positions}]
+
+    # loop over data and average over time-points
+    dats_ = []
+    labs = []
+    wt103_ppls = []
+
+    for l in range(len(dataframes)):
+
+        dat_, _ = filter_and_aggregate(dataframes[l], 
+                                    model="gpt2", 
+                                    model_id=dataframes[l].model_id.unique().item(), 
+                                    groups=variables, 
+                                    aggregating_metric="mean")
+        
+        dats_.append(dat_)
+        wt103_ppls.append(dataframes[l].wt103_ppl.unique().item())
+        labs.append(dataframes[l].model_id.unique().item())
+
+    xlabels = np.array(labs)
+    y = np.stack([d.x_perc.to_numpy() for d in dats_])
+    y_ppl = np.log(np.stack(wt103_ppls))
+
+    return y, y_ppl, xlabels
 
 
 def make_timecourse_plot(datain, x, style, col, col_order, style_order, hue_order, estimator, err_style):
