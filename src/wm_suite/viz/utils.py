@@ -3,9 +3,7 @@ import pandas as pd
 import logging
 from glob import glob
 from tqdm import tqdm
-from matplotlib import pyplot as plt
-import matplotlib
-import seaborn as sns
+from types import SimpleNamespace
 
 logging.basicConfig(level=logging.INFO)
 
@@ -14,6 +12,13 @@ logging.basicConfig(level=logging.INFO)
 #savedir = os.path.join(home_dir, "fig", "raw", "camera_ready")
 data_dir = "/home/ka2773/project/lm-mem/src/data/test_d"
 #table_savedir = os.path.join(home_dir, "tables", "revised")
+
+
+clrs = SimpleNamespace(**{
+    "green": "#2ca02c",
+    "blue": "#1f77b4",
+    "orange": "#ff7f0e",
+})
 
 
 def load_wt103_data(path: str) -> pd.DataFrame:
@@ -59,3 +64,17 @@ def load_csv_data(model:str, datadir:str, fname:str) -> pd.DataFrame:
         data = load_wt103_data(os.path.join(datadir, fname))
     
     return data
+
+
+def save_png_pdf(fig, savename: str):
+
+    savefn = os.path.join(savename + ".png")
+    logging.info(f"Saving {savefn}")
+    fig.savefig(savefn, dpi=300, format="png")
+
+    savefn = os.path.join(savename + ".pdf")
+    logging.info(f"Saving {savefn}")
+    fig.savefig(savefn, format="pdf", transparent=True, bbox_inches="tight")
+
+    return 0
+ 
