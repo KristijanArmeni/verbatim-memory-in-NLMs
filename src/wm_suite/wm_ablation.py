@@ -232,13 +232,40 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List[int], s
     return topk_heads, topk_control, attn_toi_avg
 
 
-def from_dict_to_labels(layer_head_dict: Dict) -> List:
+def from_dict_to_labels(layer_head_dict: Dict) -> List[str]:
+    """
+    Converts a dictionary specifying which heads to ablate in which layers (e.g. {0: [1, 2], 1: [3]}) to a list of labels (e.g. ["L0.H1", "L0.H2", "L1.H3"]).
+
+    Parameters
+    ----------
+    layer_head_dict : Dict
+        A dictionary specifying which heads to ablate in which layers, e.g. {0: [1, 2], 1: [3]}
+
+    Returns
+    -------
+    List[str]
+        A list of labels, e.g. ["L0.H1", "L0.H2", "L1.H3"]
+    
+    """
 
     return [f"L{l}.H{h}" for i, l in enumerate(layer_head_dict) for h in layer_head_dict[l] if layer_head_dict[l]]
 
 
-def from_labels_to_dict(labels: List) -> Dict:
+def from_labels_to_dict(labels: List[str]) -> Dict:
+    """
+    Converts a list of labels (e.g. ["L0.H1", "L0.H2", "L1.H3"]) to a dictionary specifying which heads to ablate in which layers.
 
+    Parameters
+    ----------
+    labels : List[str]
+        A list of labels, e.g. ["L0.H1", "L0.H2", "L1.H3"]
+    
+    Returns
+    -------
+    Dict
+        A dictionary specifying which heads to ablate in which layers, e.g. {0: [1, 2], 1: [3]}
+
+    """
     out = {l: [] for l in range(12)}
 
     for label in labels:
@@ -314,7 +341,20 @@ def ablate_attn_module(model, layer_head_dict, ablation_type):
     return model
 
 
-def get_pairs(lh_dict):
+def get_pairs(lh_dict: Dict) -> List[Dict]:
+    """
+    Takes a dict with layers as keys and heads as values and returns a list of dicts with all possible pairs of heads (one dict for each pair).
+
+    Parameters
+    ----------
+    lh_dict : Dict
+        A dictionary (output of get_lh_dict()) specifying heads and layers to be ablated
+    
+    Returns
+    -------
+    List[Dict]
+        A list of dicts with all possible pairs of heads (one dict for each pair).
+    """
 
     # enumerate all pairs
     all_pairs = [(l, h) for l in lh_dict.keys() for h in lh_dict[l]]
