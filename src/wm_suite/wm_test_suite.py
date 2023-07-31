@@ -14,7 +14,7 @@ from tqdm import tqdm, trange
 import logging
 
 # own modules
-sys.path.append("/home/ka2773/project/lm-mem/src")
+from paths import PATHS   # project root must be in python path for this to work, it adds src/ to sys.path
 from data.wt103.dataset import WikiTextDataset
 from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits, make_word_lists, concat_and_tokenize_inputs
 from wm_suite.io.stimuli import prefixes, prompts
@@ -23,12 +23,6 @@ from wm_suite.io.test_ds import get_test_data
 
 
 logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
-
-# own modules
-if "win" in sys.platform:
-    sys.path.append(os.path.join(os.environ['homepath'], 'project', 'lm-mem', 'src'))
-elif "linux" in sys.platform:
-    sys.path.append(os.path.join(os.environ['HOME'], 'project', 'lm-mem', 'src'))
 
 
 # ===== DATASET CLASS ===== #
@@ -593,20 +587,6 @@ def outputs2dataframe(colnames: List, arrays: List, metacols: List, metarrays: L
 
     return output
 
-# ===== Setup for gpt2 ====== #
-def setup():
-    logging.info("SETUP: nltk punkt")
-    import nltk
-    nltk.download("punkt")
-
-    logging.info("SETUP: GPT2 Tokenizer")
-    GPT2TokenizerFast.from_pretrained("gpt2")
-
-    logging.info("SETUP: Head Model")
-    GPT2LMHeadModel.from_pretrained("gpt2")
-
-    return 0
-
 
 # ===== RUNTIME CODE WRAPPER ===== #
 def main(input_args: List = None):
@@ -618,8 +598,6 @@ def main(input_args: List = None):
     # collect input arguments
     parser = argparse.ArgumentParser(description="")
 
-    parser.add_argument("--setup", action="store_true",
-                        help="downloads and places nltk model and Tokenizer")
     parser.add_argument("--test_run", action="store_true")
     parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3", "sce4", "sce5", "sce6", "sce7"],
                         help="str, which scenario to use")
@@ -689,9 +667,6 @@ def main(input_args: List = None):
         argins = parser.parse_args(input_args)
     else:
         argins = parser.parse_args()
-
-    if argins.setup:
-        setup()
 
     # if test run, populate input arguments manually (these are corresponding to choices in wm_suite.io.test_ds.get_test_data())
     if argins.test_run:
@@ -883,9 +858,8 @@ def main(input_args: List = None):
 
     # ===== WT-103 PERPLEXITY ===== #
 
-    test_set_path = '/home/ka2773/project/lm-mem/data/wikitext-103/wiki.test.tokens'
-    logging.info(f"Loading {test_set_path}...")
-    _, ids = WikiTextDataset(tokenizer=tokenizer).retokenize_txt(test_set_path)
+    logging.info(f"Loading {PATHS.wt103_test}...")
+    _, ids = WikiTextDataset(tokenizer=tokenizer).retokenize_txt(PATHS.wt103_test)
 
     #initialize experiment class
     experiment2 = Experiment(model=model, ismlm=ismlm,
@@ -981,6 +955,7 @@ def main(input_args: List = None):
     logging.info("Saving {}".format(os.path.join(outpath)))
     output_df.to_csv(outpath, sep="\t")
 
+    return output_df
 
 # ===== RUN ===== #
 if __name__ == "__main__":
