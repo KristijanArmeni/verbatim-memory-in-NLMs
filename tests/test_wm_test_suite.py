@@ -1,6 +1,5 @@
 import os
 from src.wm_suite import wm_test_suite
-from src.wm_suite.utils import get_paths
 from paths import PATHS as p
 
 def test_wm_test_suite():
