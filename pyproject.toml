@@ -35,6 +35,6 @@ wms_reproduce_figs_conll2022 = "wm_suite.viz.make_figures:main"
 universal = true
 
 [tool.pytest.ini_options]
-pythonpath = ["src", "src/wm_suite", "data", "models"]
+pythonpath = ["./", "src", "src/wm_suite", "data", "models"]
 testpaths = "tests"
 addopts = "--ignore=tests/test_awd_lstm.py"
