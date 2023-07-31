@@ -28,7 +28,7 @@ import sys
 import os
 from types import SimpleNamespace
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(name)s | %(message)s")
 
 if "PATHSCONFIG" not in os.environ:
 
@@ -41,6 +41,9 @@ config = configparser.ConfigParser()
 config.read(os.environ['PATHSCONFIG'])
 PATHS = SimpleNamespace(**config["paths"])
 
+if PATHS.src not in sys.path:
+    logging.info(f"Adding {PATHS.src} to pythonpath")
+    sys.path.append(PATHS.src)
 
 if __name__ == "__main__":
 
