@@ -144,6 +144,32 @@ class Experiment(object):
         whether or not to reuse key-value matrices from previous time-steps in transformers
     loss_fct_batched : instace of `torch.nn.CrossEntropyLoss(reduction="none")`
 
+        
+    Examples
+    --------
+    ```python
+    from transformers import GPT2LMHeadModel, GPT2TokenizerFast
+    import torch
+
+    model = GPT2LMHeadModel.from_pretrained("gpt2")   # load pretrained weights
+    tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")  
+
+    model.eval()  # set to evaluation mode
+
+    # initialize experiment class
+    experiment = Experiment(model=model, 
+                            ismlm=False,
+                            tokenizer=tokenizer,
+                            context_len=1024,
+                            batch_size=1,
+                            stride=1,
+                            use_cache=False,
+                            device="cpu")  # or "cuda"
+
+    # run experiment
+    output_dict = experiment.start(input_sequences = input_sequences)
+    ```
+
     """
 
     def __init__(self, model, ismlm, tokenizer, context_len, batch_size, stride, use_cache, device):
