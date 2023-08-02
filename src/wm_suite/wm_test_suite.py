@@ -1,17 +1,20 @@
 
 import json
-import sys, os
+import os
 import argparse
 import numpy as np
 import numpy.typing as npt
+from scipy.stats import bootstrap
 import pandas as pd
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config
 import torch
 from torch.utils.data import Dataset, DataLoader
+
 from tqdm import trange
 from typing import List, Dict, Tuple, Any
 from tqdm import tqdm, trange
 import logging
+logging.basicConfig(format=("[%(levelname)s] %(filename)s | %(message)s"), level=logging.INFO)
 
 # own modules
 from paths import PATHS   # project root must be in python path for this to work, it adds src/ to sys.path
@@ -20,9 +23,7 @@ from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits, make_wo
 from wm_suite.io.stimuli import prefixes, prompts
 from wm_suite.wm_ablation import ablate_attn_module, find_topk_attn, find_topk_intersection, from_labels_to_dict, from_dict_to_labels
 from wm_suite.io.test_ds import get_test_data
-
-
-logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
+from wm_suite.viz.func import filter_and_aggregate
 
 
 # ===== DATASET CLASS ===== #
@@ -609,13 +610,39 @@ def outputs2dataframe(colnames: List, arrays: List, metacols: List, metarrays: L
         counter += 1
 
     # put into a single df and save
-    output = pd.concat(experiment_outputs)
+    output = pd.concat(experiment_outputs, ignore_index=True)
 
     return output
 
 
+def get_input_args_for_testing():
+
+    logging.info("Using input args provided to main(), not from script.")
+
+    arglist = [
+        "--scenario", "sce1",
+        "--condition", "repeat",
+        "--list_type", "random",
+        "--list_len", "3",
+        "--prompt_len", "1",
+        "--model_type", "ablated",
+        "--model_id", "ablate_1-5",
+        "--ablate_layer_head_dict", "{1: [0, 1, 2], 5: [5, 6]}",
+        "--ablation_type", "zero",
+        "--checkpoint", "gpt2",
+        "--tokenizer", "gpt2",
+        "--model_seed", "12345",
+        "--noun_list_file", "/home/ka2773/project/lm-mem/src/data/noun_lists/random_lists.json",
+        "--output_dir", "./",
+        "--output_filename", "test.csv",
+        "--device", "cuda",
+        "--output_dir", "/home/ka2773/project/lm-mem/test",
+    ]
+
+    return arglist
+
 # ===== RUNTIME CODE WRAPPER ===== #
-def main(input_args: List = None):
+def main(input_args: List = None, devtesting:bool = False):
 
     from ast import literal_eval
     from string import punctuation
@@ -633,11 +660,17 @@ def main(input_args: List = None):
     parser.add_argument("--list_type", type=str, choices=["random", "categorized"])
     parser.add_argument("--pretokenize_moses", action="store_true")
     parser.add_argument("--noun_list_file", type=str, help="json file with noun lists")
-    parser.add_argument("--tokenizer", type=str, default="gpt2")
     parser.add_argument("--context_len", type=int, default=1024,
                         help="length of context window in tokens for transformers")
+    parser.add_argument("--checkpoint", type=str, default="gpt2",
+                        help="the path to folder with pretrained models (expected to work with model.from_pretraiend() method)")
+    parser.add_argument("--tokenizer", type=str, default="gpt2")
     parser.add_argument("--model_type", type=str, default="pretrained",
                         help="model label controlling which checkpoint to load")
+    parser.add_argument("--model_id", type=str, default="")
+    parser.add_argument('--compute_wt103_ppl', action='store_true')
+    
+    # ablation params
     parser.add_argument("--ablate_layer_head_dict", type=str,
                         help="A string formated as dict, specifying which layers and heads to ablate (assuming 0-indexing)." 
                         "E.g. to ablate heads 0, 1, 2 in layer 1 and heads 5, 6 in layer 5, you type:" 
@@ -650,8 +683,8 @@ def main(input_args: List = None):
     parser.add_argument("--ablate_params", type=str, default="Q,K",
                         help="Attention parameters to be ablate. Specify as comma-separated string.")
     parser.add_argument("--ablation_type", type=str, choices=["zero", "shuffle"], default="zero")
-    parser.add_argument("--checkpoint", type=str, default="gpt2",
-                        help="the path to folder with pretrained models (expected to work with model.from_pretraiend() method)")
+
+    # experiment params
     parser.add_argument("--model_seed", type=int, default=12345,
                         help="seed value to be used in torch.manual_seed() prior to calling GPT2Model()")
     parser.add_argument("--batch_size", type=int, default=1)
@@ -662,34 +695,16 @@ def main(input_args: List = None):
                         help="str, the name of folder to write the output_filename in")
     parser.add_argument("--output_filename", type=str,
                         help="str, the name of the output file saving the dataframe")
+    parser.add_argument("--aggregate_output", action="store_true",
+                        help="whether or not to only output aggregated dataframe")
+    parser.add_argument("--aggregate_positions", type=str,
+                        help="string represing a a python list of integers indicating over which positions to aggregate (e.g. '[0, 1]' to aggregate over first two positions)")
 
 
-    # uncomment these to evaluate code below without having to call the script
-    #input_args = [
-    #    "--scenario", "sce1",
-    #    "--condition", "repeat",
-    #    "--list_type", "random",
-    #    "--list_len", "3",
-    #    "--prompt_len", "1",
-    #    "--model_type", "ablation",
-    #    "--ablate_topk_heads", "intersect-induction-matching",
-    #    "--ablate_topk_heads_toi", "(14, 16, 18)",
-    #    #"--ablate_topk_heads_seed", '11111',
-    #    "--ablation_type", "zero",
-    #    "--checkpoint", "gpt2",
-    #    "--tokenizer", "gpt2",
-    #    #"--checkpoint", "/scratch/ka2773/project/lm-mem/checkpoints/gpt2_full_12-768-1024_a_01/checkpoint-27500",
-    #    #"--tokenizer", "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer",
-    #    "--model_seed", "12345",
-    #    "--noun_list_file", "/home/ka2773/project/lm-mem/src/data/noun_lists/random_lists.json",
-    #    "--output_dir", "./",
-    #    "--output_filename", "test.csv",
-    #    "--device", "cuda",
-    #    "--output_dir", "/scratch/ka2773/project/lm-mem/output/ablation",
-    #]
+    if devtesting:   # manually set this to True if testing code interactively
+        input_args = get_input_args_for_testing()
 
     if input_args:
-        logging.info("Using input args provided to main(), not from script.")
         argins = parser.parse_args(input_args)
     else:
         argins = parser.parse_args()
@@ -702,13 +717,11 @@ def main(input_args: List = None):
         argins.list_len = 3
         argins.prompt_len = "1"
 
-    sys.path.append("/home/ka2773/project/lm-mem/src/data/")
-
 
     # ===== INITIATE MODEL AND TOKANIZER CLASS ===== #
 
     # declare device and paths
-    device = torch.device(argins.device if torch.cuda.is_available() else "cpu")
+    device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
 
     # setup the model
     logging.info("Loading tokenizer {}".format(argins.tokenizer))
@@ -759,7 +772,7 @@ def main(input_args: List = None):
         model.transformer.wpe.weight = torch.nn.Parameter(data=wpe_shuf,
                                                           requires_grad=False)
 
-    elif "ablation" in argins.model_type:
+    elif "ablated" in argins.model_type:
 
         logging.info(f"Running ablation experiment")
 
@@ -883,20 +896,23 @@ def main(input_args: List = None):
 
 
     # ===== WT-103 PERPLEXITY ===== #
+    ppl = torch.tensor(torch.nan)
 
-    logging.info(f"Loading {PATHS.wt103_test}...")
-    _, ids = WikiTextDataset(tokenizer=tokenizer).retokenize_txt(PATHS.wt103_test)
+    if argins.compute_wt103_ppl:
 
-    #initialize experiment class
-    experiment2 = Experiment(model=model, ismlm=ismlm,
-                            tokenizer=tokenizer,
-                            context_len=argins.context_len,
-                            batch_size=argins.batch_size,
-                            stride=1,
-                            use_cache=False,
-                            device=device)
-    
-    ppl, _, _ = experiment2.ppl(input_ids=torch.tensor([ids]), context_len=1024, stride=256)
+        logging.info(f"Loading {PATHS.wt103_test}...")
+        _, ids = WikiTextDataset(tokenizer=tokenizer).retokenize_txt(PATHS.wt103_test)
+
+        #initialize experiment class
+        experiment2 = Experiment(model=model, ismlm=ismlm,
+                                tokenizer=tokenizer,
+                                context_len=argins.context_len,
+                                batch_size=argins.batch_size,
+                                stride=1,
+                                use_cache=False,
+                                device=device)
+        
+        ppl, _, _ = experiment2.ppl(input_ids=torch.tensor([ids]), context_len=1024, stride=256)
 
 
     # ===== POST PROCESSING ===== #
@@ -936,7 +952,9 @@ def main(input_args: List = None):
         #logging.info(f"Saving {fn}")
         #torch.save(experiment.model.state_dict(), fn)
 
-            # store wikitext-103 perplexity
+    if argins.model_statedict_filename and argins.compute_wt103_ppl:
+
+        # store wikitext-103 perplexity
         ppl_dict = {"wt103_ppl": round(ppl.cpu().item(), 2),
                     "model": argins.model_statedict_filename}
         
@@ -950,13 +968,17 @@ def main(input_args: List = None):
     colnames = ["token", "surp", "marker_pos", "marker_pos_rel"]
     metacols = ["ppl", "scenario", "second_list", "list", "trialID", "positionID", "subtok", "list_len", "prompt_len"]
 
+    scenarioid2label = {
+        "sce1": "intact",
+    }
+
     arrays = [output_dict["token"],
               output_dict["surp"],
               output_dict['marker_pos'],
               output_dict['marker_pos_rel']]
     
     metarrays = [output_dict['sequence_ppl'],                                                  
-                 [argins.scenario for _ in range(len(input_sequences_info["trialID"]))],  # "sce1" | "sce2" | etc. 
+                 [scenarioid2label[argins.scenario] for _ in range(len(input_sequences_info["trialID"]))],  # "sce1" | "sce2" | etc. 
                  [argins.condition for _ in range(len(input_sequences_info["trialID"]))], # "repeat" | "permute" | "control"
                  [argins.list_type for _ in range(len(input_sequences_info["trialID"]))], # "random" | "categorized"
                  input_sequences_info["trialID"],
@@ -970,18 +992,71 @@ def main(input_args: List = None):
 
     output_df = outputs2dataframe(colnames, arrays, metacols, metarrays)
 
+    for col in ("prompt_len", "list_len"):
+        output_df[col] = output_df[col].astype(int)
+
+    output_df['model'] = argins.model_type
+    output_df = output_df.rename(columns={'trialID': 'marker', "stimID": "stimid", "scenario": "context"})
+    output_df['model_id'] = argins.model_id
+
     output_df.attrs = {'wt103_ppl': np.round(ppl.cpu().item(), 2),
                        'argins': argins}
 
     # drop nan rows (merged BPE timesteps)
     output_df = output_df.loc[~output_df.token.str.strip("Ġ").isin([""]), :]
 
-    # save output
-    outpath = os.path.join(argins.output_dir, argins.output_filename)
-    logging.info("Saving {}".format(os.path.join(outpath)))
-    output_df.to_csv(outpath, sep="\t")
+    # this is the variable that is returned
+    output = output_df
 
-    return output_df
+    if argins.aggregate_output:
+
+        print(output_df.dtypes)
+
+        variables = [{"list_len": [int(argins.list_len)]},
+                     {"prompt_len": [int(argins.prompt_len)]},
+                     {"context": ["intact"]},
+                     {"marker_pos_rel": literal_eval(argins.aggregate_positions)}  # average over first timestep
+                    ]
+
+        print(variables)
+
+        outdict = {"median": None, "ci95": None, "model_id": None}
+        output_agg, _ = filter_and_aggregate(output_df, 
+                                             model=argins.model_type, 
+                                             model_id=output_df.model_id.unique().item(), 
+                                             groups=variables, 
+                                             aggregating_metric="mean")
+        
+        y = output_agg.x_perc.to_numpy()
+
+        outdict["median"] = np.median(y)
+        ci = bootstrap((y,), 
+                        axis=0, 
+                        statistic=np.median, 
+                        confidence_level=0.95,
+                        n_resamples=10000,
+                        random_state=np.random.RandomState(12345))
+        outdict["ci95"] = (ci.confidence_interval.low, ci.confidence_interval.high)
+        outdict["model_id"] = argins.model_id
+
+        output = outdict
+
+    # save output
+    if argins.output_dir and argins.output_filename:
+
+        outpath = os.path.join(argins.output_dir, argins.output_filename)
+        logging.info("Saving {}".format(os.path.join(outpath)))
+
+        # save the full, non-aggregated dataframe
+        if type(output) == pd.DataFrame:
+            output.to_csv(outpath, sep="\t")
+
+        # or save the aggregatec metrics in json
+        elif type(output) is dict:
+            with open(outpath, 'w') as fh:
+                json.dump(output, fh, indent=4)
+
+    return output
 
 # ===== RUN ===== #
 if __name__ == "__main__":
