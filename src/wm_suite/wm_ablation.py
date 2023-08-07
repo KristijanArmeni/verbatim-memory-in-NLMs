@@ -106,7 +106,7 @@ class GPT2AttentionAblated(GPT2Attention):
         attn_weights = nn.Softmax(dim=-1)(attn_weights)
 
         if self.ablation_type == "zero":
-            attn_weights[0, torch.tensor(self.head_indxs), :, :] = 0
+            attn_weights[:, torch.tensor(self.head_indxs), :, :] = 0
 
         elif self.ablation_type == "shuffle":
 
