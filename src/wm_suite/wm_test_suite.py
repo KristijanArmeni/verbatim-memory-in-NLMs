@@ -361,7 +361,6 @@ class Experiment(object):
             target_ids = targets[:, tgt_beg_loc:tgt_end_loc].to(self.device)
             target_ids[:, :-trg_len] = self.loss_fct_batched.ignore_index
 
-
             #print(selected_input_ids)
             #print(target_ids)
 
@@ -1010,15 +1009,11 @@ def main(input_args: List = None, devtesting:bool = False):
 
     if argins.aggregate_output:
 
-        print(output_df.dtypes)
-
         variables = [{"list_len": [int(argins.list_len)]},
                      {"prompt_len": [int(argins.prompt_len)]},
                      {"context": ["intact"]},
                      {"marker_pos_rel": literal_eval(argins.aggregate_positions)}  # average over first timestep
                     ]
-
-        print(variables)
 
         outdict = {"median": None, "ci95": None, "model_id": None}
         output_agg, _ = filter_and_aggregate(output_df, 
