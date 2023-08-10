@@ -8,10 +8,14 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(funcName)s() | %
 # own modules
 from paths import PATHS
 from wm_suite import wm_test_suite
-from wm_suite.wm_ablation import from_labels_to_dict, from_dict_to_labels, find_topk_attn
+from wm_suite.wm_ablation import from_labels_to_dict
 
 
-def greedy_search(max_pair: List[str], remaining_heads:List[str], log_path: str, log_id:str) -> (List[float], List[str], dict, dict):
+def greedy_search(max_pair: List[str], 
+                  remaining_heads: List[str],
+                  log_path: str,
+                  log_id: str,
+                  patience_limit: int = 0) -> (List[float], List[str], dict, dict):
     """
     Parameters
     ----------
@@ -41,21 +45,28 @@ def greedy_search(max_pair: List[str], remaining_heads:List[str], log_path: str,
     ```
     """
 
+    n_total_runs = len(remaining_heads)
+
     # start by ablating the pair with highest effect
     current_best = max_pair
 
-    best_scores = []
-    best_labels = []
-
+    best_scores = []                                # for storing repeat surprisal scores
+    best_scores_ci = []                             # for storing confidence intervals
+    best_scores_x1, best_scores_x2 = [], []         # for storing raw surprisal values
+    best_scores_x1_ci, best_scores_x2_ci = [], []   # for storing raw surprisal values
+    best_labels = []                                # for storing the labels for each step of the search
     # store the whole search space for quality check
     all_scores = {}
     all_labels = {}
     patience = 0
-    patience_limit = 2
     counter = 0
 
-    # run the search until we run out of heads or if we have not improved for 2 steps 
-    while len(remaining_heads) > 0 or patience < patience_limit:
+    if patience_limit == 0:
+        patience_limit = n_total_runs  # if not specify, set patience limit to the number of total runs
+        logging.info(f"Setting patience limit to N_total {patience_limit} iterations")
+
+    # run the search until we run out of heads or if we have not improved for 2 rounds 
+    while (len(remaining_heads) > 0) and (patience < patience_limit):
 
         best_score = -1            # dummy score to start with
         best_combination = None    # dummy label
@@ -87,7 +98,7 @@ def greedy_search(max_pair: List[str], remaining_heads:List[str], log_path: str,
             "--ablation_type", "zero",
             "--checkpoint", "gpt2",
             "--tokenizer", "gpt2",
-            "--batch_size", "10",
+            "--batch_size", "23",
             "--model_seed", "12345",
             "--noun_list_file", "/home/ka2773/project/lm-mem/src/data/noun_lists/random_lists.json",
             "--device", "cuda",
@@ -96,14 +107,26 @@ def greedy_search(max_pair: List[str], remaining_heads:List[str], log_path: str,
             # run the ablation experiment
             output = wm_test_suite.main(input_args)
 
-            repsurp = np.round(output["median"], 2)
+            # get values from the aggregated outputs
+            repsurp = np.round(output["rs"]["median"], 2)
+            repsurp_ci = output["rs"]["ci95"]
+            x1 = np.round(output["x1"]["median"], 2)
+            x2 = np.round(output["x2"]["median"], 2)
+            x1_ci = output["x1"]["ci95"]
+            x2_ci = output["x2"]["ci95"]
 
             # log the score
-            scores[i] = np.round(repsurp, 2)
+            scores[i] = repsurp
 
             # update the best score
             if repsurp > best_score:
-                best_score = repsurp
+                
+                best_score = repsurp           # repeat surprisal
+                best_score_ci = repsurp_ci     # repeat surprisal confidence interval
+                best_score_x1 = x1             # raw surprisal on first list
+                best_score_x2 = x2             # raw surprisal on second list
+                best_score_x1_ci = x1_ci       # ci for raw surprisal on first list
+                best_score_x2_ci = x2_ci       # ci for raw surprisal on second list
                 best_combination = current_best + [new_head]
         
             #print feedback
@@ -130,7 +153,13 @@ def greedy_search(max_pair: List[str], remaining_heads:List[str], log_path: str,
         if best_scores and (best_score < best_scores[-1]):
             patience += 1
         
+        # store the best score and its confidence interval and raw surprisals
         best_scores.append(best_score)
+        best_scores_ci.append(best_score_ci)
+        best_scores_x1.append(best_score_x1)
+        best_scores_x2.append(best_score_x2)
+        best_scores_x1_ci.append(best_score_x1_ci)
+        best_scores_x2_ci.append(best_score_x2_ci)
 
         # check that the best score was tracked correctly
         assert best_score == np.max(scores)
@@ -142,14 +171,13 @@ def greedy_search(max_pair: List[str], remaining_heads:List[str], log_path: str,
         # if log path is specified, save logs
         if log_path is not None:
             tmpfn = os.path.join(log_path, f"log_best_scores{'_' + log_id}.json")
-            tmpdict = {"scores": best_scores, "labels": best_labels}
+            tmpdict = {"scores": best_scores, "scores_ci": best_scores_ci, "labels": best_labels}
             with open(tmpfn, "w") as fh:
                 json.dump(tmpdict, fh, indent=4)
 
         # store all the scores in this run for quality check
         all_scores[i] = scores.tolist()
         all_labels[i] = remaining_heads
-        print(remaining_heads)
 
         # remove the best head from the list of remaining heads
         remaining_heads.remove(best_head)
@@ -157,9 +185,21 @@ def greedy_search(max_pair: List[str], remaining_heads:List[str], log_path: str,
         counter += 1
 
     print("\n===== Done =====")
+    if patience == patience_limit:
+        logging.info(f"Reached patience limit of {patience_limit} iterations")
+    logging.info(f"Iterations ran: {len(best_scores)}/{len(n_total_runs)} | patience: {patience}/{patience_limit}")
     logging.info(f"Found best score: {np.max(best_scores)} for combination: {' '.join(best_labels[np.argmax(best_scores)])}")
 
-    return best_scores, best_labels, all_scores, all_labels
+    outs = {
+        "rs": {"scores": best_scores, "ci": best_scores_ci },
+        "x1": {"scores": best_scores_x1, "ci": best_scores_x1_ci},
+        "x2": {"scores": best_scores_x2, "ci": best_scores_x2_ci},
+        "best_labels": best_labels,
+        "searched_scores": all_scores,
+        "searched_labels": all_labels,
+    }
+
+    return outs
 
 
 def main(input_args=None):
@@ -185,7 +225,6 @@ def main(input_args=None):
             remaining_heads = json.load(fh)["lh_list"]
         remaining_heads.remove("L0.H10")
         remaining_heads.remove("L1.H11")
-        remaining_heads = remaining_heads
 
     elif args.head_type == "postmatch":
 
@@ -206,19 +245,12 @@ def main(input_args=None):
         remaining_heads.remove("L2.H3")    
 
     # run the search
-    outputs = greedy_search(max_pair, remaining_heads, log_path=args.output_dir, log_id=args.head_type)
-    
-    outs = {
-        "best_scores": outputs[0],
-        "best_labels": outputs[1],
-        "all_scores": outputs[2],
-        "all_labels": outputs[3],
-    }
+    outputs = greedy_search(max_pair, remaining_heads, log_path=args.output_dir, log_id=args.head_type, patience_limit=0)
 
     # save the outputs
     logging.info(f"Saving outputs to {os.path.join(args.output_dir, args.output_filename)}")
     with open(os.path.join(args.output_dir, args.output_filename), "w") as fh:
-        json.dump(outs, fh, indent=4)
+        json.dump(outputs, fh, indent=4)
 
 
     return None

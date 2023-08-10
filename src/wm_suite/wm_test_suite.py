@@ -4,7 +4,7 @@ import os
 import argparse
 import numpy as np
 import numpy.typing as npt
-from scipy.stats import bootstrap
+from scipy.stats import bootstrap, median_abs_deviation
 import pandas as pd
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config
 import torch
@@ -1007,6 +1007,7 @@ def main(input_args: List = None, devtesting:bool = False):
     # this is the variable that is returned
     output = output_df
 
+    # ===== COMPUTE REPEAT SURPRISAL IF NEEDED ===== #
     if argins.aggregate_output:
 
         variables = [{"list_len": [int(argins.list_len)]},
@@ -1015,23 +1016,46 @@ def main(input_args: List = None, devtesting:bool = False):
                      {"marker_pos_rel": literal_eval(argins.aggregate_positions)}  # average over first timestep
                     ]
 
-        outdict = {"median": None, "ci95": None, "model_id": None}
+        # create dict for storing output measures
+        outdict = {"x1": {"median": None, "mad": None, "minmax": None, "ci95": None},  # raw surprisal on first list
+                   "x2": {"median": None, "mad": None, "minmax": None, "ci95": None},  # raw surprisal on second list
+                   "rs": {"median": None, "mad": None, "minmax": None, "ci95": None},  # reapeat surprisal
+                   "model_id": None
+                   }
+        
+        # compute repeat surprisal
         output_agg, _ = filter_and_aggregate(output_df, 
                                              model=argins.model_type, 
                                              model_id=output_df.model_id.unique().item(), 
                                              groups=variables, 
                                              aggregating_metric="mean")
         
+        x1 = output_agg.x1.to_numpy()
+        x2 = output_agg.x2.to_numpy()
         y = output_agg.x_perc.to_numpy()
 
-        outdict["median"] = np.median(y)
-        ci = bootstrap((y,), 
-                        axis=0, 
-                        statistic=np.median, 
-                        confidence_level=0.95,
-                        n_resamples=10000,
+        # repeat surprisal
+        outdict["rs"]["median"] = np.median(y)
+        outdict["rs"]["minmax"] = (np.min(y), np.max(y))
+        outdict["rs"]["mad"] = median_abs_deviation(y)
+        ci = bootstrap((y,), axis=0, statistic=np.median, confidence_level=0.95, n_resamples=10000,
                         random_state=np.random.RandomState(12345))
-        outdict["ci95"] = (ci.confidence_interval.low, ci.confidence_interval.high)
+        outdict["rs"]["ci95"] = (ci.confidence_interval.low, ci.confidence_interval.high)
+
+        # first list
+        outdict["x1"]["median"] = np.median(x1)
+        outdict["x1"]["minmax"] = (np.min(x1), np.max(x1))
+        outdict["x1"]["mad"] = median_abs_deviation(x1)
+        ci = bootstrap((x1,), axis=0, statistic=np.median, confidence_level=0.95, n_resamples=10000, random_state=np.random.RandomState(12345))
+        outdict["x1"]["ci95"] = (ci.confidence_interval.low, ci.confidence_interval.high)
+
+        # second list
+        outdict["x2"]["median"] = np.median(x2)
+        outdict["x2"]["minmax"] = (np.min(x2), np.max(x2))
+        outdict["x2"]["mad"] = median_abs_deviation(x2)
+        ci = bootstrap((x2,), axis=0, statistic=np.median, confidence_level=0.95, n_resamples=10000, random_state=np.random.RandomState(12345))
+        outdict["x2"]["ci95"] = (ci.confidence_interval.low, ci.confidence_interval.high)
+
         outdict["model_id"] = argins.model_id
 
         output = outdict
