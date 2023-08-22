@@ -1,3 +1,4 @@
+# %%
 import os, sys
 import numpy as np
 import pandas as pd
@@ -17,7 +18,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 ABLATION_FILENAME_CODES = [str(i) for i in range(12)] + ["01", "23", "56", "711", "0123", "56711", "all"]
 
-
+# %%
 def check_datadir(datadir: str) -> str:
 
     if "WMS_DATADIR" in os.environ.keys():
@@ -31,7 +32,7 @@ def check_datadir(datadir: str) -> str:
 
     return datadir
 
-
+# %%
 def get_data(fn: str) -> Tuple[Dict, np.ndarray]:
     
     print(f"Loading {fn}")
@@ -40,7 +41,7 @@ def get_data(fn: str) -> Tuple[Dict, np.ndarray]:
     
     return a, b
 
-
+# %%
 def get_mean_se(x: np.ndarray, axis: Tuple) -> Tuple[float, float]:
     """
     Parameters:
@@ -69,7 +70,7 @@ def get_mean_se(x: np.ndarray, axis: Tuple) -> Tuple[float, float]:
     
     return m, sem_per_layer
 
-
+# %%
 def plot_attention(ax: mpl.axes.Axes, x: np.ndarray, token_ids: np.ndarray, labels: List):
     """
     Parameters:
@@ -103,7 +104,7 @@ def plot_attention(ax: mpl.axes.Axes, x: np.ndarray, token_ids: np.ndarray, labe
 
     return ax
 
-
+# %%
 def attn_amplitude_plot(axes, x: np.ndarray, d: Dict, target_id=13, query_id=45, seed=12345):
 
     # set ylabels for legend
@@ -132,7 +133,7 @@ def attn_amplitude_plot(axes, x: np.ndarray, d: Dict, target_id=13, query_id=45,
 
     return ax1, ax2
 
-
+# %%
 def attn_amplitude_plot_control_tokens(axes, x: np.ndarray, d: Dict, colors, seed=12345):
 
     ylabels = [s.strip('Ġ') for s in d['tokens'][0]]
@@ -152,7 +153,7 @@ def attn_amplitude_plot_control_tokens(axes, x: np.ndarray, d: Dict, colors, see
 
     return axes, img1, data1
 
-
+# %%
 def plot_schematic(ax, d, colors, squeezed=False):
     
 #    first_list = " ".join([s.strip("Ġ") for s in d['tokens'][0][13:20]])
@@ -230,7 +231,7 @@ def plot_schematic(ax, d, colors, squeezed=False):
 
     return ax
 
-
+# %%
 def plot_imshow_and_average(axes, dat:np.ndarray, selection: Dict=None, c:str="#000000", img_txt_c="white"):
 
     m = np.mean(dat, axis=(0, 1))           # mean across sequences and heads
@@ -272,7 +273,7 @@ def plot_imshow_and_average(axes, dat:np.ndarray, selection: Dict=None, c:str="#
 
     return axes, im1, (m, se)
 
-
+# %%
 def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors: List, query_id: int, target_id: int, n_tokens_per_window: int):
     """"
     plots 3-by-3 figure with line plots and images
@@ -285,6 +286,10 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors
 
     # token indices from nearest to furthest
     first_list = [target_id + i for i in np.arange(1, n_tokens_per_window*2, 2)]
+    
+    # if we
+    if target_id == 14:
+        first_list = [16, 18, 19]
     preceding = [query_id - i for i in range(1, n_tokens_per_window+1)]
 
     logging.info(f"Summing attn weights over early tokens: {np.array(first_list)}")
@@ -320,66 +325,73 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors
 
     return ax, (img1, img2, img3), (d1, d2, d3)
 
-
+# %%
 def generate_plot2(datadir, query):
 
     if query == "colon-colon-p1":
         fn = "attention_weights_gpt2_colon-colon-p1.npz"
+        target_id = 13
         query_idx = 45
         suptitle = ""
         n_tokens_per_window = 3
 
     elif query == "colon-semicolon-p1":
         fn = "attention_weights_gpt2_colon-semicolon-p1.npz"
+        target_id = 13
         query_idx = 45
         suptitle = ""
         n_tokens_per_window = 3
     
     elif query == "comma-comma-p1":
         fn = "attention_weights_gpt2_comma-comma-p1.npz"
+        target_id = 13
         query_idx = 45  # this is first noun in the list
         suptitle = ""
         n_tokens_per_window = 3
 
     elif query == "colon-colon-p1-ablate-11":
         fn = "attention_weights_gpt2-ablate-10-all_colon-colon-p1-ctxlen1.npz"  # this is 0 indexing
+        target_id = 13
         query_idx = 45
         suptitle = "GPT-2 attention patterns over past context (ablated layer 11)"
         n_tokens_per_window = 3
 
     elif query == "colon-colon-p1-ablate-2":
         fn = "attention_weights_gpt2-ablate-2-all_colon-colon-p1-ctxlen1.npz"  # this is 0 indexing
+        target_id = 13
         query_idx = 45
         suptitle = "GPT-2 attention patterns over past context (ablated layer 3)"
         n_tokens_per_window = 3
 
     elif query == "colon-colon-p1-ctxlen3":
         fn = "attention_weights_gpt2_colon-colon-p1-ctxlen3.npz"  # this is 0 indexing
+        target_id = 13
         query_idx = 45
         suptitle = "GPT-2 attention patterns over past context (ctxlen3)"
         n_tokens_per_window = 3
 
     elif query == "colon-colon-p1-ctxlen4":
         fn = "attention_weights_gpt2_colon-colon-p1-ctxlen4.npz"  # this is 0 indexing
+        target_id = 13
         query_idx = 45
         suptitle = "GPT-2 attention patterns over past context (ctxlen4)"
         n_tokens_per_window = 3
 
-    elif query == "colon-colon-p1-n1":
+    elif query == "colon-colon-p1-single-token":
         fn = "attention_weights_gpt2_colon-colon-p1.npz"
+        target_id = 13
         query_idx = 45
         suptitle = "Copy and previous-token attention heads in GPT-2 (single-token window)"
         n_tokens_per_window = 1
 
-    elif query == "colon-colon-n2":
-        fn = "gpt2_attn_query-n2.npz"
-        query_idx = 48
-        title_string = ":"
+    # attention weights starting at first noun in the list
+    elif query == "colon-colon-n1":
+        fn = "attention_weights_gpt2_colon-colon-n1.npz"
+        target_id = 14
+        query_idx = 46
+        n_tokens_per_window = 3
+        suptitle = "Attention to previous tokens (from first noun in the list)"
 
-    elif query == "colon-semicolon-n2":
-        fn = "attention_weights_gpt2_colon-semicolon-n2.npz"
-        query_idx = 48 # this is the position of the second noun in the list
-        title_string = "second noun"
 
     x1, d1 = get_data(os.path.join(datadir, fn))
 
@@ -387,7 +399,7 @@ def generate_plot2(datadir, query):
 
     # ===== PLOT ===== #
 
-    if query in ["colon-colon-p1", 'colon-semicolon-p1', 'comma-comma-p1']:
+    if query in ["colon-colon-p1", 'colon-semicolon-p1', 'comma-comma-p1', 'colon-colon-n1']:
 
         fig = plt.figure(figsize=(12, 6.5))
 
@@ -405,7 +417,7 @@ def generate_plot2(datadir, query):
         ax6 = fig.add_subplot(gs[2, 1], sharex=ax3, sharey=ax5)
         ax7 = fig.add_subplot(gs[2, 2], sharex=ax4, sharey=ax5)
 
-        # for the main figure, font can remain smaller (as the figure itself is lareger), 
+        # for the main figure, font can remain smaller (as the figure itself is larger), 
         if query in ["colon-colon-p1"]:
             plot_schematic(ax1, d1, colors=clrs, squeezed=False)
         else:
@@ -418,15 +430,6 @@ def generate_plot2(datadir, query):
         for a in (ax2, ax3, ax4):
             plt.setp(a.get_xticklabels(), visible=False)
 
-        #axes[0, 0].set_title("1")
-        #axes[0, 1].set_title("2")
-        #axes[0, 2].set_title("3")
-        #axes[1, 0].set_title("3")
-        #axes[1, 1].set_title("4")
-        #axes[1, 2].set_title("5")
-
-        #plt.show()
-
     else:
 
         fig, axes = plt.subplots(2, 2, figsize=(11, 5.5), sharex="all", sharey="row", 
@@ -438,9 +441,14 @@ def generate_plot2(datadir, query):
         img_txt_clrs = ["black", "white", "white"]
     else:
         img_txt_clrs = ["black", "black", "white"]
-    ax, imgs, data1 = attn_weights_per_head_layer(ax=axes, x=x1, colors=clrs, img_text_colors=img_txt_clrs,
-                                                  target_id=13, 
+
+    # ===== PLOTTING FUNCTION ===== #
+    ax, imgs, data1 = attn_weights_per_head_layer(ax=axes, 
+                                                  x=x1, 
+                                                  target_id=target_id, 
                                                   query_id=query_idx,
+                                                  colors=clrs, 
+                                                  img_text_colors=img_txt_clrs,
                                                   n_tokens_per_window=n_tokens_per_window)
 
     lfs = 18
@@ -452,9 +460,6 @@ def generate_plot2(datadir, query):
     ax[1, 0].set_ylabel("Head", fontsize=lfs)
     ax[0, 0].set_ylabel("Avg. attention\nweight", fontsize=lfs)
 
-    # suptitles
-    #ax[0, 0].set_title("Attention to tokens in first list", fontsize=16)
-    #ax[0, 1].set_title("Attention to previous tokens", fontsize=16)
 
     for a in ax[0, :]:
         a.set_ylim([0, 0.5])
@@ -545,7 +550,7 @@ def generate_plot2(datadir, query):
 
     return fig, fig_, data
 
-
+# %%
 def save_png_pdf(fig, savename: str):
 
     savefn = os.path.join(savename + ".png")
@@ -558,13 +563,13 @@ def save_png_pdf(fig, savename: str):
 
     return 0
 
-
+# %%
 def main(input_args=None):
 
     import argparse
     
     parser = argparse.ArgumentParser()
-    parser.add_argument("--which", type=str, choices=["all", "main_fig", "control_fig", "single_token_fig"])
+    parser.add_argument("--which", type=str, choices=["all", "main_fig", "control_fig", "single_token_fig", "first_noun_fig"])
     parser.add_argument("--datadir", type=str)
     parser.add_argument("--savedir", type=str)
 
@@ -584,12 +589,18 @@ def main(input_args=None):
         main_fig = True
         control_fig = True
         single_token_fig = True
-    
+        first_noun_fig = True
+        ctxlen3_fig = True
+        ctxlen4_fig = True
+
     else:
 
         main_fig = True if args.which == "main_fig" else False
         control_fig = True if args.which == "control_fig" else False
         single_token_fig = True if args.which == "single_token_fig" else False
+        first_noun_fig = True if args.which == "first_noun_fig" else False
+        ctxlen3_fig = True if args.which == "ctxlen3_fig" else False
+        ctxlen4_fig = True if args.which == "ctxlen4_fig" else False
 
 
     with plt.style.context("seaborn-ticks"):
@@ -633,9 +644,21 @@ def main(input_args=None):
 
         # single token plot
         if single_token_fig:
-            fig4, fig4_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-n1")
+            fig4, fig4_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-single-token")
             if args.savedir:
-                save_png_pdf(fig4, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1-n1"))
+                save_png_pdf(fig4, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1-single-token"))
+
+
+        if first_noun_fig:
+
+            fig5, fig5_, data = generate_plot2(datadir=datadir, query="colon-colon-n1")
+            if args.savedir:
+                save_png_pdf(fig5, os.path.join(args.savedir, "gpt2_attn_colon-colon-n1"))
+                save_png_pdf(fig5_, os.path.join(args.savedir, "gpt2_attn_colon-colon-n1_control"))
+
+                fn = os.path.join(args.savedir, "gpt2_attn_colon-colon-n1" + ".csv")
+                logging.info(f"Saving {fn}")
+                data.to_csv(fn, sep='\t')
 
         # ===== CONTROL FIGURES: ABLATED MODEL ==== #
         #fig5, fig5_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-ablate-11")
@@ -676,6 +699,14 @@ def main(input_args=None):
 
     #    fig1, fig2 = generate_plot(datadir=datadir, query="colon-semicolon-p1")
 
+# %%
 if __name__ == "__main__":
 
     main()
+
+# %%
+
+# main(["--which", "first_noun_fig", "--datadir", "C:\\users\\karmeni1\\project\\lm-mem\\data\\ablation"])
+
+
+# %%
