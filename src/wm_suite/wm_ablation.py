@@ -5,7 +5,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 from transformers.models.gpt2.modeling_gpt2 import GPT2Attention
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Union
 from itertools import product
 import logging
 
@@ -132,7 +132,7 @@ class GPT2AttentionAblated(GPT2Attention):
         return attn_output, attn_weights
 
 
-def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List[int], seed: int) -> Dict:
+def find_topk_attn(attn: np.ndarray, topk: int, attn_threshold: Union[float, None], tokens_of_interest: List[int], seed: int) -> Dict:
 
     """
     Takes attn.shape = (samples, timesteps, heads, layer) of attention weights and finds <topk> heads across layers
@@ -144,6 +144,9 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List[int], s
         array of attention weights (shape = (samples, timesteps, heads, layer))
     topk : int
         top-10 criterion
+    attn_threshold : float
+        threshold indicating to select only heads with attention score > threshold
+        if > 0, it is used in conjunction with the topk criterion (if == 0, it means all heads it is ignored)
     tokens_of_interest: list
         a list of indices representing token positions to sum the attention weights over
     seed : int
@@ -168,7 +171,22 @@ def find_topk_attn(attn: np.ndarray, topk: int, tokens_of_interest: List[int], s
     # flatten from (heads, layers) and find top-k
     orig_shape = attn_toi_avg.shape
     x = attn_toi_avg.flatten()
-    inds = np.argpartition(x, -topk)[-topk:]
+    topk_inds = np.argpartition(x, -topk)[-topk:]  # indices of shape (20,)
+
+
+    # if threshold is provided, make sure to select heads that are top-k and with attention > threshold
+    if attn_threshold is not None:
+        thrsh_bool = x > attn_threshold   # boolean of shape (144,)
+
+        topk_bool = np.zeros(x.shape, dtype=bool)   # create a boolean of shape (144,)
+        topk_bool[topk_inds] = True
+
+        # find indices
+        inds = np.where((topk_bool & thrsh_bool) == True)[0]   
+    else:
+        inds = topk_inds
+
+    logging.info(f"Found {len(inds)} heads with top-{topk} attn scores and attention score > {attn_threshold}.")
 
     # now create a boolean which is reshaped back to (heads, layers)
     arr_indx = np.zeros(x.shape)
