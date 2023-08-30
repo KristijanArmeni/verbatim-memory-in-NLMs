@@ -14,7 +14,7 @@ from tqdm import trange
 from typing import List, Dict, Tuple, Any
 from tqdm import tqdm, trange
 import logging
-logging.basicConfig(format=("[%(levelname)s] %(filename)s | %(message)s"), level=logging.INFO)
+logging.basicConfig(format=("[%(levelname)s] %(funcName)s() | %(message)s"), level=logging.INFO)
 
 # own modules
 from paths import PATHS   # project root must be in python path for this to work, it adds src/ to sys.path
