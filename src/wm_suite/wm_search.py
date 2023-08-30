@@ -11,18 +11,28 @@ from wm_suite import wm_test_suite
 from wm_suite.wm_ablation import from_labels_to_dict
 
 
-def greedy_search(max_pair: List[str], 
-                  remaining_heads: List[str],
+def greedy_search(attention_heads: List[str],
+                  repeat_surprisal_timesteps: List[int], 
+                  list_len: int,
+                  save_every: int,
                   log_path: str,
                   log_id: str,
                   patience_limit: int = 0) -> (List[float], List[str], dict, dict):
     """
     Parameters
     ----------
-    max_pair : List[str]
-        The pair of heads with the highest effect
-    remaining_heads : List[str]
+    attention_heads : List[str]
         The list of heads that are not in the max_pair
+    repeat_surprisal_timesteps : List[int]
+        The timesteps for which to compute the repeat surprisal
+    list_len : int
+        The number of nouns in the lists
+    save_every : int
+        How often to save the outputs
+    log_path : str
+        The path to the log directory
+    log_id : str
+        The id of the log, will used to construct the log filenames
     
     Returns
     -------
@@ -38,17 +48,16 @@ def greedy_search(max_pair: List[str],
     Examples
     --------
     ```python
-    >>> max_pair = ["L0.H10", "L1.H11"]
-    >>> remaining_heads = ["L3.H0", "L4.H7", "L4.H10", "L5.H11"]
+    >>> attention_heads = ["L3.H0", "L4.H7", "L4.H10", "L5.H11"]
 
-    >>> best_scores, labels, searched_scores, searched_labels = greedy_search(max_pair, remaining_heads)
+    >>> best_scores, labels, searched_scores, searched_labels = greedy_search(attention_heads)
     ```
     """
 
-    n_total_runs = len(remaining_heads)
+    n_total_runs = len(attention_heads)
 
     # start by ablating the pair with highest effect
-    current_best = max_pair
+    current_best = []
 
     best_scores = []                                # for storing repeat surprisal scores
     best_scores_ci = []                             # for storing confidence intervals
@@ -65,22 +74,36 @@ def greedy_search(max_pair: List[str],
         patience_limit = n_total_runs  # if not specify, set patience limit to the number of total runs
         logging.info(f"Setting patience limit to N_total {patience_limit} iterations")
 
+    # function for saving outputs every `save_every` iterations
+    def create_outputs(rs, rs_ci, rs_labels, x1, x1_ci, x2, x2_ci, all_rs, all_labels):
+
+        outs = {
+            "rs": {"scores": rs, "ci": rs_ci },
+            "x1": {"scores": x1, "ci": x1_ci},
+            "x2": {"scores": x2, "ci": x2_ci},
+            "best_labels": rs_labels,
+            "searched_scores": all_rs,
+            "searched_labels": all_labels,
+        }
+
+        return outs
+
     # run the search until we run out of heads or if we have not improved for 2 rounds 
-    while (len(remaining_heads) > 0) and (patience < patience_limit):
+    while (len(attention_heads) > 0) and (patience < patience_limit):
 
         best_score = -1            # dummy score to start with
         best_combination = None    # dummy label
-        scores = np.zeros(len(remaining_heads))
-        head_labels = np.array(remaining_heads)
+        scores = np.zeros(len(attention_heads))
+        head_labels = np.array(attention_heads)
         searched_labels = []
 
         print("\n====================================")
-        logging.info(f"Doing search (N_iterations = {len(remaining_heads)} | patience = {patience}/{patience_limit})")
+        logging.info(f"Doing search (N_iterations = {len(attention_heads)} | patience = {patience}/{patience_limit} | Save = every {save_every} iterations)")
         logging.info(f"Current best: {' '.join(current_best)}")
         logging.info(f"Current best score: {best_score}")
         print("====================================\n")
 
-        for i, new_head in enumerate(remaining_heads):
+        for i, new_head in enumerate(attention_heads):
 
             lh_dict = from_labels_to_dict(current_best + [new_head])
 
@@ -88,12 +111,12 @@ def greedy_search(max_pair: List[str],
             "--scenario", "sce1",
             "--condition", "repeat",
             "--list_type", "random",
-            "--list_len", "3",
+            "--list_len", f"{list_len}",
             "--prompt_len", "1",
             "--model_type", "ablated",
             "--model_id", f"ablate_{i}_{new_head}",
             "--aggregate_output",
-            "--aggregate_positions", "[0]",
+            "--aggregate_positions", f"{repeat_surprisal_timesteps}",
             "--ablate_layer_head_dict", f"{lh_dict}",
             "--ablation_type", "zero",
             "--checkpoint", "gpt2",
@@ -149,8 +172,9 @@ def greedy_search(max_pair: List[str],
         # find the best head to add
         best_head = head_labels[np.argmax(scores)]
         
-        # if current best score is smaller than the one from the previous round, increase patience
-        if best_scores and (best_score < best_scores[-1]):
+        # if increment from past iteraion is smaller than 1%, increase patience
+        increment = best_score - best_scores[-1] if best_scores else 1  # dummy value to keep the code running
+        if increment < 1:
             patience += 1
         
         # store the best score and its confidence interval and raw surprisals
@@ -175,29 +199,47 @@ def greedy_search(max_pair: List[str],
             with open(tmpfn, "w") as fh:
                 json.dump(tmpdict, fh, indent=4)
 
+        # check if save_every is reached and save full output at current iteration
+        if (counter+1) % save_every == 0:
+            tmpfn = os.path.join(log_path, f"scores_{log_id}_iter-{counter+1:02d}.json")
+            logging.info(f"Saving scores to {tmpfn}")
+            outs = create_outputs(rs=best_scores, 
+                                  rs_ci=best_scores_ci,
+                                  rs_labels=best_labels,
+                                  x1=best_scores_x1,
+                                  x1_ci=best_scores_x1_ci,
+                                  x2=best_scores_x2,
+                                  x2_ci=best_scores_x2_ci,
+                                  all_rs=all_scores,
+                                  all_labels=all_labels)
+            with open(tmpfn, "w") as fh:
+                json.dump(outs, fh, indent=4)
+
         # store all the scores in this run for quality check
         all_scores[i] = scores.tolist()
-        all_labels[i] = remaining_heads
+        all_labels[i] = attention_heads
 
         # remove the best head from the list of remaining heads
-        remaining_heads.remove(best_head)
+        attention_heads.remove(best_head)
 
         counter += 1
 
     print("\n===== Done =====")
     if patience == patience_limit:
         logging.info(f"Reached patience limit of {patience_limit} iterations")
-    logging.info(f"Iterations ran: {len(best_scores)}/{len(n_total_runs)} | patience: {patience}/{patience_limit}")
+    logging.info(f"Iterations ran: {len(best_scores)}/{n_total_runs} | patience: {patience}/{patience_limit}")
     logging.info(f"Found best score: {np.max(best_scores)} for combination: {' '.join(best_labels[np.argmax(best_scores)])}")
 
-    outs = {
-        "rs": {"scores": best_scores, "ci": best_scores_ci },
-        "x1": {"scores": best_scores_x1, "ci": best_scores_x1_ci},
-        "x2": {"scores": best_scores_x2, "ci": best_scores_x2_ci},
-        "best_labels": best_labels,
-        "searched_scores": all_scores,
-        "searched_labels": all_labels,
-    }
+    # create the final outputs for return
+    outs = create_outputs(rs=best_scores, 
+                          rs_ci=best_scores_ci,
+                          rs_labels=best_labels,
+                          x1=best_scores_x1,
+                          x1_ci=best_scores_x1_ci,
+                          x2=best_scores_x2,
+                          x2_ci=best_scores_x2_ci,
+                          all_rs=all_scores,
+                          all_labels=all_labels)
 
     return outs
 
@@ -208,7 +250,11 @@ def main(input_args=None):
     import json
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--head_type", type=str, required=True)
+    parser.add_argument("--lh_dict_json", type=str, required=True)
+    parser.add_argument("--log_id", type=str, required=True)
+    parser.add_argument("--repeat_surprisal_timesteps", type=str, required=True)
+    parser.add_argument("--list_len", type=int, required=True, default=3)
+    parser.add_argument("--patience_limit", type=int, default=0)
     parser.add_argument("--output_dir", type=str, required=True)
     parser.add_argument("--output_filename", type=str, required=True)
 
@@ -217,35 +263,18 @@ def main(input_args=None):
     else:
         args = parser.parse_args()
 
-    if args.head_type == "matching":
-
-        max_pair = ["L0.H10", "L1.H11"]
-        fn = os.path.join(PATHS.root, "data", "topk_heads", "top_20_matching.json")
-        with open(fn, "r") as fh:
-            remaining_heads = json.load(fh)["lh_list"]
-        remaining_heads.remove("L0.H10")
-        remaining_heads.remove("L1.H11")
-
-    elif args.head_type == "postmatch":
-
-        max_pair = ["L10.H11", "L10.H0"]
-        fn = os.path.join(PATHS.root, "data", "topk_heads", "top_20_postmatch.json")
-        with open(fn, "r") as fh:
-            remaining_heads = json.load(fh)["lh_list"]
-        remaining_heads.remove("L10.H11")
-        remaining_heads.remove("L10.H0")
-
-    elif args.head_type == "recent":
-        
-        max_pair = ["L3.H2", "L2.H3"]
-        fn = os.path.join(PATHS.root, "data", "topk_heads", "top_20_recent.json")
-        with open(fn, "r") as fh:
-            remaining_heads = json.load(fh)["lh_list"]
-        remaining_heads.remove("L3.H2")
-        remaining_heads.remove("L2.H3")    
-
+    # load in the top-k attention heads loaded aso
+    with open(args.lh_dict_json, "r") as fh:
+        attention_heads = json.load(fh)["lh_list"]
+ 
     # run the search
-    outputs = greedy_search(max_pair, remaining_heads, log_path=args.output_dir, log_id=args.head_type, patience_limit=0)
+    outputs = greedy_search(attention_heads=attention_heads, 
+                            repeat_surprisal_timesteps=args.repeat_surprisal_timesteps,
+                            list_len=args.list_len,
+                            save_every=5,
+                            patience_limit=args.patience_limit,
+                            log_path=args.output_dir,
+                            log_id=args.log_id)
 
     # save the outputs
     logging.info(f"Saving outputs to {os.path.join(args.output_dir, args.output_filename)}")
