@@ -138,7 +138,26 @@ def replace_cue_symbols(sequences: List, tokens: List, markers: List, symbols: T
     return sequences, tokens
 
 
-def main(input_args=None):
+def get_args_for_devtesting():
+
+    input_args = ["--scenario", "sce1",
+                  "--condition", "repeat",
+                  "--list_type", "random",
+                  "--noun_list_file", "/home/ka2773/project/lm-mem/src/data/noun_lists/random_lists.json",
+                  "--list_len", "10",
+                  "--prompt_len", "1",
+                  "--query_token", "c5",
+                  "--list1_cue_symbol", "",
+                  "--list2_cue_symbol", "",
+                  "--savedir", "/scratch/ka2773/project/lm-ecog/data/attn",
+                  "--checkpoint", "gpt2",
+                  "--tokenizer", "gpt2",
+                  #"--state_dict", "/scratch/ka2773/project/lm-mem/output/ablation/gpt2_ablate-11-all.pt",
+                  "--output_filename", "gpt2_attn_test.npz"]
+                  
+    return input_args
+
+def main(input_args=None, devtesting=False):
 
     import argparse
     import json
@@ -156,7 +175,7 @@ def main(input_args=None):
                         help="[optional] Symbol that introduces first list.")
     parser.add_argument("--list2_cue_symbol", type=str, default='',
                         help="[optional] Symbol that introduces second list.")
-    parser.add_argument("--query_token", type=str, choices=["p1", "n1", "n2", "n3"],
+    parser.add_argument("--query_token", type=str,
                         help="p1 == prompt token (e.g. ':'), n1 == first token in the repeated list, n2 == second token in the repeated list etc.")
     parser.add_argument("--checkpoint", type=str, default="")
     parser.add_argument("--state_dict", type=str, default="")
@@ -166,20 +185,8 @@ def main(input_args=None):
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    #input_args = ["--scenario", "sce1",
-    #              "--condition", "repeat",
-    #              "--list_type", "random",
-    #              "--noun_list_file", "/home/ka2773/project/lm-mem/src/data/noun_lists/random_lists.json",
-    #              "--list_len", "3",
-    #              "--prompt_len", "1",
-    #              "--query_token", "p1",
-    #              "--list1_cue_symbol", "",
-    #              "--list2_cue_symbol", ";",
-    #              "--savedir", "/scratch/ka2773/project/lm-ecog/data/attn",
-    #              "--checkpoint", "",
-    #              "--tokenizer", "gpt2",
-    #              "--state_dict", "/scratch/ka2773/project/lm-mem/output/ablation/gpt2_ablate-11-all.pt",
-    #              "--output_filename", "gpt2_attn.npz"]
+    if devtesting:
+        input_args = get_args_for_devtesting()
 
     if input_args is not None:
         args = parser.parse_args(input_args)
@@ -252,12 +259,38 @@ def main(input_args=None):
         
         query_idxs = [find_cue_token_ids(np.array(markers))[1] for markers in input_sequences_info["trialID"]]
 
+    elif args.query_token in ["r1", "r2", "r3", "r4"]:
+
+        tag2id = {"r1": 1, "r2": 2, "r3": 3, "r4": 4}
+        offset_from_comma = tag2id[args.query_token]   # get number of positions to subtract from comma position
+        query_idxs = [find_cue_token_ids(np.array(markers))[1] - offset_from_comma for markers in input_sequences_info["trialID"]]
+
+        # the nouns we should find at these positions are known, make a quick check
+        if args.query_token == "r1":
+            assert sum([strings[i][idx] == "Ġagain" for i, idx in enumerate(query_idxs)]) == 230
+        elif args.query_token == "r2":
+            assert sum([strings[i][idx] == "Ġlist" for i, idx in enumerate(query_idxs)]) == 230
+        elif args.query_token == "r3":
+            assert sum([strings[i][idx] == "Ġthe" for i, idx in enumerate(query_idxs)]) == 230
+        elif args.query_token == "r4":
+            assert sum([strings[i][idx] == "Ġread" for i, idx in enumerate(query_idxs)]) == 230
+
     # if the query token is a noun in the list, find it by looking for list marker and puncutation markers
-    elif args.query_token in ['n1', 'n2', 'n3']:
+    elif args.query_token in ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'n10']:
         
-        tag2id = {'n1': 0, 'n2': 1, 'n3': 2} # index to pick the right id
-        punct_id = tag2id[args.query_token]
-        query_idxs = [find_list_punctuation_index(np.array(markers), np.array(punct_markers))[punct_id]-1 for markers, punct_markers in zip(input_sequences_info["trialID"], input_sequences_info["subtok"])]
+        tag2id = {f'n{i+1}': i for i in range(10)} # index to pick the right id
+        punct_id = tag2id[args.query_token]  # grab id for the specified query noun
+        index_offset = -1  # shift by one position so we get the nouns before the commas
+        query_idxs = [find_list_punctuation_index(np.array(markers), np.array(punct_markers))[punct_id] - index_offset for markers, punct_markers in zip(input_sequences_info["trialID"], input_sequences_info["subtok"])]
+
+    elif args.query_token in ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9']:
+        
+        tag2id = {f'c{i+1}': i for i in range(9)}
+        punct_id = tag2id[args.query_token]  # grab id for the specified query comma
+        query_idxs = [find_list_punctuation_index(np.array(markers), np.array(punct_markers))[punct_id] for markers, punct_markers in zip(input_sequences_info["trialID"], input_sequences_info["subtok"])]
+
+        # check that we've indeed found the commas at all positions
+        assert sum([strings[i][idx] == "," for i, idx in enumerate(query_idxs)])
 
     # replace ':' (default) by another character is specified (e.g. for control experiments)
     control_cue_tokens = [';', ',']
