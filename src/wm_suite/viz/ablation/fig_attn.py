@@ -1,16 +1,15 @@
 # %%
-import os, sys
+import os
 import numpy as np
 import pandas as pd
 from scipy.stats import sem
-from scipy.stats import bootstrap, median_abs_deviation
+from scipy.stats import median_abs_deviation
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 import matplotlib as mpl
 from matplotlib.ticker import AutoMinorLocator
 import matplotlib.patches as patches
 from src.wm_suite.wm_ablation import find_topk_attn
-from src.wm_suite.viz.func import filter_and_aggregate
 import logging
 from typing import List, Dict, Tuple
 
@@ -160,11 +159,28 @@ def plot_schematic(ax, d, colors, squeezed=False):
 #    ctx = " ".join([s.strip("Ġ") for s in d['tokens'][0][20:35]])
 #    second_list = " ".join([s.strip("Ġ") for s in d['tokens'][0][-11:-1]])
 
+    ax.set_ylim(0, 2)
+
     cue1 = d['tokens'][0][13].strip("Ġ")
     cue2 = d['tokens'][0][45].strip("Ġ")
 
     labels = ["Mary wrote down a list of words", cue1, "$N_1, N_2, N_3$", 
-                "[...] when she got back she read", "the list again",  cue2]
+                "...when she got back she read", "the list again",  cue2]
+    
+    xmax = 39
+    ypos = 0.85
+    labels2 = {
+        0: {"text": "Mary wrote down a list of words", "xpos": 0*xmax, "ypos": ypos, "c": "tab:gray", "fc": "None", "fcalpha": None},
+        1: {"text": cue1, "xpos": 0.32*xmax, "ypos": ypos, "c": "black", "fc": "tab:green", "fcalpha": 0.3},
+        2: {"text": "$N_1$", "xpos": 0.35*xmax, "ypos": ypos, "c": "black", "fc": "tab:blue", "fcalpha": 0.3},
+        3: {"text": "$,$", "xpos": 0.4*xmax, "ypos": ypos, "c": "black", "fc": "None", "fcalpha": None},
+        4: {"text": "$N_2$", "xpos": 0.43*xmax, "ypos": ypos, "c": "black", "fc": "tab:blue", "fcalpha": 0.3},
+        5: {"text": "$,$", "xpos": 0.48*xmax, "ypos": ypos, "c": "black", "fc": "None", "fcalpha": None},
+        6: {"text": "$N_3$", "xpos": 0.51*xmax, "ypos": ypos, "c": "black", "fc": "tab:blue", "fcalpha": 0.3},
+        7: {"text": "...when she got back she read", "xpos": 0.56*xmax, "ypos": ypos, "c": "tab:grey", "fc": "None", "fcalpha": None},
+        8: {"text": "the list again", "xpos": 0.86*xmax, "ypos": ypos, "c": "black", "fc": "tab:orange", "fcalpha": 0.3},
+        9: {"text": cue2, "xpos": xmax, "ypos": ypos, "c": "black", "fc": "tab:red", "fcalpha": 0.3},
+    }
 
     xmax=39
     if squeezed:
@@ -174,59 +190,61 @@ def plot_schematic(ax, d, colors, squeezed=False):
         xpos = [0*xmax, 0.33*xmax, 0.37*xmax, 0.51*xmax, 0.85*xmax, xmax]    
         text_fs, annot_fs = 15, 15
 
-    ypos = [0.35, 0.35, 0.35, 0.35, 0.35, 0.35]
+    ypos = np.array([0.35, 0.35, 0.35, 0.35, 0.35, 0.35])+0.7
     xarrow_from = [39, 39, 39]
-    xarrow_to = [16.5, 35.5, 13.5]
+    xarrow_to = [0.44*xmax, 0.91*xmax, 0.32*xmax]
 
     if squeezed:
         fractions = [0.08, 0.26, 0.1]
         lw = 2
     else:
-        fractions = [0.1, 0.26, 0.15]
+        fractions = [0.07, 0.36, 0.12]  # (postmatch, recent, matching)
         lw = 1.7
 
     ax.set_axis_off()
 
-    for i, tk in enumerate(labels):
+    for i, tkey in enumerate(labels2):
 
-        c, fc, fcalpha = "tab:gray", "None", None
-        if i in [2, 4]:
-            c, fc, fcalpha = "black", "tab:gray", 0.3
-        elif i in [1, 5]: 
-            c, fc, fcalpha = "black", "tab:red", 0.3
-
-        if cue1 != cue2:
-            if i in [1]:
-                c, fc, fcalpha = "black", "tab:red", 0.3
-            if i in [5]:
-                c, fc, fcalpha = "black", "tab:green", 0.3
-
-        ax.text(xpos[i], ypos[i], tk, color=c, fontsize=text_fs, ha='left',
-        bbox=dict(facecolor=fc, alpha=fcalpha, edgecolor='gray', boxstyle='round'))
+        tkdict = labels2[tkey]
+        ax.text(tkdict["xpos"], tkdict["ypos"], tkdict["text"], color=tkdict["c"], fontsize=text_fs, ha='left',
+                bbox=dict(facecolor=tkdict["fc"], alpha=tkdict["fcalpha"], edgecolor='gray', boxstyle='round'))
 
     for i in range(len(xarrow_from)):
+        
+        if i == 0:
+            ypos_to = 2
+            ypos_to2 = 2
+            arrprops = {'arrowstyle': "-[",
+                        'color': f"{colors[i]}",
+                        "lw": lw,
+                        'ls':'dashed', 
+                        'connectionstyle': f'bar,fraction={fractions[i]}'}
+        else:
+            ypos_to = 1.4
+            ypos_to2 = 1.4
+            arrprops = {'arrowstyle': "->", 
+                        'color': f"{colors[i]}",
+                        "lw": lw,
+                        'ls':'dashed', 
+                        'connectionstyle': f'bar,fraction={fractions[i]}'}
 
-            ax.annotate('', 
-                        xy=(xarrow_to[i], 0.75),
-                        xytext=(xarrow_from[i], 0.75), 
-                        va='center', 
-                        ha='center',
-                        fontsize=14,
-                        arrowprops={'arrowstyle': '->', 
-                                    'color': f"{colors[i]}",
-                                    "lw": lw,
-                                    'ls':'dashed', 
-                                    'connectionstyle': f'bar,fraction={fractions[i]}'})
+        ax.annotate('', 
+                    xy=(xarrow_to[i], ypos_to),
+                    xytext=(xarrow_from[i], ypos_to2), 
+                    va='center', 
+                    ha='center',
+                    fontsize=14,
+                    arrowprops=arrprops)
 
     if not squeezed:
-        ax.text(39.3, 0.8, "Query", color="tab:gray", fontsize=annot_fs, ha="left", fontweight="bold")
-        ax.text(39.3, 1.8, "Attention", color="tab:gray", fontsize=annot_fs, ha="left", fontweight="bold")
+        ax.text(39.5, 0.8, "Query", color="tab:gray", fontsize=annot_fs, ha="left", fontweight="bold")
+        ax.text(39.5, 1.8, "Attention", color="tab:gray", fontsize=annot_fs, ha="left", fontweight="bold")
 
-        ax.text(26, 2, "Post-matching heads", color=colors[0], fontsize=annot_fs, ha="center", fontweight="bold")
-        ax.text(34.5, 1.3, "Recent-tokens heads", color=colors[1], fontsize=annot_fs, ha="center", fontweight="bold")
-        ax.text(18, 2.9, "Matching heads", color=colors[2], fontsize=annot_fs, ha="center", fontweight="bold")
+        ax.text(26, 3.4, "Postmatch heads", color=colors[0], fontsize=annot_fs, ha="center", fontweight="bold")
+        ax.text(34.5, 2.6, "Recent-tokens heads", color=colors[1], fontsize=annot_fs, ha="center", fontweight="bold")
+        ax.text(18, 4.2, "Matching heads", color=colors[2], fontsize=annot_fs, ha="center", fontweight="bold")
 
-    ax.text(-2.5, 0.35, "LM Input", color="tab:gray", fontsize=annot_fs, ha="center", fontweight="bold")
+    ax.text(-2.5, 0.85, "LM Input", color="tab:gray", fontsize=annot_fs, ha="center", fontweight="bold")
     ax.set_xticks(np.arange(0, 40))
 
     return ax
@@ -237,8 +255,8 @@ def plot_imshow_and_average(axes, dat:np.ndarray, selection: Dict=None, c:str="#
     m = np.mean(dat, axis=(0, 1))           # mean across sequences and heads
     se = sem(np.mean(dat, axis=0), axis=0)  # SE over head means
 
-    axes[0].plot(m, '--o', markersize=8, mec='white', color=c)
-    axes[0].fill_between(np.arange(dat.shape[-1]), y1=m+se, y2=m-se, color=c, alpha=0.3)
+    #axes[0].plot(m, '--o', markersize=8, mec='white', color=c)
+    #axes[0].fill_between(np.arange(dat.shape[-1]), y1=m+se, y2=m-se, color=c, alpha=0.3)
 
     if c == "#1f77b4":
         cmap = plt.cm.Blues
@@ -248,30 +266,33 @@ def plot_imshow_and_average(axes, dat:np.ndarray, selection: Dict=None, c:str="#
         cmap = plt.cm.Greens
     elif c == "#000000":
         cmap = plt.cm.Greys
-    im1 = axes[1].imshow(np.mean(dat, axis=0), cmap=cmap, aspect='auto', vmin=0, vmax=1)
+
+
+    im1 = axes[0].imshow(np.mean(dat, axis=0).T, origin="lower", cmap=cmap, aspect='equal', vmin=0, vmax=1)
 
     if selection:
-        lays = [(i-0.45, h-0.5) for i in selection.keys() if selection[i] for h in selection[i]]
+        lays = [(h-0.45, i-0.5) for i in selection.keys() if selection[i] for h in selection[i]]
         for xy in lays:
             rect = patches.Rectangle(xy, 0.99, 0.99, linewidth=1.3, edgecolor="black", facecolor="none")
-            axes[1].add_patch(rect) 
+            axes[0].add_patch(rect) 
 
         textc = "white"
         if c == "#2ca02c":
             textc = "black"
-        xycoord = [(i, h+0.1) for i in selection.keys() if selection[i] for h in selection[i]]
-        xyinds = [(i, h) for i in selection.keys() if selection[i] for h in selection[i]]
+        xycoord = [(h+0.1, i) for i in selection.keys() if selection[i] for h in selection[i]]
+        xyinds = [(h, i) for i in selection.keys() if selection[i] for h in selection[i]]
         for xy, xyind in zip(xycoord, xyinds):
 
-            value = round(np.mean(dat, axis=0)[xyind[1], xyind[0]], 2)
+            value = round(np.mean(dat, axis=0)[xyind[0], xyind[1]], 2)
             texts = f"{value:.2f}".lstrip("0")
             if value == 1.0:
                 texts = f"{value:.0f}"
             
-            axes[1].text(x=xy[0], y=xy[1], s=texts, ha="center", va="center", c=img_txt_c, fontweight="semibold")
+            axes[0].text(x=xy[0], y=xy[1], s=texts, ha="center", va="center", c=img_txt_c, fontweight="semibold")
 
 
     return axes, im1, (m, se)
+
 
 # %%
 def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors: List, query_id: int, target_id: int, n_tokens_per_window: int):
@@ -299,7 +320,7 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors
     sel = target_id
     xtmp = x[:, sel, ...]
 
-    selection, _, _ = find_topk_attn(x, topk=10, tokens_of_interest=[target_id], seed=12345)
+    selection, _, _ = find_topk_attn(x, topk=20, attn_threshold=0.2, tokens_of_interest=[target_id], seed=12345)
     _, img1, d1 = plot_imshow_and_average(ax[:, 0], xtmp, selection=selection, c=colors[2], img_txt_c=img_text_colors[0])
 
     # sum over selected positions and plot image
@@ -307,7 +328,7 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors
     sel[np.array(first_list)] = True
     xtmp = np.sum(x[:, sel, ...], 1)
 
-    selection, _, _ = find_topk_attn(x, topk=10, tokens_of_interest=first_list, seed=12345)  # to mark top-10 cells
+    selection, _, _ = find_topk_attn(x, topk=20, attn_threshold=0.2, tokens_of_interest=first_list, seed=12345)  # to mark top-10 cells
     _, img2, d2 = plot_imshow_and_average(ax[:, 1], xtmp, selection=selection, c=colors[0], img_txt_c=img_text_colors[1])
 
     # sum over selected positions and plot image
@@ -315,7 +336,7 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors
     sel[np.array(preceding)] = True
     xtmp = np.sum(x[:, sel, ...], 1)
 
-    selection, _, _ = find_topk_attn(x, topk=10, tokens_of_interest=preceding, seed=12345)  # to mark top-10 cells
+    selection, _, _ = find_topk_attn(x, topk=20, attn_threshold=0.2, tokens_of_interest=preceding, seed=12345)  # to mark top-10 cells
     _, img3, d3 = plot_imshow_and_average(ax[:, 2], xtmp, selection=selection, c=colors[1], img_txt_c=img_text_colors[2])
 
     for a in ax[0, :]:
@@ -401,9 +422,9 @@ def generate_plot2(datadir, query):
 
     if query in ["colon-colon-p1", 'colon-semicolon-p1', 'comma-comma-p1', 'colon-colon-n1']:
 
-        fig = plt.figure(figsize=(12, 6.5))
+        fig = plt.figure(figsize=(12, 5.5))
 
-        gs = GridSpec(3, 3, height_ratios=[0.6, 1, 2.5], figure=fig)
+        gs = GridSpec(2, 3, height_ratios=[0.3, 1.6], figure=fig)
 
         ax1 = fig.add_subplot(gs[0, :])
 
@@ -413,9 +434,9 @@ def generate_plot2(datadir, query):
         ax4 = fig.add_subplot(gs[1, 2], sharey=ax2)
 
         # second row axes
-        ax5 = fig.add_subplot(gs[2, 0], sharex=ax2)
-        ax6 = fig.add_subplot(gs[2, 1], sharex=ax3, sharey=ax5)
-        ax7 = fig.add_subplot(gs[2, 2], sharex=ax4, sharey=ax5)
+        #ax5 = fig.add_subplot(gs[2, 0], sharex=ax2)
+        #ax6 = fig.add_subplot(gs[2, 1], sharex=ax3, sharey=ax5)
+        #ax7 = fig.add_subplot(gs[2, 2], sharex=ax4, sharey=ax5)
 
         # for the main figure, font can remain smaller (as the figure itself is larger), 
         if query in ["colon-colon-p1"]:
@@ -423,12 +444,12 @@ def generate_plot2(datadir, query):
         else:
             plot_schematic(ax1, d1, colors=clrs, squeezed=True)
 
-        axes = np.array([[ax2, ax3, ax4], [ax5, ax6, ax7]])
+        axes = np.array([[ax2, ax3, ax4]])
 
-        for a in (ax3, ax4, ax6, ax7):
+        for a in (ax3, ax4):
             plt.setp(a.get_yticklabels(), visible=False)
-        for a in (ax2, ax3, ax4):
-            plt.setp(a.get_xticklabels(), visible=False)
+        #for a in (ax2, ax3, ax4):
+        #    plt.setp(a.get_xticklabels(), visible=False)
 
     else:
 
@@ -437,8 +458,10 @@ def generate_plot2(datadir, query):
                                )
 
     # ==== PLOT FIGURE ===== #
-    if query in ["colon-colon-p1"]:
+    if query in ["colon-colon-p1"] and n_tokens_per_window == 3:
         img_txt_clrs = ["black", "white", "white"]
+    elif query in ["colon-colon-p1"] and n_tokens_per_window == 1:
+        img_txt_clrs = ["black", "black", "black"]
     else:
         img_txt_clrs = ["black", "black", "white"]
 
@@ -457,98 +480,54 @@ def generate_plot2(datadir, query):
         lfs = 22
         titlefs = 23
 
-    ax[1, 0].set_ylabel("Head", fontsize=lfs)
-    ax[0, 0].set_ylabel("Avg. attention\nweight", fontsize=lfs)
+    ax[0, 0].set_ylabel("Layer", fontsize=lfs)
 
-
-    for a in ax[0, :]:
-        a.set_ylim([0, 0.5])
-        a.set_yticks([0, 0.5])
-        a.yaxis.set_minor_locator(AutoMinorLocator())
-        a.grid(visible=True, which="both", linewidth=0.5)
+    #for a in ax[0, :]:
+    #    a.set_ylim([0, 0.5])
+    #    a.set_yticks([0, 0.5])
+    #    a.yaxis.set_minor_locator(AutoMinorLocator())
+    #    a.grid(visible=True, which="both", linewidth=0.5)
 
     # ticks and ticklabels
-    for a in ax[1, :]:
-        a.set_xticks(np.arange(0, 11, 2))
-        a.set_xticklabels(np.arange(1, 12, 2), fontsize=lfs)
-        a.yaxis.set_minor_locator(AutoMinorLocator(2))
-        a.xaxis.set_minor_locator(AutoMinorLocator(2))
+    for a in ax[0, :]:
+        a.set_yticks(np.arange(0, 12, 1))
+        a.set_yticklabels([str(i) if i%2 != 0 else "" for i in range(1, 13, 1)], fontsize=lfs)
+        #a.yaxis.set_minor_locator(AutoMinorLocator(2))
+        #a.xaxis.set_minor_locator(AutoMinorLocator(2))
+        a.grid(visible=True, which="both", linestyle="--", linewidth=0.5)
+        a.set_xticks(np.arange(0, 12, 1))
+        a.set_xticklabels([str(i) if i%2 != 0 else "" for i in range(1, 13, 1)], fontsize=lfs)
 
  
-    ax[0, 0].tick_params(axis="y", labelsize=lfs)
-    ax[1, 0].set_yticks(np.arange(0, 12, 2))
-    ax[1, 0].set_yticklabels(np.arange(1, 12, 2), fontsize=lfs)
+    # add image plot ticks
 
     # colorbar
-    cax = ax[1, 0].inset_axes([1.03, 0, 0.03, 1])
-    cbar = fig.colorbar(imgs[0], ax=ax[1, 0], cax=cax, ticks=[0, 0.5, 1])
+    cax = ax[0, 0].inset_axes([1.03, 0, 0.03, 1])
+    cbar = fig.colorbar(imgs[0], ax=ax[0, 0], cax=cax, ticks=[0, 0.5, 1])
     cbar.ax.set_yticklabels(["", "", ""])
 
-    cax = ax[1, 1].inset_axes([1.03, 0, 0.03, 1])
-    cbar = fig.colorbar(imgs[1], ax=ax[1, 1], cax=cax, ticks=[0, 0.5, 1])
+    cax = ax[0, 1].inset_axes([1.03, 0, 0.03, 1])
+    cbar = fig.colorbar(imgs[1], ax=ax[0, 1], cax=cax, ticks=[0, 0.5, 1])
     cbar.ax.set_yticklabels(["", "", ""])
 
-    cax = ax[1, 2].inset_axes([1.03, 0, 0.03, 1])
-    cbar = fig.colorbar(imgs[2], ax=ax[1, 2], cax=cax, ticks=[0, 0.5, 1])
+    cax = ax[0, 2].inset_axes([1.03, 0, 0.03, 1])
+    cbar = fig.colorbar(imgs[2], ax=ax[0, 2], cax=cax, ticks=[0, 0.5, 1])
     cbar.ax.set_yticklabels([0, 0.5, 1])
     cbar.ax.set_ylabel("Attention weight", fontsize=lfs-3)
     cbar.ax.tick_params(labelsize=lfs-3)
 
-    fig.supxlabel("Layer", fontsize=lfs)
+    fig.supxlabel("Head", fontsize=lfs)
     fig.suptitle(suptitle, fontsize=titlefs)
     fig.tight_layout()
-
-    # ===== CONTROL FIGURE ===== #
-
-    fig_, axes2 = plt.subplots(2, 1, figsize=(6, 4.5), sharex="col",
-                               gridspec_kw={"height_ratios": [1, 2]})
-
-    axes2, img2_, data2 = attn_amplitude_plot_control_tokens(axes2, x1, d1, colors=["#000000"], seed=12345)
-    #axes2.legend(title="Target token", fontsize=12, title_fontsize=12)
-
-    lfs=16
-
-    axes2[0].set_ylim([0, 0.5])
-    axes2[0].set_yticks([0, 0.25, 0.5])
-    axes2[0].set_yticklabels([0, '', 0.5])
-
-    axes2[1].set_yticks(np.arange(0, 12, 2))
-    axes2[1].set_yticklabels(np.arange(1, 12, 2), fontsize=lfs)
-
-    fig_.supxlabel("Layer", fontsize=lfs)
-    axes2[0].set_ylabel("Avg. attention\nweight", fontsize=lfs)
-    axes2[1].set_ylabel("Head", fontsize=lfs)
-
-    for a in axes2:
-        a.tick_params(axis="y", labelsize=lfs)
-
-    for a in axes2:
-        a.set_xticks(np.arange(0, 11, 2))
-        a.set_xticklabels(np.arange(1, 12, 2), fontsize=lfs)
-
-    # despine and gridlines
-    axes2[0].grid(visible=True, linewidth=0.5)
-    axes2[0].spines['top'].set_visible(False)
-    axes2[0].spines['right'].set_visible(False)
-
-    cax = axes2[1].inset_axes([1.04, 0.1, 0.04, 0.8])
-    cbar = fig_.colorbar(img2_, ax=axes2[1], cax=cax)
-    cbar.ax.set_ylabel("Attention weight", rotation=90, fontsize=lfs)
-    cbar.ax.tick_params(labelsize=lfs)
-
-    
-    fig_.suptitle("GPT-2 attention over random tokens in intervening context", fontsize=15)
-    fig_.tight_layout()
 
     # format data in a csv
     datarec_ax0 = {f"layer-{i+1}": v for i, v in enumerate(data1[0][0])}   # to nouns
     datarec_ax1 = {f"layer-{i+1}": v for i, v in enumerate(data1[1][0])}   # to nouns
-    datarec_fig0 = {f"layer-{i+1}": v for i, v in enumerate(data2[0])}   # to nouns
-    data = pd.DataFrame.from_dict([datarec_ax0, datarec_ax1, datarec_fig0]).T
-    data.columns = ['distant', 'recent', 'intermediate']
+    data = pd.DataFrame.from_dict([datarec_ax0, datarec_ax1]).T
+    data.columns = ['distant', 'recent']
 
 
-    return fig, fig_, data
+    return fig, data
 
 # %%
 def save_png_pdf(fig, savename: str):
@@ -607,13 +586,12 @@ def main(input_args=None):
 
         if main_fig:
 
-            fig1, fig1_, data = generate_plot2(datadir=datadir, query="colon-colon-p1")
+            fig1, data = generate_plot2(datadir=datadir, query="colon-colon-p1")
 
             if args.savedir:
-                save_png_pdf(fig1, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1"))
-                save_png_pdf(fig1_, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1_control"))
+                save_png_pdf(fig1, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1_v2"))
 
-                fn = os.path.join(args.savedir, "gpt2_attn_colon-colon-p1" + ".csv")
+                fn = os.path.join(args.savedir, "gpt2_attn_colon-colon-p1_v2" + ".csv")
                 logging.info(f"Saving {fn}")
                 data.to_csv(fn, sep='\t')
 

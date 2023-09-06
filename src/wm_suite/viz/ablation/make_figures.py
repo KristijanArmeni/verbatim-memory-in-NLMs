@@ -6,8 +6,7 @@ import argparse
 
 # own modules
 from paths import PATHS as p
-from src.wm_suite.viz.ablation import (fig_attn_example, 
-                                       fig_attn, 
+from src.wm_suite.viz.ablation import (fig_attn, 
                                        fig_triplets)
 
 from src.wm_suite.viz.func import set_manuscript_style
@@ -20,9 +19,9 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 def main(input_args=None):
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--datadir", type=str)
+    parser.add_argument("--datadir", type=str, required=True)
     parser.add_argument("--which", type=str, choices=["all", "attn_example", "attn_weights", "triplets"])
-    parser.add_argument("--savedir", type=str)
+    parser.add_argument("--savedir", type=str, required=True)
 
     if input_args is None:
         args = parser.parse_args()
@@ -45,9 +44,9 @@ def main(input_args=None):
         #logging.info("Drawing attention weights example plot...")
         #attn_weights_example.main(["--datadir", args.datadir, "--savedir", args.savedir])
 
-    # if flags["attn_weights"]:
-        #logging.info("Drawing attention weights figure...")
-        #attn_weights_figure.main(["--datadir", args.datadir, "--which", "main_fig", "--savedir", args.savedir])
+    if flags["attn_weights"]:
+        logging.info("Drawing attention weights figure...")
+        fig_attn.main(["--datadir", args.datadir, "--which", "main_fig", "--savedir", args.savedir])
 
     if flags["triplets"]:
 
