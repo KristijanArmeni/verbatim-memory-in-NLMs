@@ -11,7 +11,7 @@ WT103_TRANSFORMER_OSF_URL = "https://osf.io/download/ejwug/"
 AWD_LSTM_RESULTS_OSF_URL = "https://osf.io/download/yu7m3/"
 
 # Armeni et al, 2023
-OSF_URL_ATTN_WEIGHTS_ZIP = "https://osf.io/download/uye56/"
+OSF_URL_ATTN_WEIGHTS_ZIP_TMP = "https://osf.io/download/pm6wq/"  # temporary link on 
 
 
 def download_raw_data_zip(zipurl: str, path: str):
@@ -51,7 +51,7 @@ def get_data(which: str, path: str):
 
     elif which == "attention_weights":
 
-        download_raw_data_zip(zipurl=OSF_URL_ATTN_WEIGHTS_ZIP, path=path)
+        download_raw_data_zip(zipurl=OSF_URL_ATTN_WEIGHTS_ZIP_TMP, path=path)
 
 
 def download_data():
@@ -66,9 +66,9 @@ def download_data():
     if args.which:
         get_data(which=args.which, path=args.path)
     else:
-        get_data(which="gpt2", path=path)
-        get_data(which="awd_lstm", path=path)
-        get_data(which="wt103_transformer", path=path)
+        get_data(which="gpt2", path=args.path)
+        get_data(which="awd_lstm", path=args.path)
+        get_data(which="wt103_transformer", path=args.path)
 
     return None
 
@@ -77,8 +77,8 @@ def download_data():
 def download_data2():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--which", type=str, choices=["attention_weights", "ablation_experiment"])
-    parser.add_argument("--path", type=str)
+    parser.add_argument("--which", type=str, choices=["attention_weights", "ablation_experiment"], required=True)
+    parser.add_argument("--path", type=str, required=True)
 
     args = parser.parse_args()
 
