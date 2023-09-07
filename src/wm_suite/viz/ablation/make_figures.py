@@ -6,8 +6,7 @@ import argparse
 
 # own modules
 from paths import PATHS as p
-from src.wm_suite.viz.ablation import (fig_attn, 
-                                       fig_triplets)
+from src.wm_suite.viz.ablation import fig_attn
 
 from src.wm_suite.viz.func import set_manuscript_style
 
@@ -48,15 +47,6 @@ def main(input_args=None):
         logging.info("Drawing attention weights figure...")
         fig_attn.main(["--datadir", args.datadir, "--which", "main_fig", "--savedir", args.savedir])
 
-    if flags["triplets"]:
-
-        logging.info("Drawing memory ablation figure...")
-        if args.datadir is None:
-            args.datadir = os.path.join(p.data, "ablation", "zero_attn", "topk", "triplets")
-        if args.savedir is None:
-            args.savedir = os.path.join(p.root, 'fig', "ablation", "topk", "triplets")
-
-        fig_triplets.main(["--datadir", args.datadir, "--savedir", args.savedir])
 
     return 0
 
