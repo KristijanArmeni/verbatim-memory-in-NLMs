@@ -174,8 +174,12 @@ def greedy_search(attention_heads: List[str],
         
         # if increment from past iteraion is smaller than 1%, increase patience
         increment = best_score - best_scores[-1] if best_scores else 1  # dummy value to keep the code running
-        if increment < 1:
+        patience_delta = 0.5
+        if increment < patience_delta:
             patience += 1
+        # reset patience counter if increment is larger than 1% (growing again)
+        elif (increment >= patience_delta) and (patience > 0):
+            patience = 0
         
         # store the best score and its confidence interval and raw surprisals
         best_scores.append(best_score)
