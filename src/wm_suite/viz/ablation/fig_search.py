@@ -99,13 +99,13 @@ def make_plot(data: Dict, member_dict: Dict):
     tmp = data["best_labels"][-1]
     xlabels = np.array(["" for _ in range(len(member_dict))], dtype=object)
     for i, s in enumerate(tmp):
-        xlabels[i] = f"{i+1} " + reformat_str(s)
+        xlabels[i] = f"{i+1}  " + reformat_str(s)
 
     ax1.set_xticklabels(xlabels, rotation=45, ha="right")
 
     ax1.set_ylim(0, 100 if ax1.get_ylim()[1] < 100 else ax1.get_ylim()[1])
-    ax1.set_xlabel("Found head")
-    ax1.set_ylabel("Median repeat surprisal (%)")
+    ax1.set_xlabel("Ablated head")
+    ax1.set_ylabel("Median repeat surprisal\n(%)")
 
     cols = {0:'tab:green', 1:'tab:blue', 2:'tab:orange'}
     for i, l in enumerate(ax1.xaxis.get_ticklabels()):
@@ -141,8 +141,6 @@ def make_plot(data: Dict, member_dict: Dict):
     ax1.spines["right"].set_visible(False)
     ax1.grid(visible=True, axis="both", linestyle="--", alpha=0.5)
     ax2.grid(visible=True, axis="both", linestyle="--", alpha=0.5)
-
-    plt.tight_layout()
     
     return fig, (ax1, ax2)
 
@@ -153,6 +151,7 @@ files = get_filenames(os.path.basename(__file__))
 
 data1 = load_json(os.path.join(PATHS.search, files["topk_n1"]))
 data2 = load_json(os.path.join(PATHS.search, files["topk_n2"]))
+data3 = load_json(os.path.join(PATHS.search, files["topk_n2_n3"]))
 
 data1_ = load_json(os.path.join(PATHS.search, files["topk_n1_list"]))
 data2_ = load_json(os.path.join(PATHS.search, files["topk_n2_list"]))
@@ -164,10 +163,25 @@ membership2 = get_membership_dict((data2_["lh_list"], data2_["members"]))
 # %%
 
 fig, axes = make_plot(data1, membership1)
+axes[0].set_title("Greedy search results across all head types (effects on N1)")
+axes[1].set_title("Searched heads")
+plt.tight_layout()
 plt.show()
 
 # %%
 
 fig2, axes2 = make_plot(data2, membership2)
+axes2[0].set_title("Greedy search results across all head types (effects on N2)")
+axes2[1].set_title("Searched heads")
+plt.tight_layout()
 plt.show()
+
+# %%
+fig3, axes3 = make_plot(data3, membership2)
+axes3[0].set_title("Greedy search results across all head types (effects on N2+N3)")
+axes3[1].set_title("Searched heads")
+plt.tight_layout()
+plt.show()
+
+
 # %%
