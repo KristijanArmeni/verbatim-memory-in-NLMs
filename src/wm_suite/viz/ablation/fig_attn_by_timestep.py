@@ -100,9 +100,9 @@ for infix in infix_strings1+infix_strings2:
 # %%
 # define the toi
 x = datadict["p1"]  # use the data sampled at ':' to define the heads
-lh_dict_match, _, match_vals = find_topk_attn(x, topk=10, tokens_of_interest=[13], seed=12345)
-lh_dict_post, _, post_vals = find_topk_attn(x, topk=10, tokens_of_interest=[14], seed=12345)
-lh_dict_recent, _, recent_vals = find_topk_attn(x, topk=10, tokens_of_interest=[58], seed=12345)
+lh_dict_match, _, match_vals = find_topk_attn(x, topk=20, attn_threshold=0.15, tokens_of_interest=[13], seed=12345)
+lh_dict_post, _, post_vals = find_topk_attn(x, topk=10, attn_threshold=0.2, tokens_of_interest=[14], seed=12345)
+lh_dict_recent, _, recent_vals = find_topk_attn(x, topk=10, attn_threshold=0.2, tokens_of_interest=[58], seed=12345)
 # %%
 
 # stack attention weights for all nouns
@@ -206,7 +206,7 @@ def find_onsets(tokens, which):
 
 # %%
 
-plotwhich = "matching"
+plotwhich = "postmatch"
 
 if plotwhich == "matching":
     x_dat = x_match
@@ -234,6 +234,7 @@ elif plotwhich == "recent":
 
 current_cmap.set_bad(color='lightgrey')
 
+set_manuscript_style()
 
 fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(12, 4.5), sharex=True, 
                        gridspec_kw={'height_ratios': [1, 2]})
@@ -272,16 +273,18 @@ setstr = lambda x: f"Min = {x[0]:.2f}\nMed = {x[2]:.2f}\nMax = {x[1]:.2f}"
 patch_ons = find_onsets(seltok, plotwhich)
 marker1_ons, patch_timestep, marker2_ons = set_timesteps(patch_ons)
 
-im = ax[1].imshow(datnan.T, aspect="auto", vmin=0, vmax=1, cmap=current_cmap)
+im = ax[1].imshow(datnan.T, aspect="auto", vmin=0, cmap=current_cmap)
 
-liney = np.median(datnan[0:marker1_ons+1, :], axis=1)
-line1 = ax[0].plot(liney, "--o", color=lc, markersize=5)[0]
+liney = datnan[0:marker1_ons+1, :]
+lines = ax[0].plot(liney, "--", color="gray")
+
+median_line = ax[0].plot(np.median(datnan[0:marker1_ons+1, :], axis=1), "-", color=lc)[0]
 
 ax[1].set_ylabel("Head\n(Layer/head index)")
 ax[1].set_xlabel("Token")
 ax[1].set_xticks(hasvals)
 ax[1].set_xticklabels(seltok, rotation=90)
-ax[1].set_yticks(np.arange(0, 10))
+ax[1].set_yticks(np.arange(0, len(ylabs)))
 ax[1].set_yticklabels(ylabs)
 
 
@@ -293,18 +296,18 @@ ax[0].set_ylabel("Med. att.\nacross heads")
 
 #rect1 = patches.Rectangle((marker1_ons-0.5, -0.5), 1, 10, linewidth=1, ec='tab:purple', facecolor='none', zorder=2)
 #ax[1].add_patch(rect1)
-marker1 = ax[1].vlines(marker1_ons, 8.5, 9.5, color='tab:red', linewidth=2)
+marker1 = ax[1].vlines(marker1_ons, len(ylabs)-0.5, len(ylabs)-1, color='tab:red', linewidth=2)
 
 # draw it at marker1_ons initially, but hide and activate once patch_ons exists
-rect = patches.Rectangle((marker1_ons-0.5, -0.5), 1, 10, linewidth=1, ec='tab:purple', facecolor='none', zorder=2)  
+rect = patches.Rectangle((marker1_ons-0.5, -0.5), 1, len(ylabs), linewidth=1, ec='tab:purple', facecolor='none', zorder=2)  
 ax[1].add_patch(rect)
 rect.set_visible(False)
 
 if marker2_ons is None:
-    marker2 = ax[1].vlines(marker1_ons, 8.5, 9.5, color='tab:red', linewidth=2)
+    marker2 = ax[1].vlines(marker1_ons, len(ylabs)-0.5, len(ylabs)-1, color='tab:red', linewidth=2)
     marker2.set_visible(False)
 elif marker2_ons is not None:
-    marker2 = ax[1].vlines(marker2_ons, 8.5, 9.5, color='tab:red', linewidth=2)
+    marker2 = ax[1].vlines(marker2_ons, len(ylabs)-0.5, len(ylabs)-1, color='tab:red', linewidth=2)
     marker2.set_visible(True)
 
 txtoffset = 8
@@ -326,10 +329,14 @@ def update(frame):
 
     marker1_ons, patch_timestep, marker2_ons = set_timesteps(rect_onsets)
 
-    linedat = np.median(data[0:marker1_ons+1, :], axis=1)
+    linedat = data[0:marker1_ons+1, :]
 
-    line1.set_ydata(linedat)
-    line1.set_xdata(np.arange(0, len(linedat)))
+    for i, l in enumerate(lines):
+        l.set_ydata(linedat[:, i])
+        l.set_xdata(np.arange(0, len(linedat)))
+
+    median_line.set_ydata(np.median(linedat, axis=1))
+    median_line.set_xdata(np.arange(0, len(linedat)))
 
     segs = marker1.get_segments()[0]
     segs[:, 0] = marker1_ons
@@ -383,7 +390,7 @@ def prepare_timesteps(x_in, keystr, frames):
         #print(f"from: {t[endt]} ({endt}) | to: {t[targett]}) ({targett})")
 
         v["attn"].append(x[targett, :])
-        v["labs"].append(f"{t[targett]}\n({targett})")
+        v["labs"].append(f"{t[targett]}({targett})\n{t[endt]}({endt})")
         v["query"].append(t[endt])
         v["query_id"].append(endt)
         v["target"].append(t[targett])
@@ -407,29 +414,30 @@ dr2 = prepare_timesteps(x_recent, "recent", odd_frames)
 
 #%%
 
-fig, ax = plt.subplots(2, 3, figsize=(15, 6), sharey=True)
+fig, ax = plt.subplots(2, 3, figsize=(17, 6), sharey=True)
 
 ax[0, 0].plot(np.arange(len(dm1["labs"])), dm1["attn"], "--o", color=clrs.green)
 ax[0, 1].plot(np.arange(len(dp1["labs"])), dp1["attn"], "--^", color=clrs.blue)
 ax[0, 2].plot(np.arange(len(dr1["labs"])), dr1["attn"], "--s", color=clrs.orange)
 
+fs=9
 ax[0, 0].set_xticks(np.arange(len(dm1["labs"])))
-ax[0, 0].set_xticklabels(dm1["labs"])
+ax[0, 0].set_xticklabels(dm1["labs"], fontsize=fs)
 ax[0, 1].set_xticks(np.arange(len(dp1["labs"])))
-ax[0, 1].set_xticklabels(dp1["labs"])
+ax[0, 1].set_xticklabels(dp1["labs"], fontsize=fs)
 ax[0, 2].set_xticks(np.arange(len(dr1["labs"])))
-ax[0, 2].set_xticklabels(dr1["labs"])
+ax[0, 2].set_xticklabels(dr1["labs"], fontsize=fs)
 
 ax[1, 0].plot(np.arange(len(dm2["labs"]))[1::], dm2["attn"][1::], "--o", color=clrs.green)
 ax[1, 1].plot(np.arange(len(dp2["labs"]))[1::], dp2["attn"][1::], "--^", color=clrs.blue)
 ax[1, 2].plot(np.arange(len(dr2["labs"]))[1::], dr2["attn"][1::], "--s", color=clrs.orange)
 
 ax[1, 0].set_xticks(np.arange(len(dm2["labs"]))[1::])
-ax[1, 0].set_xticklabels(dm2["labs"][1::])
+ax[1, 0].set_xticklabels(dm2["labs"][1::], fontsize=fs)
 ax[1, 1].set_xticks(np.arange(len(dp2["labs"]))[1::])
-ax[1, 1].set_xticklabels(dp2["labs"][1::])
+ax[1, 1].set_xticklabels(dp2["labs"][1::], fontsize=fs)
 ax[1, 2].set_xticks(np.arange(len(dr2["labs"]))[1::])
-ax[1, 2].set_xticklabels(dr2["labs"][1::])
+ax[1, 2].set_xticklabels(dr2["labs"][1::], fontsize=fs)
 
 
 ax[0, 0].set_title("Top-10 matching heads\n(target token occurs once)")
@@ -450,7 +458,7 @@ for a in ax[1, :]:
     a.spines["right"].set_visible(False)
     a.grid(visible=True, which="both", linewidth=0.5)
 
-fig.supxlabel("Target token in list\n(Timestep index in input sequence)")
+fig.supxlabel("Target token (sequence position index)\nSource token (sequence position index)")
 fig.supylabel("Mean attention across input sequences")
 
 plt.tight_layout()
