@@ -9,7 +9,10 @@ from matplotlib.gridspec import GridSpec
 import matplotlib as mpl
 from matplotlib.ticker import AutoMinorLocator
 import matplotlib.patches as patches
+
 from src.wm_suite.wm_ablation import find_topk_attn
+from src.wm_suite.viz.func import set_manuscript_style
+
 import logging
 from typing import List, Dict, Tuple
 
@@ -206,7 +209,7 @@ def plot_schematic(ax, d, colors, squeezed=False):
     for i, tkey in enumerate(labels2):
 
         tkdict = labels2[tkey]
-        ax.text(tkdict["xpos"], tkdict["ypos"], tkdict["text"], color=tkdict["c"], fontsize=text_fs, ha='left',
+        ax.text(tkdict["xpos"], tkdict["ypos"], tkdict["text"], color=tkdict["c"], fontsize=text_fs, fontweight="semibold", ha='left',
                 bbox=dict(facecolor=tkdict["fc"], alpha=tkdict["fcalpha"], edgecolor='gray', boxstyle='round'))
 
     for i in range(len(xarrow_from)):
@@ -288,7 +291,7 @@ def plot_imshow_and_average(axes, dat:np.ndarray, selection: Dict=None, c:str="#
             if value == 1.0:
                 texts = f"{value:.0f}"
             
-            axes[0].text(x=xy[0], y=xy[1], s=texts, ha="center", va="center", c=img_txt_c, fontweight="semibold")
+            axes[0].text(x=xy[0], y=xy[1], s=texts, ha="center", va="center", c=img_txt_c, fontweight="bold")
 
 
     return axes, im1, (m, se)
@@ -422,9 +425,9 @@ def generate_plot2(datadir, query):
 
     if query in ["colon-colon-p1", 'colon-semicolon-p1', 'comma-comma-p1', 'colon-colon-n1']:
 
-        fig = plt.figure(figsize=(12, 5.5))
+        fig = plt.figure(figsize=(12.5, 5.5))
 
-        gs = GridSpec(2, 3, height_ratios=[0.3, 1.6], figure=fig)
+        gs = GridSpec(2, 3, height_ratios=[0.3, 1.3], figure=fig)
 
         ax1 = fig.add_subplot(gs[0, :])
 
@@ -433,10 +436,6 @@ def generate_plot2(datadir, query):
         ax3 = fig.add_subplot(gs[1, 1], sharey=ax2)
         ax4 = fig.add_subplot(gs[1, 2], sharey=ax2)
 
-        # second row axes
-        #ax5 = fig.add_subplot(gs[2, 0], sharex=ax2)
-        #ax6 = fig.add_subplot(gs[2, 1], sharex=ax3, sharey=ax5)
-        #ax7 = fig.add_subplot(gs[2, 2], sharex=ax4, sharey=ax5)
 
         # for the main figure, font can remain smaller (as the figure itself is larger), 
         if query in ["colon-colon-p1"]:
@@ -454,7 +453,7 @@ def generate_plot2(datadir, query):
     else:
 
         fig, axes = plt.subplots(2, 2, figsize=(11, 5.5), sharex="all", sharey="row", 
-                               gridspec_kw={'height_ratios': [1, 2]},
+                               gridspec_kw={'height_ratios': [1, 1.8]},
                                )
 
     # ==== PLOT FIGURE ===== #
@@ -480,24 +479,13 @@ def generate_plot2(datadir, query):
         lfs = 22
         titlefs = 23
 
-    ax[0, 0].set_ylabel("Layer", fontsize=lfs)
-
-    #for a in ax[0, :]:
-    #    a.set_ylim([0, 0.5])
-    #    a.set_yticks([0, 0.5])
-    #    a.yaxis.set_minor_locator(AutoMinorLocator())
-    #    a.grid(visible=True, which="both", linewidth=0.5)
-
     # ticks and ticklabels
     for a in ax[0, :]:
         a.set_yticks(np.arange(0, 12, 1))
         a.set_yticklabels([str(i) if i%2 != 0 else "" for i in range(1, 13, 1)], fontsize=lfs)
-        #a.yaxis.set_minor_locator(AutoMinorLocator(2))
-        #a.xaxis.set_minor_locator(AutoMinorLocator(2))
         a.grid(visible=True, which="both", linestyle="--", linewidth=0.5)
         a.set_xticks(np.arange(0, 12, 1))
         a.set_xticklabels([str(i) if i%2 != 0 else "" for i in range(1, 13, 1)], fontsize=lfs)
-
  
     # add image plot ticks
 
@@ -512,11 +500,12 @@ def generate_plot2(datadir, query):
 
     cax = ax[0, 2].inset_axes([1.03, 0, 0.03, 1])
     cbar = fig.colorbar(imgs[2], ax=ax[0, 2], cax=cax, ticks=[0, 0.5, 1])
-    cbar.ax.set_yticklabels([0, 0.5, 1])
-    cbar.ax.set_ylabel("Attention weight", fontsize=lfs-3)
-    cbar.ax.tick_params(labelsize=lfs-3)
+    cbar.ax.set_yticklabels([0, 0.5, 1], fontsize=lfs)
+    cbar.ax.set_ylabel("Attention weight", fontsize=lfs, fontweight="semibold")
+    cbar.ax.tick_params(labelsize=lfs)
 
-    fig.supxlabel("Head", fontsize=lfs)
+    ax[0, 0].set_ylabel("Layer", fontsize=lfs, fontweight="semibold")
+    fig.supxlabel("Head", fontsize=lfs, fontweight="semibold")
     fig.suptitle(suptitle, fontsize=titlefs)
     fig.tight_layout()
 
@@ -582,61 +571,61 @@ def main(input_args=None):
         ctxlen4_fig = True if args.which == "ctxlen4_fig" else False
 
 
-    with plt.style.context("seaborn-ticks"):
+    set_manuscript_style()
 
-        if main_fig:
+    if main_fig:
 
-            fig1, data = generate_plot2(datadir=datadir, query="colon-colon-p1")
+        fig1, data = generate_plot2(datadir=datadir, query="colon-colon-p1")
 
-            if args.savedir:
-                save_png_pdf(fig1, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1_v2"))
+        if args.savedir:
+            save_png_pdf(fig1, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1_v2"))
 
-                fn = os.path.join(args.savedir, "gpt2_attn_colon-colon-p1_v2" + ".csv")
-                logging.info(f"Saving {fn}")
-                data.to_csv(fn, sep='\t')
+            fn = os.path.join(args.savedir, "gpt2_attn_colon-colon-p1_v2" + ".csv")
+            logging.info(f"Saving {fn}")
+            data.to_csv(fn, sep='\t')
 
-        # ===== CONTROL FIGURES: SWAP QUERY TOKENS ==== #
-        if control_fig:
+    # ===== CONTROL FIGURES: SWAP QUERY TOKENS ==== #
+    if control_fig:
 
-            fig2, _, data = generate_plot2(datadir=datadir, query="colon-semicolon-p1")
+        fig2, _, data = generate_plot2(datadir=datadir, query="colon-semicolon-p1")
 
-            if args.savedir:
+        if args.savedir:
 
-                savename = "gpt2_attn_colon-semicolon-p1"
-                save_png_pdf(fig2, os.path.join(args.savedir, savename))
+            savename = "gpt2_attn_colon-semicolon-p1"
+            save_png_pdf(fig2, os.path.join(args.savedir, savename))
 
-                fn = os.path.join(args.savedir, savename + ".csv")
-                logging.info(f"Saving {fn}")
-                data.to_csv(fn, sep='\t')
-
-
-            fig3, _, data = generate_plot2(datadir=datadir, query="comma-comma-p1")
-            if args.savedir:
-
-                savename = "gpt2_attn_comma-comma-p1"
-                save_png_pdf(fig3, os.path.join(args.savedir, savename))
-                
-                fn = os.path.join(args.savedir, savename + ".csv")
-                logging.info(f"Saving {fn}")
-                data.to_csv(fn, sep='\t')
-
-        # single token plot
-        if single_token_fig:
-            fig4, fig4_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-single-token")
-            if args.savedir:
-                save_png_pdf(fig4, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1-single-token"))
+            fn = os.path.join(args.savedir, savename + ".csv")
+            logging.info(f"Saving {fn}")
+            data.to_csv(fn, sep='\t')
 
 
-        if first_noun_fig:
+        fig3, _, data = generate_plot2(datadir=datadir, query="comma-comma-p1")
+        if args.savedir:
 
-            fig5, fig5_, data = generate_plot2(datadir=datadir, query="colon-colon-n1")
-            if args.savedir:
-                save_png_pdf(fig5, os.path.join(args.savedir, "gpt2_attn_colon-colon-n1"))
-                save_png_pdf(fig5_, os.path.join(args.savedir, "gpt2_attn_colon-colon-n1_control"))
+            savename = "gpt2_attn_comma-comma-p1"
+            save_png_pdf(fig3, os.path.join(args.savedir, savename))
+            
+            fn = os.path.join(args.savedir, savename + ".csv")
+            logging.info(f"Saving {fn}")
+            data.to_csv(fn, sep='\t')
 
-                fn = os.path.join(args.savedir, "gpt2_attn_colon-colon-n1" + ".csv")
-                logging.info(f"Saving {fn}")
-                data.to_csv(fn, sep='\t')
+    # single token plot
+    if single_token_fig:
+        fig4, fig4_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-single-token")
+        if args.savedir:
+            save_png_pdf(fig4, os.path.join(args.savedir, "gpt2_attn_colon-colon-p1-single-token"))
+
+
+    if first_noun_fig:
+
+        fig5, fig5_, data = generate_plot2(datadir=datadir, query="colon-colon-n1")
+        if args.savedir:
+            save_png_pdf(fig5, os.path.join(args.savedir, "gpt2_attn_colon-colon-n1"))
+            save_png_pdf(fig5_, os.path.join(args.savedir, "gpt2_attn_colon-colon-n1_control"))
+
+            fn = os.path.join(args.savedir, "gpt2_attn_colon-colon-n1" + ".csv")
+            logging.info(f"Saving {fn}")
+            data.to_csv(fn, sep='\t')
 
         # ===== CONTROL FIGURES: ABLATED MODEL ==== #
         #fig5, fig5_, data = generate_plot2(datadir=datadir, query="colon-colon-p1-ablate-11")
@@ -682,9 +671,3 @@ if __name__ == "__main__":
 
     main()
 
-# %%
-
-# main(["--which", "first_noun_fig", "--datadir", "C:\\users\\karmeni1\\project\\lm-mem\\data\\ablation"])
-
-
-# %%
