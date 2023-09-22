@@ -27,25 +27,50 @@ import logging
 import sys
 import os
 from types import SimpleNamespace
+import yaml
 
-logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(name)s | %(message)s")
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(filename)s: %(funcName)s() | %(message)s")
 
-if "PATHSCONFIG" not in os.environ:
 
-    path_to_config_toml = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pathsconfig.toml")
+def add_pathsconfig_to_environ():
 
-    logging.info(f"Adding {path_to_config_toml} to os.environ['PATHSCONFIG'] variable")
-    os.environ['PATHSCONFIG'] = path_to_config_toml
+    if "PATHSCONFIG" not in os.environ:
 
-config = configparser.ConfigParser()
-config.read(os.environ['PATHSCONFIG'])
-PATHS = SimpleNamespace(**config["paths"])
+        path_to_config_toml = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pathconfig.yaml")
 
-if PATHS.src not in sys.path:
-    logging.info(f"Adding {PATHS.src} to pythonpath")
-    sys.path.append(PATHS.src)
+        logging.info(f"Adding {path_to_config_toml} to os.environ['PATHSCONFIG'] variable")
+        os.environ['PATHSCONFIG'] = path_to_config_toml
+
+#config = configparser.ConfigParser()
+#config.read(os.environ['PATHSCONFIG'])
+#PATHS = SimpleNamespace(**config["paths"])
+
+def get_paths(path_to_config: str = None) -> SimpleNamespace:
+
+    if path_to_config is None:
+        add_pathsconfig_to_environ()
+        path_to_config = os.environ['PATHSCONFIG']
+
+    with open(path_to_config, "r") as f:
+        logging.info(f"Found {path_to_config}")
+        cfg = yaml.safe_load(f)
+
+    return SimpleNamespace(**cfg)
+
+
+def main():
+
+    paths = get_paths()
+
+    if paths.src not in sys.path:
+        logging.info(f"Adding {paths.src} to pythonpath")
+        sys.path.append(paths.src)
+
+    if paths.wm_suite not in sys.path:
+        logging.info(f"Adding {paths.wm_suite} to pythonpath")
+        sys.path.append(paths.wm_suite)
+
 
 if __name__ == "__main__":
 
-    logging.info(f"Adding {PATHS.src} to pythonpath")
-    sys.path.append(PATHS.src)
+    main()
