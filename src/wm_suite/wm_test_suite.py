@@ -17,14 +17,16 @@ import logging
 logging.basicConfig(format=("[%(levelname)s] %(funcName)s() | %(message)s"), level=logging.INFO)
 
 # own modules
-from paths import PATHS   # project root must be in python path for this to work, it adds src/ to sys.path
+from .paths import get_paths   # project root must be in python path for this to work, it adds src/ to sys.path
 from data.wt103.dataset import WikiTextDataset
-from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits, make_word_lists, concat_and_tokenize_inputs
-from wm_suite.io.stimuli import prefixes, prompts
-from wm_suite.wm_ablation import ablate_attn_module, find_topk_attn, find_topk_intersection, from_labels_to_dict, from_dict_to_labels
-from wm_suite.io.test_ds import get_test_data
-from wm_suite.viz.func import filter_and_aggregate
+from .io.prepare_transformer_inputs import mark_subtoken_splits, make_word_lists, concat_and_tokenize_inputs
+from .io.stimuli import prefixes, prompts
+from .wm_ablation import ablate_attn_module, find_topk_attn, find_topk_intersection, from_labels_to_dict, from_dict_to_labels
+from .io.test_ds import get_test_data
+from .viz.func import filter_and_aggregate
 
+
+PATHS = get_paths()
 
 # ===== DATASET CLASS ===== #
 
