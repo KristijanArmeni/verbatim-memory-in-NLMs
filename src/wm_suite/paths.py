@@ -1,25 +1,26 @@
 """
-paths.py is a small helper function can be used to set project paths at the start of a python session.
-It reads contents from pathsconfig.toml file. pathsconfig.toml should be placed in the same directory as paths.py (root)
+paths.py is a small module contiaingin get_paths() function
+It reads contents from pathconfig.yaml file which contains paths to various directories used by wm_suite
 
 Examples
 --------
 pathsconfig.toml can look like:
-```toml
-[paths]
-src = /path/to/project/root/src
+```yaml
+src: /path/to/project/root/src
 ```
 
-```
-# assuming ./pathsconfig.toml exists
-python paths.py   # it will add /path/to/project/root/src to sys.path
+```python
+# assuming pathconfig.yaml exists in wm_suite directory
+python paths.py
+
 ```
 
 Or it can be used as a module:
 ```
-from paths import PATHS
+from wm_suite.paths import get_paths
+p = get_paths()
+print(p.src)           # evaluates to /path/to/project/root/src
 
-PATHS.src  # evaluates to /path/to/project/root/src
 ```
 """
 import logging
@@ -31,6 +32,7 @@ import logging
 
 logger = logging.getLogger("wm_suite.utils")
 
+
 def add_pathsconfig_to_environ():
 
     if "PATHSCONFIG" not in os.environ:
@@ -40,13 +42,8 @@ def add_pathsconfig_to_environ():
         logger.info(f"Adding {path_to_config_toml} to os.environ['PATHSCONFIG'] variable")
         os.environ['PATHSCONFIG'] = path_to_config_toml
 
-#config = configparser.ConfigParser()
-#config.read(os.environ['PATHSCONFIG'])
-#PATHS = SimpleNamespace(**config["paths"])
-
 
 def get_paths(path_to_config: str = None) -> SimpleNamespace:
-
     """
     A wrapper to read path values from pathconfig.yaml
 
