@@ -2,8 +2,6 @@ import requests, zipfile, io
 import logging
 import argparse
 
-logging.basicConfig(level=logging.INFO, format='%(message)s')
-
 # Armeni et al, 2022
 OSF_FILES_URL = "https://osf.io/5gy7x/files/osfstorage"
 GPT2_RESULTS_OSF_URL = "https://osf.io/download/s3zv9/"
@@ -12,6 +10,33 @@ AWD_LSTM_RESULTS_OSF_URL = "https://osf.io/download/yu7m3/"
 
 # Armeni et al, 2023
 OSF_URL_ATTN_WEIGHTS_ZIP_TMP = "https://osf.io/download/pm6wq/"  # temporary link on 
+
+
+def get_wm_logger(name: str) -> logging.Logger:
+
+    formatter = logging.Formatter('[%(levelname)s] %(module)s.%(funcName)s() | %(message)s')
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+    
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    logger.propagate = False
+    
+    return logger
+
+logger = get_wm_logger("wm_suite.utils")
+
+
+def set_logger_level(level: str) -> logging.Logger:
+
+    logger = logging.getLogger("wm_suite.utils")
+
+    if level == "info":
+        logger.setLevel(logging.INFO)
+    elif level == "critical":
+        logger.setLevel(logging.CRITICAL)
 
 
 def download_raw_data_zip(zipurl: str, path: str):

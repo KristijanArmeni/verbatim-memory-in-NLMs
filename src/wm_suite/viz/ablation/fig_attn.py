@@ -15,14 +15,13 @@ from wm_suite.viz.func import set_manuscript_style
 import logging
 from typing import List, Dict, Tuple
 
-logging.basicConfig(level=logging.INFO, format="%(level)s %(filename)s: %(funcName)s | %(message)s")
-
+logger = logging.getLogger("wm_suite.utils")
 
 
 # %%
 def get_data(fn: str) -> Tuple[Dict, np.ndarray]:
     
-    print(f"Loading {fn}")
+    logger.info(f"Loading {fn}")
     b = dict(np.load(fn), allow_pickle=True) 
     a = np.stack(b['data']) # shape = (seq, token, head, layer)
     
@@ -185,8 +184,8 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors
         first_list = [16, 18, 19]
     preceding = [query_id - i for i in range(1, n_tokens_per_window+1)]
 
-    logging.info(f"Summing attn weights over early tokens: {np.array(first_list)}")
-    logging.info(f"Summing attn weights over late tokens: {np.array(preceding)}")
+    logger.info(f"Summing attn weights over early tokens: {np.array(first_list)}")
+    logger.info(f"Summing attn weights over late tokens: {np.array(preceding)}")
 
     # sum over selected positions and plot image
     sel = target_id
@@ -429,7 +428,7 @@ def main(input_args=None):
     else:
         args = parser.parse_args(input_args)
 
-    logging.info(f"Using {args.datadir} as data directory")
+    logger.info(f"Using {args.datadir} as data directory")
     datadir = args.datadir
 
     if args.which is None:

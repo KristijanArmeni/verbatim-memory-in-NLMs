@@ -1,16 +1,14 @@
-
-import json
 from ast import literal_eval
 import torch
 import numpy as np
 import torch.nn as nn
 from transformers.models.gpt2.modeling_gpt2 import GPT2Attention
 from typing import List, Dict, Tuple, Union
-from itertools import product
 import logging
 
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+#logging.basicConfig(level=logging.INFO, format="%(message)s")
 
+logger = logging.getLogger("wm_suite.utils")
 
 def shuffle_weights(x: torch.Tensor) -> torch.Tensor:
 
@@ -161,7 +159,7 @@ def find_topk_attn(attn: np.ndarray, topk: int, attn_threshold: Union[float, Non
     # aggregate over the select time-window
     sel = np.zeros(shape=attn.shape[1], dtype=bool)
 
-    logging.info(f"Finding top-{topk} attn heads across sequence positions {tokens_of_interest}")
+    logger.info(f"Finding top-{topk} attn heads across sequence positions {tokens_of_interest}")
     sel[np.array(tokens_of_interest)] = True
     attn_toi = np.sum(attn[:, sel, ...], 1)
 
@@ -186,7 +184,7 @@ def find_topk_attn(attn: np.ndarray, topk: int, attn_threshold: Union[float, Non
     else:
         inds = topk_inds
 
-    logging.info(f"Found {len(inds)} heads with top-{topk} attn scores and attention score > {attn_threshold}.")
+    logger.info(f"Found {len(inds)} heads with top-{topk} attn scores and attention score > {attn_threshold}.")
 
     # now create a boolean which is reshaped back to (heads, layers)
     arr_indx = np.zeros(x.shape)
@@ -231,7 +229,7 @@ def find_topk_attn(attn: np.ndarray, topk: int, attn_threshold: Union[float, Non
                 
                 extra_indices = np.where(np.in1d(values[:, col], smallest_values))[0]
 
-                print(f"Need {len(extra_indices)} extra indices in layer {col}")
+                logger.info(f"Need {len(extra_indices)} extra indices in layer {col}")
                 available_indices = np.hstack([available_indices, extra_indices])
                 num_heads = len(available_indices)
             
@@ -346,7 +344,7 @@ def ablate_attn_module(model, layer_head_dict, ablation_type):
     layers = [i for i in layer_head_dict.keys() if layer_head_dict[i]]
 
     print_dict = {i: layer_head_dict[i] for i in layer_head_dict.keys() if layer_head_dict[i]}
-    logging.info(f"Setting GPT2AttentionAblated({ablation_type}) in layers and heads:\n{print_dict}.")
+    logger.info(f"Setting GPT2AttentionAblated({ablation_type}) in layers and heads:\n{print_dict}.")
 
     for layer_idx in layers:
 
@@ -428,7 +426,7 @@ def get_triplets(lh_dict:Dict, pair:List) -> List[Tuple]:
         a list containing all triplet pairs
     """
 
-    logging.info(f"Finding {len([(l, h) for l in lh_dict.keys() for h in lh_dict[l] if lh_dict[l]])} triplets for pair {pair}")
+    logger.info(f"Finding {len([(l, h) for l in lh_dict.keys() for h in lh_dict[l] if lh_dict[l]])} triplets for pair {pair}")
 
     heads = from_dict_to_labels(lh_dict)
 
@@ -452,7 +450,7 @@ def get_lh_dict(attn, which: str, seed=None) -> List:
         return_random = False
     elif seed is not None:
         return_random = True
-        logging.info("Seed argument provided to get_lh_dict, returning random selection...")
+        logger.info("Seed argument provided to get_lh_dict, returning random selection...")
 
 
     # ===== PAIRED ABLATIONS ===== #

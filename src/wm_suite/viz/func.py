@@ -2,7 +2,6 @@
 A module with functions used across several scripts. Mostly to prepare data prior to plotting and the plotting functions
 themselves.
 """
-import os
 import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
@@ -11,8 +10,7 @@ import pandas as pd
 import logging
 from typing import List, Dict, Tuple
 
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-
+logger = logging.getLogger("wm_suite.utils")
 
 def set_manuscript_style(style=None):
 
@@ -20,10 +18,11 @@ def set_manuscript_style(style=None):
         try:
             plt.style.use(style)
         except:
-            logging.info(f"Couldn't find {style} matplotlib style, using default...")
+            logger.info(f"Couldn't find {style} matplotlib style, using default...")
 
+    logger.info("Adding Segoe UI to the matplotlib.rcParams['font.sans-serif']...")
     matplotlib.rcParams['font.family'] = 'sans-serif'
-    matplotlib.rcParams['font.sans-serif'] = ['Segoe UI']
+    matplotlib.rcParams['font.sans-serif'] = ['Segoe UI'] + matplotlib.rcParams['font.sans-serif']
 
     matplotlib.rcParams['pdf.fonttype'] = 42
     matplotlib.rcParams['ps.fonttype'] = 42
