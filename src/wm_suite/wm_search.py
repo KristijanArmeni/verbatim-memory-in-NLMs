@@ -11,12 +11,37 @@ from wm_suite import wm_test_suite
 from wm_suite.wm_ablation import from_labels_to_dict
 
 
+class Criterion():
+
+    def __init__(self, patience_limit, max_iter):
+
+        self.patience_limit = patience_limit
+        self.max_iter = max_iter
+
+
+    def check(self, search_space, patience, counter):
+
+        # if max iter is not set
+        # check that the patience limit is not reached and the remaining search space is not empty
+        condition1 = len(search_space) > 0 and (patience < self.patience_limit)
+        
+        # if max iteration limit is set, include it in the stopping criterion
+        if self.max_iter:    
+            condition2 = self.max_iter > counter
+            stopnow = condition1 and condition2
+        else:
+            stopnow = condition1
+
+        return stopnow
+
+
 def greedy_search(attention_heads: List[str],
                   repeat_surprisal_timesteps: List[int], 
                   list_len: int,
                   save_every: int,
                   log_path: str,
                   log_id: str,
+                  max_iter: int = None,
                   patience_limit: int = 0) -> (List[float], List[str], dict, dict):
     """
     Parameters
@@ -33,24 +58,26 @@ def greedy_search(attention_heads: List[str],
         The path to the log directory
     log_id : str
         The id of the log, will used to construct the log filenames
+    max_iter : int
+        The maximum number of iterations to run the search for (if patience limit is not yet reached)
+    patience_limit : int
+        value idicating the number iterations to perform once the search has stopped increasing by > 0.5% repeat surprisal
     
     Returns
     -------
-    best_scores : List[float]
-        The best scores for each step of the search
-    best_labels : List[str]
-        The best labels for each step of the search
-    all_scores : dict
-        The searched scores for each step of the search
-    all_labels : dict
-        The searched labels for each step of the search
+    Dict :
+        The outputs of the search stored in a dict with keys:
+        - rs : repeat surprisal scores (and 95% ci) for each step of the search
+        - x1 : raw surprisal on first list
+        - x2 : raw surprisal on second list
+        - best_labels : the best layer/head label for each step of the search
     
     Examples
     --------
     ```python
     >>> attention_heads = ["L3.H0", "L4.H7", "L4.H10", "L5.H11"]
 
-    >>> best_scores, labels, searched_scores, searched_labels = greedy_search(attention_heads)
+    >>> output_dict = greedy_search(attention_heads)
     ```
     """
 
@@ -88,8 +115,11 @@ def greedy_search(attention_heads: List[str],
 
         return outs
 
+
+    early_stop = Criterion(patience_limit=patience_limit, max_iter=max_iter)
+
     # run the search until we run out of heads or if we have not improved for 2 rounds 
-    while (len(attention_heads) > 0) and (patience < patience_limit):
+    while early_stop.check(search_space=attention_heads, patience=patience, counter=counter):
 
         best_score = -1            # dummy score to start with
         best_combination = None    # dummy label
@@ -98,7 +128,7 @@ def greedy_search(attention_heads: List[str],
         searched_labels = []
 
         print("\n====================================")
-        logging.info(f"Doing search (N_iterations = {len(attention_heads)} | patience = {patience}/{patience_limit} | Save = every {save_every} iterations)")
+        logging.info(f"Doing search (N_iterations = {len(attention_heads)} | patience = {patience}/{patience_limit} | max_iter = {max_iter} | Save = every {save_every} iterations)")
         logging.info(f"Current best: {' '.join(current_best)}")
         logging.info(f"Current best score: {best_score}")
         print("====================================\n")
@@ -248,7 +278,22 @@ def greedy_search(attention_heads: List[str],
     return outs
 
 
-def main(input_args=None):
+def get_input_args_for_devtesting():
+
+    out = ["--lh_dict_json", "/home/ka2773/project/lm-mem/data/topk_heads/all_heads.json",
+           "--subsample_size", "0",
+           "--subsample_n", "3",
+           "--subsample_seed","12345",
+           "--log_id", "test",
+           "--repeat_surprisal_timesteps", "[1,2]",
+           "--list_len", "3",
+           "--patience_limit", "5",
+           "--output_dir", "./",
+           "--output_filename", "test.json"]
+    
+    return out
+
+def main(input_args=None, devtesting=False):
     
     import argparse
     import json
@@ -262,15 +307,21 @@ def main(input_args=None):
     parser.add_argument("--output_dir", type=str, required=True)
     parser.add_argument("--output_filename", type=str, required=True)
 
+    if devtesting:
+        logging.warning("Running in devtesting mode!")
+        input_args = get_input_args_for_devtesting()
+
     if input_args is not None:
         args = parser.parse_args(input_args)
     else:
         args = parser.parse_args()
 
+    logging.info("Using the following input arguments:\n" + "\n".join([f"{k}: {v}" for k, v in vars(args).items()]))
+
     # load in the top-k attention heads loaded aso
     with open(args.lh_dict_json, "r") as fh:
         attention_heads = json.load(fh)["lh_list"]
- 
+
     # run the search
     outputs = greedy_search(attention_heads=attention_heads, 
                             repeat_surprisal_timesteps=args.repeat_surprisal_timesteps,
