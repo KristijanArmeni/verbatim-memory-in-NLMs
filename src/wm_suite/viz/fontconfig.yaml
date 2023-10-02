@@ -1,0 +1,30 @@
+fig_attn.py:
+  dejavusans:
+    labelfs: 18
+    tickfs: 15
+    annotfs: 9
+    titlefs: 12
+    schema_annot_fs: 12  # main text
+    schema_text_fs: 12
+  segoeui:
+    labelfs: 20
+    tickfs: 20
+    annotfs: 9
+    titlefs: 12
+    schemafs: 15
+    schema_annot_fs: 15  # main text
+    schema_text_fs: 15
+
+fig_attn_scatter.py:
+  dejavusans:
+    labelfs: 12
+    tickfs: 12
+    annotfs: 12
+    titlefs: 12
+    schemafs: 13
+  segoeui:
+    labelfs: 12
+    tickfs: 12
+    annotfs: 12
+    titlefs: 12
+    schemafs: 15

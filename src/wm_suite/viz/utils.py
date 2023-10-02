@@ -1,11 +1,12 @@
 import os
+import yaml
 import pandas as pd
 import logging
 from glob import glob
 from tqdm import tqdm
 from types import SimpleNamespace
+from ..utils import logger
 
-logging.basicConfig(level=logging.INFO)
 
 #home_dir = os.path.join(os.environ['homepath'], "project", "lm-mem")
 #data_dir = os.path.join(home_dir, "data", "outputs")
@@ -21,12 +22,30 @@ clrs = SimpleNamespace(**{
 })
 
 
+def get_font_config(pymodule, currentfont):
+
+    with open(os.path.join(os.path.dirname(__file__), "fontconfig.yaml"), "r") as f:
+        cfg = yaml.safe_load(f)
+
+    if currentfont == "DejaVu Sans":
+        fontkey = "dejavusans"
+    elif currentfont == "Segoe UI":
+        fontkey = "segoeui"
+    else:
+        raise ValueError(f"Don't have config for {currentfont} in fontconfig.yaml")
+
+    fontcfg = cfg[pymodule][fontkey]
+    print_names = "".join([f'- {k}: {v}\n' for k, v in fontcfg.items()])
+    logger.info(f"Specified font size config for {currentfont}:\n{print_names}")
+
+    return fontcfg
+
 def load_wt103_data(path: str) -> pd.DataFrame:
     
     o = []
     files = glob(path)
 
-    logging.info(f"Found {len(files)} files...")
+    logger.info(f"Found {len(files)} files...")
 
     for f in tqdm(files, desc="file"):
 
@@ -49,18 +68,18 @@ def load_csv_data(model:str, datadir:str, fname:str) -> pd.DataFrame:
     if model == "gpt2":
 
         filename = os.path.join(datadir, fname)
-        logging.info(f"Loading {filename}")
+        logger.info(f"Loading {filename}")
         data = pd.read_csv(filename, sep="\t", index_col=0)
     
     elif model == "awd_lstm":
     
         fn = os.path.join(datadir, fname)
-        logging.info(f"Loading {fn}")
+        logger.info(f"Loading {fn}")
         data = pd.read_csv(fn, sep="\t", index_col=None)
 
     elif model in ["w-01v2", "w-03v2", "w-06v2", "w-12v2"]:
 
-        logging.info(f"Loading matches to {fname}...")
+        logger.info(f"Loading matches to {fname}...")
         data = load_wt103_data(os.path.join(datadir, fname))
     
     return data
@@ -69,11 +88,11 @@ def load_csv_data(model:str, datadir:str, fname:str) -> pd.DataFrame:
 def save_png_pdf(fig, savename: str):
 
     savefn = os.path.join(savename + ".png")
-    logging.info(f"Saving {savefn}")
-    fig.savefig(savefn, dpi=300, format="png")
+    logger.info(f"Saving {savefn}")
+    fig.savefig(savefn, dpi=300, format="png", bbox_inches="tight")
 
     savefn = os.path.join(savename + ".pdf")
-    logging.info(f"Saving {savefn}")
+    logger.info(f"Saving {savefn}")
     fig.savefig(savefn, format="pdf", transparent=True, bbox_inches="tight")
 
     return 0

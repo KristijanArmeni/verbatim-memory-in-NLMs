@@ -12,6 +12,7 @@ from typing import List, Dict, Tuple
 
 logger = logging.getLogger("wm_suite.utils")
 
+
 def set_manuscript_style(style=None):
 
     if style is not None:
@@ -20,9 +21,13 @@ def set_manuscript_style(style=None):
         except:
             logger.info(f"Couldn't find {style} matplotlib style, using default...")
 
-    logger.info("Adding Segoe UI to the matplotlib.rcParams['font.sans-serif']...")
-    matplotlib.rcParams['font.family'] = 'sans-serif'
-    matplotlib.rcParams['font.sans-serif'] = ['Segoe UI'] + matplotlib.rcParams['font.sans-serif']
+    #logger.info("Adding Segoe UI to the matplotlib.rcParams['font.sans-serif']...")
+    #matplotlib.rcParams['font.family'] = 'sans-serif'
+
+    #if font[0] & (font[0] in matplotlib.rcParams['font.sans-serif']):
+    #    pass
+    #elif font[0] & (font[0] not in matplotlib.rcParams['font.sans-serif']):
+    #    matplotlib.rcParams['font.sans-serif'] = font + matplotlib.rcParams['font.sans-serif']
 
     matplotlib.rcParams['pdf.fonttype'] = 42
     matplotlib.rcParams['ps.fonttype'] = 42

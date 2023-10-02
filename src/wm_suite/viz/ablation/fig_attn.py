@@ -3,14 +3,13 @@ import os
 import numpy as np
 import pandas as pd
 from scipy.stats import sem
-from scipy.stats import median_abs_deviation
 from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
-import matplotlib as mpl
 import matplotlib.patches as patches
 
 from wm_suite.wm_ablation import find_topk_attn
 from wm_suite.viz.func import set_manuscript_style
+from wm_suite.viz.utils import get_font_config
 
 import logging
 from typing import List, Dict, Tuple
@@ -29,7 +28,7 @@ def get_data(fn: str) -> Tuple[Dict, np.ndarray]:
 
 
 # %%
-def plot_schematic(ax, d, colors, squeezed=False):
+def plot_schematic(ax, d, colors, annot_fs, text_fs, squeezed=False):
     
 #    first_list = " ".join([s.strip("Ġ") for s in d['tokens'][0][13:20]])
 #    ctx = " ".join([s.strip("Ġ") for s in d['tokens'][0][20:35]])
@@ -58,10 +57,10 @@ def plot_schematic(ax, d, colors, squeezed=False):
     xmax=39
     if squeezed:
         xpos = [0*xmax, 0.346*xmax, 0.37*xmax, 0.50*xmax, 0.85*xmax, xmax]
-        text_fs, annot_fs = 16, 16
+        #text_fs, annot_fs = 16, 16
     else:
         xpos = [0*xmax, 0.33*xmax, 0.37*xmax, 0.51*xmax, 0.85*xmax, xmax]    
-        text_fs, annot_fs = 15, 15
+        #text_fs, annot_fs = 12, 12
 
     ypos = np.array([0.35, 0.35, 0.35, 0.35, 0.35, 0.35])+0.7
     xarrow_from = [39, 39, 39]
@@ -124,7 +123,7 @@ def plot_schematic(ax, d, colors, squeezed=False):
 
 
 # %%
-def plot_imshow_and_average(axes, dat:np.ndarray, selection: Dict=None, c:str="#000000", img_txt_c="white"):
+def plot_imshow_and_average(axes, dat:np.ndarray, selection: Dict=None, c:str="#000000", img_txt_c="white", img_txt_fs=12):
 
     m = np.mean(dat, axis=(0, 1))           # mean across sequences and heads
     se = sem(np.mean(dat, axis=0), axis=0)  # SE over head means
@@ -150,6 +149,8 @@ def plot_imshow_and_average(axes, dat:np.ndarray, selection: Dict=None, c:str="#
         textc = "white"
         if c == "#2ca02c":
             textc = "black"
+
+        # annotate cells with attention values    
         xycoord = [(h+0.1, i) for i in selection.keys() if selection[i] for h in selection[i]]
         xyinds = [(h, i) for i in selection.keys() if selection[i] for h in selection[i]]
         for xy, xyind in zip(xycoord, xyinds):
@@ -159,14 +160,14 @@ def plot_imshow_and_average(axes, dat:np.ndarray, selection: Dict=None, c:str="#
             if value == 1.0:
                 texts = f"{value:.0f}"
             
-            axes[0].text(x=xy[0], y=xy[1], s=texts, ha="center", va="center", c=img_txt_c, fontweight="bold")
+            axes[0].text(x=xy[0], y=xy[1], s=texts, ha="center", va="center", c=img_txt_c, fontsize=img_txt_fs, fontweight="bold")
 
 
     return axes, im1, (m, se)
 
 
 # %%
-def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors: List, query_id: int, target_id: int, n_tokens_per_window: int):
+def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors: List, img_text_fs: int, query_id: int, target_id: int, n_tokens_per_window: int):
     """"
     plots 3-by-3 figure with image plots
 
@@ -192,7 +193,7 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors
     xtmp = x[:, sel, ...]
 
     selection, _, _ = find_topk_attn(x, topk=20, attn_threshold=0.2, tokens_of_interest=[target_id], seed=12345)
-    _, img1, d1 = plot_imshow_and_average(ax[:, 0], xtmp, selection=selection, c=colors[2], img_txt_c=img_text_colors[0])
+    _, img1, d1 = plot_imshow_and_average(ax[:, 0], xtmp, selection=selection, c=colors[2], img_txt_c=img_text_colors[0], img_txt_fs=img_text_fs)
 
     # sum over selected positions and plot image
     sel = np.zeros(shape=x.shape[1], dtype=bool)
@@ -200,7 +201,7 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors
     xtmp = np.sum(x[:, sel, ...], 1)
 
     selection, _, _ = find_topk_attn(x, topk=20, attn_threshold=0.2, tokens_of_interest=first_list, seed=12345)  # to mark top-10 cells
-    _, img2, d2 = plot_imshow_and_average(ax[:, 1], xtmp, selection=selection, c=colors[0], img_txt_c=img_text_colors[1])
+    _, img2, d2 = plot_imshow_and_average(ax[:, 1], xtmp, selection=selection, c=colors[0], img_txt_c=img_text_colors[1], img_txt_fs=img_text_fs)
 
     # sum over selected positions and plot image
     sel = np.zeros(shape=x.shape[1], dtype=bool)
@@ -208,7 +209,7 @@ def attn_weights_per_head_layer(ax, x: np.ndarray, colors: List, img_text_colors
     xtmp = np.sum(x[:, sel, ...], 1)
 
     selection, _, _ = find_topk_attn(x, topk=20, attn_threshold=0.2, tokens_of_interest=preceding, seed=12345)  # to mark top-10 cells
-    _, img3, d3 = plot_imshow_and_average(ax[:, 2], xtmp, selection=selection, c=colors[1], img_txt_c=img_text_colors[2])
+    _, img3, d3 = plot_imshow_and_average(ax[:, 2], xtmp, selection=selection, c=colors[1], img_txt_c=img_text_colors[2], img_txt_fs=img_text_fs)
 
     for a in ax[0, :]:
         a.grid(visible=True, linewidth=0.5)
@@ -305,6 +306,8 @@ def make_plot(datadir: str, query: str) -> Tuple[plt.Figure, pd.DataFrame]:
 
     clrs = plt.rcParams['axes.prop_cycle'].by_key()['color'][0:3]
 
+    fontcfg = get_font_config(pymodule=os.path.basename(__file__), currentfont=plt.rcParams['font.sans-serif'][0])
+
     # ===== PLOT ===== #
 
     if query in ["colon-colon-p1", 'colon-semicolon-p1', 'comma-comma-p1', 'colon-colon-n1']:
@@ -323,7 +326,7 @@ def make_plot(datadir: str, query: str) -> Tuple[plt.Figure, pd.DataFrame]:
 
         # for the main figure, font can remain smaller (as the figure itself is larger), 
         if query in ["colon-colon-p1"]:
-            plot_schematic(ax1, d1, colors=clrs, squeezed=False)
+            plot_schematic(ax1, d1, text_fs=fontcfg["schema_text_fs"], annot_fs=fontcfg["schema_annot_fs"], colors=clrs, squeezed=False)
         else:
             plot_schematic(ax1, d1, colors=clrs, squeezed=True)
 
@@ -353,21 +356,22 @@ def make_plot(datadir: str, query: str) -> Tuple[plt.Figure, pd.DataFrame]:
                                                   query_id=query_idx,
                                                   colors=clrs, 
                                                   img_text_colors=img_txt_clrs,
+                                                  img_text_fs=fontcfg["annotfs"],
                                                   n_tokens_per_window=n_tokens_per_window)
 
-    lfs = 18
-    titlefs = 19
-    if query in ["comma-comma-p1", "colon-semicolon-p1", "colon-colon-p1-n1"]:
-        lfs = 22
-        titlefs = 23
+    lfs = fontcfg["labelfs"]
+    titlefs = fontcfg["titlefs"]
+    #if query in ["comma-comma-p1", "colon-semicolon-p1", "colon-colon-p1-n1"]:
+    #    lfs = 22
+    #    titlefs = 23
 
     # ticks and ticklabels
     for a in ax[0, :]:
         a.set_yticks(np.arange(0, 12, 1))
-        a.set_yticklabels([str(i) if i%2 != 0 else "" for i in range(1, 13, 1)], fontsize=lfs)
+        a.set_yticklabels([str(i) if i%2 != 0 else "" for i in range(1, 13, 1)], fontsize=fontcfg["tickfs"])
         a.grid(visible=True, which="both", linestyle="--", linewidth=0.5)
         a.set_xticks(np.arange(0, 12, 1))
-        a.set_xticklabels([str(i) if i%2 != 0 else "" for i in range(1, 13, 1)], fontsize=lfs)
+        a.set_xticklabels([str(i) if i%2 != 0 else "" for i in range(1, 13, 1)], fontsize=fontcfg["tickfs"])
  
     # add image plot ticks
 
@@ -382,12 +386,12 @@ def make_plot(datadir: str, query: str) -> Tuple[plt.Figure, pd.DataFrame]:
 
     cax = ax[0, 2].inset_axes([1.03, 0, 0.03, 1])
     cbar = fig.colorbar(imgs[2], ax=ax[0, 2], cax=cax, ticks=[0, 0.5, 1])
-    cbar.ax.set_yticklabels([0, 0.5, 1], fontsize=lfs)
-    cbar.ax.set_ylabel("Attention weight", fontsize=lfs, fontweight="semibold")
+    cbar.ax.set_yticklabels([0, 0.5, 1], fontsize=fontcfg["tickfs"])
+    cbar.ax.set_ylabel("Attention weight", fontsize=fontcfg["labelfs"], fontweight="semibold")
     cbar.ax.tick_params(labelsize=lfs)
 
-    ax[0, 0].set_ylabel("Layer", fontsize=lfs, fontweight="semibold")
-    fig.supxlabel("Head", fontsize=lfs, fontweight="semibold")
+    ax[0, 0].set_ylabel("Layer", fontsize=fontcfg["labelfs"], fontweight="semibold")
+    fig.supxlabel("Head", fontsize=fontcfg["labelfs"], fontweight="semibold")
     fig.suptitle(suptitle, fontsize=titlefs)
     fig.tight_layout()
 
