@@ -63,7 +63,6 @@ def get_paths(path_to_config: str = None) -> SimpleNamespace:
         path_to_config = os.environ['PATHSCONFIG']
 
     with open(path_to_config, "r") as f:
-        logger.info(f"Found {path_to_config}")
         cfg = yaml.safe_load(f)
 
     return SimpleNamespace(**cfg)
