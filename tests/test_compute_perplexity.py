@@ -42,22 +42,22 @@ def test_compute_perplexity(transformer_test_data):
 
 
     # ===== RUN EXPERIMENT LOOP ===== #
-    inputs, _ = transformer_test_data
+    inputs = transformer_test_data
     
     # using.ppl_batched()
-    output_dict1 = experiment.start(input_sequences = inputs)   # batch size at 1
-    output_dict2 = experiment2.start(input_sequences = inputs)  # batch size at 5
+    output_dict1 = experiment.start(input_sequences = [e.ids for e in inputs])   # batch size at 1
+    output_dict2 = experiment2.start(input_sequences = [e.ids for e in inputs])  # batch size at 5
 
     # using experiment.ppl()
     ppl2 = []
     for inp in inputs:
-        ppl2.append(experiment.ppl(input_ids=inp, context_len=1024, stride=1)[0].item())
+        ppl2.append(experiment.ppl(input_ids=inp.ids, context_len=1024, stride=1)[0].item())
 
     # using compute_perplexity()
     ppl = []
     for inp in inputs:
         ppl.append(compute_perplexity(model=model, 
-                                     input_ids=inp, 
+                                     input_ids=inp.ids, 
                                      tokenizer=tokenizer, 
                                      context_len=1024, 
                                      stride=1, 

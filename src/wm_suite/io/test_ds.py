@@ -25,7 +25,7 @@ def get_test_data():
                   ["lumber", "research", "resort"],
                 ]
 
-    test_inputs, metadata = concat_and_tokenize_inputs(prefix=prefixes["sce1"]["1"],
+    test_inputs = concat_and_tokenize_inputs(prefix=prefixes["sce1"]["1"],
                                                 prompt=prompts["sce1"]["1"],
                                                 word_list1=test_lists,
                                                 word_list2=test_lists,
@@ -35,4 +35,4 @@ def get_test_data():
                                                 marker_logic="outside",
                                                 ismlm=False)
                                                 
-    return test_inputs, metadata
+    return test_inputs

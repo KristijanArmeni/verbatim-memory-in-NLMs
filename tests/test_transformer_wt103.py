@@ -32,16 +32,16 @@ def test_transformer_wt103_experiment(transformer_wt103_test_data):
 
 
     # ===== RUN EXPERIMENT LOOP ===== #
-    inputs, metadata = transformer_wt103_test_data
-    output_dict = experiment.start(input_sequences = inputs)
+    inputs = transformer_wt103_test_data
+    output_dict = experiment.start(input_sequences = [sequence.ids for sequence in inputs])
 
     n_stim = len(inputs)
 
     # check markers, should be only values 0, 1, 2, 3
-    assert np.array_equal(np.unique(metadata["trialID"][0]), [0, 1, 2, 3])
+    assert np.array_equal(np.unique(inputs[0].trial_ids), [0, 1, 2, 3])
 
     # check that there are 4 subsequences in positionID field, they start with 0-index
-    assert len(np.where(np.array(metadata["positionID"][0]) == 0)[0]) == 4
+    assert len(np.where(np.array(inputs[0].position_ids) == 0)[0]) == 4
 
     assert isinstance(output_dict, Dict)
 

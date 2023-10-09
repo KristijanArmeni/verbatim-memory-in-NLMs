@@ -2,24 +2,17 @@ import json
 import sys, os
 import argparse
 import numpy as np
-import pandas as pd
-from transformers import AutoTokenizer, GPT2TokenizerFast
+from transformers import GPT2TokenizerFast
 import torch
 from torch.nn import functional as F
 from tqdm import trange
 from typing import List, Tuple, Dict
 from string import punctuation
-import logging
 from mosestokenizer import MosesTokenizer
 
-logging.basicConfig(format=("[INFO] %(message)s"), level=logging.INFO)
-
-# own modules
-if "win" in sys.platform:
-    sys.path.append(os.path.join(os.environ['homepath'], 'project', 'lm-mem', 'src'))
-elif "linux" in sys.platform:
-    sys.path.append(os.path.join(os.environ['HOME'], 'project', 'lm-mem', 'src'))
-
+from ..paths import get_paths
+from ..utils import logger
+from .stimuli import prefixes, prompts
 
 # ===== WRAPPERS FOR DATASET CONSTRUCTION ===== #
 
@@ -89,6 +82,25 @@ def mark_subtoken_splits(tokens: List[str],
     return ids
 
 
+class InputSequence(object):
+
+    def __init__(self):
+
+        self.str = None
+        self.toks = None
+        self.ids = None
+        self.stim_id = None
+        self.trial_ids = None
+        self.subtok_ids = None
+        self.position_ids = None
+        self.list_len = None
+        self.prompt = None
+
+    def __repr__(self) -> str:
+        
+        return f"InputSequence({self.stim_id})"
+
+
 def concat_and_tokenize_inputs(prefix:str,
                                prompt:str, 
                                word_list1:List[str], 
@@ -151,12 +163,13 @@ def concat_and_tokenize_inputs(prefix:str,
         eos1 = tokenizer.eos_token
         eos2 = tokenizer.eos_token
 
-    logging.info(f"Using {eos1} and {eos2} as start and end eos tokens, respectively")
+    logger.info(f"Using {eos1} and {eos2} as start and end eos tokens, respectively")
     if pretokenize_moses:
-        logging.info(f"Pretokenizing input sequenes with MosesTokenizer('en') ...")
+        logger.info(f"Pretokenizing input sequenes with MosesTokenizer('en') ...")
 
     # list storing outputs
     input_seqs_tokenized = []
+    input_seqs_new = []
 
     # pretokenize with moses and conver back to strings if need be
     if pretokenize_moses:
@@ -169,6 +182,10 @@ def concat_and_tokenize_inputs(prefix:str,
     # loop over trials
     for i in trange(len(input_seqs), desc="sequence: "):
 
+        seq = InputSequence()
+
+        seq.str = eos1 + " " + prefix + input_seqs[i] + " " + prompt + input_seqs2[i]
+
         # tokenize strings separately to be able to construct markers for prefix, word lists etc.
         i1 = tokenizer.encode(eos1 + " " + prefix, add_special_tokens=False, return_tensors="pt")   # prefix IDs, add eos token
         i2 = tokenizer.encode(input_seqs[i], add_special_tokens=False, return_tensors="pt")
@@ -179,6 +196,8 @@ def concat_and_tokenize_inputs(prefix:str,
         input_ids = torch.cat((i1, i2, i3, i4), dim=1)
 
         input_seqs_tokenized.append(input_ids)
+        seq.ids = input_ids
+        seq.toks = [tokenizer.convert_ids_to_tokens(e) for e in input_ids]
 
         # tokenize unmasked tokens to be able to compute loss later on
         #if ismlm:
@@ -211,7 +230,16 @@ def concat_and_tokenize_inputs(prefix:str,
         metadata["subtok"].append(np.concatenate(split_ids).tolist())
         metadata["list_len"].append(ngram_size)
 
-    return input_seqs_tokenized, metadata
+        seq.list_len = ngram_size
+        seq.stim_id = i
+        seq.trial_ids = np.concatenate(trials).tolist()
+        seq.position_ids = np.concatenate(positions).tolist()
+        seq.subtok_ids = np.concatenate(split_ids).tolist()
+
+        input_seqs_new.append(seq)
+
+
+    return input_seqs_new
 
 
 def sample_indices_by_group(groups: np.ndarray, seed: int) -> np.ndarray:
@@ -302,9 +330,10 @@ def ensure_list2_notequal(list1: List,
 
     return list2_new
 
+
 def make_word_lists(inputs_file: str, condition: str) -> Tuple[List, List]:
 
-    logging.info("Loading {} ...".format(inputs_file))
+    logger.info("Loading {} ...".format(inputs_file))
     with open(inputs_file) as f:
 
         stim = json.load(f)
@@ -337,7 +366,7 @@ def make_word_lists(inputs_file: str, condition: str) -> Tuple[List, List]:
         # This serves as a control conditions
         # Here list length is the only common factor between two lists
 
-        logging.info("Creating control condition...")
+        logger.info("Creating control condition...")
 
         n_items_per_group = 10
         n_groups = len(word_lists1["n10"])//n_items_per_group
@@ -359,8 +388,81 @@ def make_word_lists(inputs_file: str, condition: str) -> Tuple[List, List]:
     return word_lists1, word_lists2
 
 
-# ===== Setup for gpt2 ====== #
+def get_input_sequences(condition:str="repeat", 
+                       scenario:str="sce1", 
+                       list_type:str="random", 
+                       list_len: str="n3", 
+                       prompt_key: int="1", 
+                       tokenizer_name:str="gpt2",
+                       pretokenize_moses:bool=False):
 
+    paths = get_paths()
+
+    logger.info(f"Creating input sequences for:\n{json.dumps({'condition': condition, 'scenario': scenario, 'list_len': list_len, 'prompt_key': prompt_key}, indent=4)}")
+
+    # ===== DATA MANAGEMENT ===== #
+
+    if list_type == "random":
+        input_filename = "random_lists.json"
+    elif list_type == "categorized":
+        input_filename = "categorized_lists.json"
+    
+    # load the word lists in .json files
+    fname = os.path.join(paths.data, "noun_lists", input_filename)
+
+    word_lists1, word_lists2 = make_word_lists(fname, condition=condition)
+
+
+    # ===== INITIATE EXPERIMENT CLASS ===== #
+
+    # setup the model
+    logger.info("Loading tokenizer {}".format(tokenizer_name))
+    tokenizer = GPT2TokenizerFast.from_pretrained(tokenizer_name)
+
+    # set the flag for function below
+    ismlm = False
+    #if argins.path_to_tokenizer in ['bert-base-uncased']:
+    #    ismlm=True
+
+    # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== #
+
+    # this tells the bpe split counter what symbol to look for and how it codes for splits
+    bpe_split_marker_dict = {"gpt2": "Ġ",
+                             "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
+                             "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "Ġ",
+                             "bert-base-uncased": "##",
+                             "transfo-xl-wt103": None}
+
+    # this tells the bpe split counter how these symbols are used
+    marker_logic_dict = {"gpt2": "outside",
+                         "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
+                         "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "outside",
+                         "bert-base-uncased": "within",
+                         "transfo-xl-wt103": None}
+
+    # this routing loops over prompts and prefixes
+    # it keeps track of that in meta_data
+    logger.info("Tokenizing and concatenating sequences...")
+    input_sequences  = concat_and_tokenize_inputs(prompt=prompts[scenario][prompt_key],
+                                                            prefix=prefixes[scenario]["1"],
+                                                            word_list1=word_lists1[list_len],
+                                                            word_list2=word_lists2[list_len],
+                                                            ngram_size=list_len.strip("n"),
+                                                            pretokenize_moses=pretokenize_moses,
+                                                            tokenizer=tokenizer,
+                                                            bpe_split_marker=bpe_split_marker_dict[tokenizer_name],
+                                                            marker_logic=marker_logic_dict[tokenizer_name],
+                                                            ismlm=ismlm)
+
+    # add information about prompt and list lengths for each sequence
+    for s in input_sequences:
+        s.prompt = prompt_key
+    #meta_data["prompt"] = [prompt_key for _ in meta_data["list_len"]]
+
+    return input_sequences
+
+
+# ===== Setup for gpt2 ====== #
 def get_args_for_dev(setup=False, scenario="sce1", prompt_key="1", list_len="n5", condition="repeat", path_to_tokenizer="gpt2", 
                      device="cuda", input_filename="random_lists.json", output_dir=None, output_filename=None ):
 
@@ -386,7 +488,7 @@ def main():
     from types import SimpleNamespace
 
     sys.path.append("/home/ka2773/project/lm-mem/src/data/")
-    from src.wm_suite.io.stimuli import prefixes, prompts
+
 
     # ===== INITIATIONS ===== #
 
@@ -427,17 +529,10 @@ def main():
     assert os.path.isdir(argins.output_dir)                                 # check that the folder exists
     #outpath = os.path.join(savedir, argins.output_filename)
 
-    # manage platform dependent stuff
-    if "win" in sys.platform:
-         data_dir = os.path.join(os.environ["homepath"], "project", "lm-mem", "src", "data", "noun_lists")
-    elif "linux" in sys.platform:
-         data_dir = os.path.join(os.environ["HOME"], "project", "lm-mem", "src", "data", "noun_lists")
-    #data_dir = "./data"
-
-    logging.info("condition == {}".format(argins.condition))
-    logging.info("scenario == {}".format(argins.scenario))
-    logging.info("list_len == {}".format(argins.list_len))
-    logging.info("prompt_key == {}".format(argins.prompt_key))
+    logger.info("condition == {}".format(argins.condition))
+    logger.info("scenario == {}".format(argins.scenario))
+    logger.info("list_len == {}".format(argins.list_len))
+    logger.info("prompt_key == {}".format(argins.prompt_key))
 
     # ===== DATA MANAGEMENT ===== #
 
@@ -450,7 +545,7 @@ def main():
     # ===== INITIATE EXPERIMENT CLASS ===== #
 
     # setup the model
-    logging.info("Loading tokenizer {}".format(argins.path_to_tokenizer))
+    logger.info("Loading tokenizer {}".format(argins.path_to_tokenizer))
     tokenizer = GPT2TokenizerFast.from_pretrained(argins.path_to_tokenizer)
 
     # set the flag for function below
@@ -476,7 +571,7 @@ def main():
 
     # this routing loops over prompts and prefixes
     # it keeps track of that in meta_data
-    logging.info("Tokenizing and concatenating sequences...")
+    logger.info("Tokenizing and concatenating sequences...")
     input_sequences, meta_data = concat_and_tokenize_inputs(prompt=prompts[argins.scenario][argins.prompt_key],
                                                             prefix=prefixes[argins.scenario]["1"],
                                                             word_list1=word_lists1[argins.list_len],
@@ -493,12 +588,12 @@ def main():
 
     # save files
     savename = os.path.join(argins.output_dir, argins.output_filename + ".json")
-    logging.info(f"Saving {savename}")
+    logger.info(f"Saving {savename}")
     with open(savename, "w") as fh:
         json.dump([e.tolist() for e in input_sequences], fh, indent=4)
 
     savename = os.path.join(argins.output_dir, argins.output_filename + "_info.json")
-    logging.info(f"Saving {savename}")
+    logger.info(f"Saving {savename}")
     with open(savename, "w") as fh:
         json.dump(meta_data, fh, indent=4)
 

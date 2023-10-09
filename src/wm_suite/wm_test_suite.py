@@ -13,13 +13,14 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import trange
 from typing import List, Dict, Tuple, Any
 from tqdm import tqdm, trange
-import logging
-logging.basicConfig(format=("[%(levelname)s] %(funcName)s() | %(message)s"), level=logging.INFO)
 
 # own modules
-from .paths import get_paths   # project root must be in python path for this to work, it adds src/ to sys.path
-from data.wt103.dataset import WikiTextDataset
-from .io.prepare_transformer_inputs import mark_subtoken_splits, make_word_lists, concat_and_tokenize_inputs
+from .paths import get_paths, add_data_to_syspath   # project root must be in python path for this to work, it adds src/ to sys.path
+from .utils import logger
+
+add_data_to_syspath()  # add ./data to sys.path
+from wt103.dataset import WikiTextDataset
+from .io.prepare_transformer_inputs import mark_subtoken_splits, get_input_sequences
 from .io.stimuli import prefixes, prompts
 from .wm_ablation import ablate_attn_module, find_topk_attn, find_topk_intersection, from_labels_to_dict, from_dict_to_labels
 from .io.test_ds import get_test_data
@@ -107,7 +108,7 @@ def merge_states(x:np.ndarray, bpe_split_indices:np.ndarray, tokens:np.ndarray, 
         # safety check, merged sub-words must be adjacent, else don't merge
         if (np.diff(sel) == 1).all():
 
-            logging.info(f"Merging tokens {new_tokens[sel]} at positions {sel}")
+            logger.info(f"Merging tokens {new_tokens[sel]} at positions {sel}")
 
             # replace first subword token by the mean of all subwords and delete the rest
             x[sel[0], ...] = mergefun(x[sel, ...], axis=0)    # shape = (tokens, ...)
@@ -488,7 +489,7 @@ class Experiment(object):
 
         """
 
-        logging.info(f"Batch size = {self.batch_size}, calling self.start_batched()")
+        logger.info(f"Batch size = {self.batch_size}, calling self.start_batched()")
         return self.start_batched(input_sequences)
 
 
@@ -618,7 +619,7 @@ def outputs2dataframe(colnames: List, arrays: List, metacols: List, metarrays: L
 
 def get_input_args_for_testing():
 
-    logging.info("Using input args provided to main(), not from script.")
+    logger.info("Using input args provided to main(), not from script.")
 
     arglist = [
         "--scenario", "sce1",
@@ -713,7 +714,7 @@ def main(input_args: List = None, devtesting:bool = False):
     # if test run, populate input arguments manually (these are corresponding to choices in wm_suite.io.test_ds.get_test_data())
     if argins.test_run:
 
-        logging.info("Doing a test run...")
+        logger.info("Doing a test run...")
         argins.scenario = "sce1"
         argins.list_len = 3
         argins.prompt_len = "1"
@@ -725,12 +726,12 @@ def main(input_args: List = None, devtesting:bool = False):
     device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
 
     # setup the model
-    logging.info("Loading tokenizer {}".format(argins.tokenizer))
+    logger.info("Loading tokenizer {}".format(argins.tokenizer))
     tokenizer = GPT2TokenizerFast.from_pretrained(argins.tokenizer)
 
     # pretrained models
-    logging.info("Using {} model".format(argins.model_type))
-    logging.info("Loading checkpoint {}".format(argins.checkpoint))
+    logger.info("Using {} model".format(argins.model_type))
+    logger.info("Loading checkpoint {}".format(argins.checkpoint))
     model = GPT2LMHeadModel.from_pretrained(argins.checkpoint)
 
     ismlm = False
@@ -749,21 +750,21 @@ def main(input_args: List = None, devtesting:bool = False):
     # permute the weights of gpt-small
     elif argins.model_type == "random-att":
 
-        logging.info("Permuting model attention weights ...\n")
+        logger.info("Permuting model attention weights ...\n")
         model = permute_qk_weights(model, per_head=False,
                                    seed=argins.model_seed)
 
     # permute attenion heads of gpt2 small
     elif argins.model_type == "random-att-per-head":
 
-        logging.info("Permuting Q and K weights ...\n")
+        logger.info("Permuting Q and K weights ...\n")
         model = permute_qk_weights(model, per_head=True,
                                    seed=argins.model_seed)
 
     # shuffle embedding vectors of gpt2 small
     elif argins.model_type == "shuff-wpe":
 
-        logging.info("Permuting token positions in wpe...")
+        logger.info("Permuting token positions in wpe...")
         rng = np.random.RandomState(seed=argins.model_seed)
 
         wpe = model.transformer.wpe.weight # shape = (token_positions, embedding_dim)
@@ -775,11 +776,11 @@ def main(input_args: List = None, devtesting:bool = False):
 
     elif "ablated" in argins.model_type:
 
-        logging.info(f"Running ablation experiment")
+        logger.info(f"Running ablation experiment")
 
         if argins.ablate_layer_head_dict is not None:
 
-            logging.info(f"Using the following ablation dict:\n{argins.ablate_layer_head_dict}")
+            logger.info(f"Using the following ablation dict:\n{argins.ablate_layer_head_dict}")
 
             # now set the selected head in selected layer to 0
             lh_dict = literal_eval(argins.ablate_layer_head_dict)
@@ -828,7 +829,7 @@ def main(input_args: List = None, devtesting:bool = False):
 
         # if seed is provided by the user, use random selection of heads instead
         if argins.ablate_topk_heads_seed:
-            logging.info(f"Ablating {argins.ablate_topk_heads} random heads")
+            logger.info(f"Ablating {argins.ablate_topk_heads} random heads")
             layer_head_dict = lh_dict_ctrl
 
         # ablate heads by setting GPT2Attention() classes in selected layers to GPT2AttentionAblated()
@@ -839,44 +840,23 @@ def main(input_args: List = None, devtesting:bool = False):
 
     if argins.test_run:
 
-        input_sequences, input_sequences_info = get_test_data()
+        input_sequences = get_test_data()
 
     else:
         # fname = os.path.join(data_dir, argins.input_filename)
-        word_lists1, word_lists2 = make_word_lists(argins.noun_list_file, condition=argins.condition)
+        
+        input_sequences = get_input_sequences(condition=argins.condition, 
+                                            scenario=argins.scenario, 
+                                            list_type = "random" if argins.noun_list_file == "random_lists.json" else "categorized", 
+                                            list_len=f"n{argins.list_len}", 
+                                            prompt_key=argins.prompt_len, 
+                                            tokenizer_name=argins.checkpoint,
+                                            pretokenize_moses=argins.pretokenize_moses)
 
 
-        # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== #
-
-        # this tells the bpe split counter what symbol to look for and how it codes for splits
-        bpe_split_marker_dict = {"gpt2": "Ġ",
-                                "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
-                                "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "Ġ",
-                                "bert-base-uncased": "##",
-                                "transfo-xl-wt103": None}
-
-        # this tells the bpe split counter how these symbols are used
-        marker_logic_dict = {"gpt2": "outside",
-                            "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
-                            "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "outside",
-                            "bert-base-uncased": "within",
-                            "transfo-xl-wt103": None}
-
-        # this routine loops over prompts and prefixes
-        # it keeps track of that in meta_data
-        logging.info("Tokenizing and concatenating sequences...")
-        input_sequences, input_sequences_info = concat_and_tokenize_inputs(prompt=prompts[argins.scenario][argins.prompt_len],
-                                                                        prefix=prefixes[argins.scenario]["1"],
-                                                                        word_list1=word_lists1[f"n{argins.list_len}"],
-                                                                        word_list2=word_lists2[f"n{argins.list_len}"],
-                                                                        ngram_size=str(argins.list_len),
-                                                                        pretokenize_moses=argins.pretokenize_moses,
-                                                                        tokenizer=tokenizer,
-                                                                        bpe_split_marker=bpe_split_marker_dict[argins.tokenizer],
-                                                                        marker_logic=marker_logic_dict[argins.tokenizer],
-                                                                        ismlm=ismlm)
-
-    input_sequences_info["prompt"] = [argins.prompt_len for _ in input_sequences_info['list_len']]
+    for s in input_sequences:
+        s.prompt = argins.prompt_len
+    #input_sequences_info["prompt"] = [argins.prompt_len for _ in input_sequences_info['list_len']]
 
 
     # ===== EXPERIMENT ===== #
@@ -893,7 +873,7 @@ def main(input_args: List = None, devtesting:bool = False):
                             device=device)
 
     # run experiment
-    output_dict = experiment.start(input_sequences = input_sequences)
+    output_dict = experiment.start(input_sequences = [sequence.ids for sequence in input_sequences])
 
 
     # ===== WT-103 PERPLEXITY ===== #
@@ -901,7 +881,7 @@ def main(input_args: List = None, devtesting:bool = False):
 
     if argins.compute_wt103_ppl:
 
-        logging.info(f"Loading {PATHS.wt103_test}...")
+        logger.info(f"Loading {PATHS.wt103_test}...")
         _, ids = WikiTextDataset(tokenizer=tokenizer).retokenize_txt(PATHS.wt103_test)
 
         #initialize experiment class
@@ -918,7 +898,7 @@ def main(input_args: List = None, devtesting:bool = False):
 
     # ===== POST PROCESSING ===== #
 
-    logging.info("Postprocessing outputs...")
+    logger.info("Postprocessing outputs...")
 
     # merge tokens and surprisals that were splits into BPE tokens
     output_dict = experiment.merge_bpe_splits(output_dict)
@@ -936,7 +916,7 @@ def main(input_args: List = None, devtesting:bool = False):
     output_dict['marker_pos_rel'] = [np.full(shape=len(s), fill_value=np.nan) for s in output_dict['token']]
 
     # now create absolute and relative markers for each sequence
-    for i, markers in enumerate(input_sequences_info['trialID']):
+    for i, markers in enumerate([sequence.trial_ids for sequence in input_sequences]):
 
         sel = timesteps[i]
         output_dict['marker_pos'][i][sel] = code_relative_markers(np.array(markers)[sel])[0]
@@ -950,7 +930,7 @@ def main(input_args: List = None, devtesting:bool = False):
     if argins.model_statedict_filename:
 
         fn = os.path.join(argins.output_dir, argins.model_statedict_filename)
-        #logging.info(f"Saving {fn}")
+        #logger.info(f"Saving {fn}")
         #torch.save(experiment.model.state_dict(), fn)
 
     if argins.model_statedict_filename and argins.compute_wt103_ppl:
@@ -979,17 +959,18 @@ def main(input_args: List = None, devtesting:bool = False):
               output_dict['marker_pos_rel']]
     
     metarrays = [output_dict['sequence_ppl'],                                                  
-                 [scenarioid2label[argins.scenario] for _ in range(len(input_sequences_info["trialID"]))],  # "sce1" | "sce2" | etc. 
-                 [argins.condition for _ in range(len(input_sequences_info["trialID"]))], # "repeat" | "permute" | "control"
-                 [argins.list_type for _ in range(len(input_sequences_info["trialID"]))], # "random" | "categorized"
-                 input_sequences_info["trialID"],
-                 input_sequences_info["positionID"],
-                 input_sequences_info["subtok"],
-                 input_sequences_info["list_len"],
-                 input_sequences_info["prompt"]]
+                 [scenarioid2label[argins.scenario] for _ in range(len(input_sequences))],  # "sce1" | "sce2" | etc. 
+                 [argins.condition for _ in range(len(input_sequences))],                   # "repeat" | "permute" | "control"
+                 [argins.list_type for _ in range(len(input_sequences))],                   # "random" | "categorized"
+                 [sequence.trial_ids for sequence in input_sequences],
+                 [sequence.position_ids for sequence in input_sequences],
+                 [sequence.subtok_ids for sequence in input_sequences],
+                 [sequence.list_len for sequence in input_sequences],
+                 [sequence.prompt for sequence in input_sequences],
+                 ]
 
     # put everything into a dataframe
-    logging.info("Converting to dataframe...")
+    logger.info("Converting to dataframe...")
 
     output_df = outputs2dataframe(colnames, arrays, metacols, metarrays)
 
@@ -1066,7 +1047,7 @@ def main(input_args: List = None, devtesting:bool = False):
     if argins.output_dir and argins.output_filename:
 
         outpath = os.path.join(argins.output_dir, argins.output_filename)
-        logging.info("Saving {}".format(os.path.join(outpath)))
+        logger.info("Saving {}".format(os.path.join(outpath)))
 
         # save the full, non-aggregated dataframe
         if type(output) == pd.DataFrame:
