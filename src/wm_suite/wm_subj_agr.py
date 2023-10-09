@@ -10,9 +10,9 @@ from typing import List, Tuple, Dict
 from tqdm import tqdm
 
 # own modules
-from .eval_sets import sva_lakretz, sva_short_labels, sva_long_deps, sva_heterogenous
-from .paths import get_paths
-from .utils import logger
+from eval_sets import sva_lakretz, sva_short_labels, sva_long_deps, sva_heterogenous
+from paths import get_paths
+from utils import logger
 from wm_suite.wm_ablation import  (ablate_attn_module, 
                                    find_topk_attn, 
                                    find_topk_intersection, 
@@ -237,6 +237,7 @@ def main(input_args=None, devtesting=False):
     parser.add_argument("--lh_dict", type=str)
     parser.add_argument("--model_type", type=str, choices=["unablated", "rand-init", "ablated"])
     parser.add_argument("--model_id", type=str)
+    parser.add_argument("--run_tag", type=str)
     parser.add_argument("--savedir", type=str)
 
     # this defaults to false if called as a script
@@ -260,13 +261,11 @@ def main(input_args=None, devtesting=False):
         "model": [],      # unablated etc.
         "acc": [],        # raw accuracy
         "acc0_A": [],     # baseline accuracy (attention masking only)
+        "tag": []         # run tag
     }
 
     # we only evaluate on datasets where two nouns are of a different number (e.g. the <man> next to the <houses> is/are red)
     selected_keys = [e for e in list(sva_lakretz.keys()) if sva_lakretz[e]["comment"] in sva_heterogenous]
-
-    print(selected_keys)
-    df_out = []
 
     # run every model on both datasets
     for dataset_key in selected_keys:
@@ -324,10 +323,12 @@ def main(input_args=None, devtesting=False):
 
         log['acc'].append(outputs1['accuracy'])
         log['acc0_A'].append(outputs1['accuracy_baseline'])
-   
+
+        log["tag"].append(args.run_tag)
+
         # save outputs
         savename = os.path.join(args.savedir, f"sva_{args.model_id}_{dataset_key}.json")
-        logging.info(f"Saving {savename}\n")
+        logger.info(f"Saving {savename}\n")
         with open(savename, 'w') as fh:
             json.dump(outputs1, fh, indent=4)
 
