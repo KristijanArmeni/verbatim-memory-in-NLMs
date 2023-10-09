@@ -13,6 +13,10 @@ sva_lakretz = {
     "lakretz2021_ssp": {'path': LAKRETZ2021_LONG, 'comment': "singular_singular_plural"},
     "lakretz2021_ppp": {'path': LAKRETZ2021_LONG, 'comment': "plural_plural_plural"},
     "lakretz2021_pps": {'path': LAKRETZ2021_LONG, 'comment': "plural_plural_singular"},
+    "lakretz2021_sps": {'path': LAKRETZ2021_LONG, 'comment': "singular_plural_singular"},
+    "lakretz2021_psp": {'path': LAKRETZ2021_LONG, 'comment': "plural_singular_plural"},
+    "lakretz2021_spp": {'path': LAKRETZ2021_LONG, 'comment': "singular_plural_plural"},
+    "lakretz2021_pss": {'path': LAKRETZ2021_LONG, 'comment': "plural_singular_singular"},
 }
 
 
@@ -22,11 +26,32 @@ sva_short_labels = {
     "plural_singular": "PS",
     "plural_plural": "PP",
     "singular_singular_singular": "SSS",
-    "singular_singular_plural": "SSP",
     "plural_plural_plural": "PPP",
+    "singular_singular_plural": "SSP",
     "plural_plural_singular": "PPS",
+    "singular_plural_singular": "SPS",
+    "plural_singular_plural": "PSP",
+    "singular_plural_plural": "SPP",
+    "plural_singular_singular": "PSS",
 }
 
+
 # a helper variable to filter if a dependency is short or long
-sva_long_deps = ["singular_singular_singular", "singular_singular_plural", "plural_plural_plural", "plural_plural_singular"]
-sva_heterogenous = ["plural_singular", "singular_plural", "singular_singular_plural", "plural_plural_singular"]
+sva_long_deps = ["singular_singular_singular", 
+                 "singular_singular_plural",
+                 "plural_plural_plural",
+                 "plural_plural_singular",
+                 "singular_plural_singular",
+                 "plural_singular_plural",
+                 "singular_plural_plural",
+                 "plural_singular_singular"]
+
+
+sva_heterogenous = ["plural_singular", 
+                    "singular_plural", 
+                    "singular_singular_plural", 
+                    "plural_plural_singular",
+                    "singular_plural_singular",
+                    "plural_singular_plural",
+                    "singular_plural_plural",
+                    "plural_singular_singular"]
