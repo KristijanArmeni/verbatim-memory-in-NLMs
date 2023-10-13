@@ -47,12 +47,13 @@ def get_inputs_and_targets(examples_list: Dict, comment: str) -> Tuple:
     # lakretz dataset comes in 4 versions, make it possible to only use a subsest of versions by adding <comment>
     if has_comment & (comment != ""):
         inputs = [e['input'].strip() for e in examples_list if e['comment'] == comment]
-        targets = [e['target_scores'] for e in examples_list if (e['comment'] == comment) & (len(e['target_scores']) == 2)]
+        targets = [e['target_scores'] for e in examples_list if (e['comment'] == comment)]
     else:
         # linzen dataset has whole sentences as targets, need to do .split() first
         inputs = [e['input'].strip() for e in examples_list]
         targets = [{key.split(' ')[0]: e['target_scores'][key] for key in e['target_scores'].keys()} for e in examples_list if (len(e['target_scores']) == 2)]
         
+    assert len(inputs) == len(targets)
     logger.info(f"Number of examples == {len(inputs)}")
 
     return inputs, targets
