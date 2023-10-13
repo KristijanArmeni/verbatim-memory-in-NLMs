@@ -4,7 +4,7 @@ from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits, make_wo
 from wm_suite.io.stimuli import prefixes, prompts
 from wm_suite.wm_test_suite import merge_states
 import numpy as np
-from transformers import GPT2LMHeadModel, GPT2TokenizerFast, GPT2Config
+from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 import torch
 from tqdm import tqdm
 from typing import List, Dict, Tuple
