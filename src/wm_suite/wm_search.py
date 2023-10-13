@@ -2,13 +2,12 @@ import os
 import json
 import numpy as np
 from typing import List
-import logging
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(funcName)s() | %(message)s")
 
 # own modules
-from paths import PATHS
-from wm_suite import wm_test_suite
-from wm_suite.wm_ablation import from_labels_to_dict
+from .utils import logger
+from .paths import get_paths
+from . import wm_test_suite
+from .wm_ablation import from_labels_to_dict
 
 
 class Criterion():
@@ -99,7 +98,7 @@ def greedy_search(attention_heads: List[str],
 
     if patience_limit == 0:
         patience_limit = n_total_runs  # if not specify, set patience limit to the number of total runs
-        logging.info(f"Setting patience limit to N_total {patience_limit} iterations")
+        logger.info(f"Setting patience limit to N_total {patience_limit} iterations")
 
     # function for saving outputs every `save_every` iterations
     def create_outputs(rs, rs_ci, rs_labels, x1, x1_ci, x2, x2_ci, all_rs, all_labels):
@@ -128,9 +127,9 @@ def greedy_search(attention_heads: List[str],
         searched_labels = []
 
         print("\n====================================")
-        logging.info(f"Doing search (N_iterations = {len(attention_heads)} | patience = {patience}/{patience_limit} | max_iter = {max_iter} | Save = every {save_every} iterations)")
-        logging.info(f"Current best: {' '.join(current_best)}")
-        logging.info(f"Current best score: {best_score}")
+        logger.info(f"Doing search (N_iterations = {len(attention_heads)} | patience = {patience}/{patience_limit} | max_iter = {max_iter} | Save = every {save_every} iterations)")
+        logger.info(f"Current best: {' '.join(current_best)}")
+        logger.info(f"Current best score: {best_score}")
         print("====================================\n")
 
         for i, new_head in enumerate(attention_heads):
@@ -184,9 +183,9 @@ def greedy_search(attention_heads: List[str],
         
             #print feedback
             print("\n====================================")
-            logging.info("Current score: " + str(repsurp))
-            logging.info("Current best score: " + str(best_score))
-            logging.info("Current best combination: " + ' '.join(best_combination))
+            logger.info("Current score: " + str(repsurp))
+            logger.info("Current best score: " + str(best_score))
+            logger.info("Current best combination: " + ' '.join(best_combination))
             print("====================================\n")
             
             # if log path is specified, save logs
@@ -236,7 +235,7 @@ def greedy_search(attention_heads: List[str],
         # check if save_every is reached and save full output at current iteration
         if (counter+1) % save_every == 0:
             tmpfn = os.path.join(log_path, f"scores_{log_id}_iter-{counter+1:02d}.json")
-            logging.info(f"Saving scores to {tmpfn}")
+            logger.info(f"Saving scores to {tmpfn}")
             outs = create_outputs(rs=best_scores, 
                                   rs_ci=best_scores_ci,
                                   rs_labels=best_labels,
@@ -260,9 +259,9 @@ def greedy_search(attention_heads: List[str],
 
     print("\n===== Done =====")
     if patience == patience_limit:
-        logging.info(f"Reached patience limit of {patience_limit} iterations")
-    logging.info(f"Iterations ran: {len(best_scores)}/{n_total_runs} | patience: {patience}/{patience_limit}")
-    logging.info(f"Found best score: {np.max(best_scores)} for combination: {' '.join(best_labels[np.argmax(best_scores)])}")
+        logger.info(f"Reached patience limit of {patience_limit} iterations")
+    logger.info(f"Iterations ran: {len(best_scores)}/{n_total_runs} | patience: {patience}/{patience_limit}")
+    logger.info(f"Found best score: {np.max(best_scores)} for combination: {' '.join(best_labels[np.argmax(best_scores)])}")
 
     # create the final outputs for return
     outs = create_outputs(rs=best_scores, 
@@ -281,9 +280,6 @@ def greedy_search(attention_heads: List[str],
 def get_input_args_for_devtesting():
 
     out = ["--lh_dict_json", "/home/ka2773/project/lm-mem/data/topk_heads/all_heads.json",
-           "--subsample_size", "0",
-           "--subsample_n", "3",
-           "--subsample_seed","12345",
            "--log_id", "test",
            "--repeat_surprisal_timesteps", "[1,2]",
            "--list_len", "3",
@@ -308,7 +304,7 @@ def main(input_args=None, devtesting=False):
     parser.add_argument("--output_filename", type=str, required=True)
 
     if devtesting:
-        logging.warning("Running in devtesting mode!")
+        logger.warning("Running in devtesting mode!")
         input_args = get_input_args_for_devtesting()
 
     if input_args is not None:
@@ -316,7 +312,7 @@ def main(input_args=None, devtesting=False):
     else:
         args = parser.parse_args()
 
-    logging.info("Using the following input arguments:\n" + "\n".join([f"{k}: {v}" for k, v in vars(args).items()]))
+    logger.info("Using the following input arguments:\n" + "\n".join([f"{k}: {v}" for k, v in vars(args).items()]))
 
     # load in the top-k attention heads loaded aso
     with open(args.lh_dict_json, "r") as fh:
@@ -332,7 +328,7 @@ def main(input_args=None, devtesting=False):
                             log_id=args.log_id)
 
     # save the outputs
-    logging.info(f"Saving outputs to {os.path.join(args.output_dir, args.output_filename)}")
+    logger.info(f"Saving outputs to {os.path.join(args.output_dir, args.output_filename)}")
     with open(os.path.join(args.output_dir, args.output_filename), "w") as fh:
         json.dump(outputs, fh, indent=4)
 
