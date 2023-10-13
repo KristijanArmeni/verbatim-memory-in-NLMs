@@ -1,4 +1,3 @@
-
 import json
 import os
 import argparse
@@ -15,16 +14,16 @@ from typing import List, Dict, Tuple, Any
 from tqdm import tqdm, trange
 
 # own modules
-from .paths import get_paths, add_data_to_syspath   # project root must be in python path for this to work, it adds src/ to sys.path
-from .utils import logger
+from paths import get_paths, add_data_to_syspath   # project root must be in python path for this to work, it adds src/ to sys.path
+from utils import logger
 
 add_data_to_syspath()  # add ./data to sys.path
 from wt103.dataset import WikiTextDataset
-from .io.prepare_transformer_inputs import mark_subtoken_splits, get_input_sequences
-from .io.stimuli import prefixes, prompts
-from .wm_ablation import ablate_attn_module, find_topk_attn, find_topk_intersection, from_labels_to_dict, from_dict_to_labels
-from .io.test_ds import get_test_data
-from .viz.func import filter_and_aggregate
+from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits, get_input_sequences
+from wm_suite.io.stimuli import prefixes, prompts
+from wm_suite.wm_ablation import ablate_attn_module, find_topk_attn, find_topk_intersection, from_labels_to_dict, from_dict_to_labels
+from wm_suite.io.test_ds import get_test_data
+from wm_suite.viz.func import filter_and_aggregate
 
 
 PATHS = get_paths()
@@ -1040,6 +1039,8 @@ def main(input_args: List = None, devtesting:bool = False):
         outdict["x2"]["ci95"] = (ci.confidence_interval.low, ci.confidence_interval.high)
 
         outdict["model_id"] = argins.model_id
+
+        outdict["wt103_ppl"] = ppl.cpu().item()
 
         output = outdict
 
