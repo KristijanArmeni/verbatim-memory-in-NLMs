@@ -68,6 +68,14 @@ def get_paths(path_to_config: str = None) -> SimpleNamespace:
     return SimpleNamespace(**cfg)
 
 
+def add_data_to_syspath():
+
+    paths = get_paths()
+
+    if paths.data not in sys.path:
+        logger.info(f"Adding {paths.data} to pythonpath")
+        sys.path.append(paths.data)
+
 def main():
 
     paths = get_paths()
@@ -75,6 +83,8 @@ def main():
     if paths.src not in sys.path:
         logger.info(f"Adding {paths.src} to pythonpath")
         sys.path.append(paths.src)
+
+    add_data_to_syspath()
 
     if paths.wm_suite not in sys.path:
         logger.info(f"Adding {paths.wm_suite} to pythonpath")
