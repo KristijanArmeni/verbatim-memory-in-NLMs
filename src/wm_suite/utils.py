@@ -8,8 +8,10 @@ GPT2_RESULTS_OSF_URL = "https://osf.io/download/s3zv9/"
 WT103_TRANSFORMER_OSF_URL = "https://osf.io/download/ejwug/"
 AWD_LSTM_RESULTS_OSF_URL = "https://osf.io/download/yu7m3/"
 
-# Armeni et al, 2023
+# Armeni et al, 2023 (TEMPORARY LINKS)
 OSF_URL_ATTN_WEIGHTS_ZIP_TMP = "https://osf.io/download/pm6wq/"  # temporary link on 
+OSF_URL_SVA_EXP_ZIP_TMP = "https://osf.io/download/jgdt6/"
+OSF_URL_WT103_EXP = "https://osf.io/download/db3ht/"
 
 
 def get_wm_logger(name: str) -> logging.Logger:
@@ -62,7 +64,17 @@ def get_data(which: str, path: str):
 
     logging.info(f"Downloading .zip containing {which} data...")
 
-    if which == "wt103_transformer":
+    if which == "all":
+
+        all_data = [GPT2_RESULTS_OSF_URL, 
+                    WT103_TRANSFORMER_OSF_URL, 
+                    AWD_LSTM_RESULTS_OSF_URL,
+                    OSF_URL_ATTN_WEIGHTS_ZIP_TMP]
+
+        for zip_url in all_data:
+            download_raw_data_zip(zipurl=zip_url, path=path)
+
+    elif which == "wt103_transformer":
 
         download_raw_data_zip(zipurl=WT103_TRANSFORMER_OSF_URL, path=path)
 
