@@ -98,7 +98,7 @@ class InputSequence(object):
 
     def __repr__(self) -> str:
         
-        return f"InputSequence({self.stim_id})"
+        return f"InputSequence({self.stim_id:02d}, list_len = {self.list_len}, n_toks = {len(self.toks[0])})"
 
 
 def concat_and_tokenize_inputs(prefix:str,
@@ -390,7 +390,8 @@ def make_word_lists(inputs_file: str, condition: str) -> Tuple[List, List]:
 
 def get_input_sequences(condition:str="repeat", 
                        scenario:str="sce1", 
-                       list_type:str="random", 
+                       list_type:str="random",
+                       swap_lists:bool=False, 
                        list_len: str="n3", 
                        prompt_key: int="1", 
                        tokenizer_name:str="gpt2",
@@ -411,6 +412,11 @@ def get_input_sequences(condition:str="repeat",
     fname = os.path.join(paths.data, "noun_lists", input_filename)
 
     word_lists1, word_lists2 = make_word_lists(fname, condition=condition)
+
+    #if needed, swap lists (useful for patching analyses)
+    if swap_lists:
+        word_lists2 = word_lists1
+        _, word_lists1 = make_word_lists(fname, condition=condition)
 
 
     # ===== INITIATE EXPERIMENT CLASS ===== #
