@@ -26,7 +26,7 @@ def get_query_target_indices(list_len:str, which:str) -> Tuple:
 
     """
 
-    _, _, seqs = get_input_sequences(condition="repeat", scenario="sce1", list_type="random", list_len=list_len, prompt_key="1", 
+    seqs = get_input_sequences(condition="repeat", scenario="sce1", list_type="random", list_len=list_len, prompt_key="1", 
                                      tokenizer_name="gpt2", pretokenize_moses=False)
 
     # define indices based on tokens in the first sequences (has no BPE-split tokens)
