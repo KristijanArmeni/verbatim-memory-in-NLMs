@@ -130,7 +130,13 @@ class GPT2AttentionAblated(GPT2Attention):
         return attn_output, attn_weights
 
 
-def find_topk_attn(attn: np.ndarray, topk: int, attn_threshold: Union[float, None], tokens_of_interest: List[int], seed: int) -> Dict:
+def find_topk_attn(attn: np.ndarray, 
+                   topk: int, 
+                   attn_threshold: Union[float, None],
+                   tokens_of_interest: List[int],
+                   seed: int,
+                   bos_renormalize: bool=False,
+                   ) -> Tuple[Dict, Dict, np.ndarray]:
 
     """
     Takes attn.shape = (samples, timesteps, heads, layer) of attention weights and finds <topk> heads across layers
@@ -149,12 +155,31 @@ def find_topk_attn(attn: np.ndarray, topk: int, attn_threshold: Union[float, Non
         a list of indices representing token positions to sum the attention weights over
     seed : int
         random seed for choosing heads in control ablations
+    bos_renormalize : bool
+        whether or not to exclude begining-of-sequence (BOS) token and renormalize the attention weights
+        relative to the sequence without BOS. `tokens_of_interest` are adjusted by -1 to reflect the shorter sequence
+
 
     Returns
     -------
     dict : dict
         A dictionary with every layer as key and selected heads as list entry for each layer key.
     """
+
+    if bos_renormalize:
+
+        logger.info("Renormalizing attention weights to exclude BOS token.")
+
+        # renormalize attention weights
+        attn = attn[:, 1::, :, :] / np.sum(attn[:, 1::, :, :], 
+                                           axis=1, 
+                                           keepdims=True)
+
+        logger.info(f"Renormalized attention weights with new shape: {attn.shape}")
+        logger.info("Shifting tokens of interest by - 1 to account for dropped BOS token.")
+
+        # shift token indices since we're starting at t + 1
+        tokens_of_interest = np.array(tokens_of_interest) - 1
 
     # aggregate over the select time-window
     sel = np.zeros(shape=attn.shape[1], dtype=bool)
