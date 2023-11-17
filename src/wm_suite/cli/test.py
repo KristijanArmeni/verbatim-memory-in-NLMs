@@ -32,8 +32,8 @@ def test_install():
 
 
     # ===== RUN EXPERIMENT LOOP ===== #
-    inputs, metadata = get_test_data()
-    output_dict = experiment.start(input_sequences = inputs)
+    inputs = get_test_data()
+    output_dict = experiment.start(input_sequences = [sequence.ids for sequence in inputs])
 
     logging.info("Run complete! Installation successful!")
 
