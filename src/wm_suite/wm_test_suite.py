@@ -17,8 +17,8 @@ from tqdm import tqdm, trange
 from wm_suite.paths import get_paths, add_data_to_syspath   # project root must be in python path for this to work, it adds src/ to sys.path
 from wm_suite.utils import logger
 
-add_data_to_syspath()  # add ./data to sys.path
-from wt103.dataset import WikiTextDataset
+# add_data_to_syspath()  # add ./data to sys.path
+from wm_suite.io.wt103.dataset import WikiTextDataset
 from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits, get_input_sequences
 from wm_suite.io.stimuli import prefixes, prompts
 from wm_suite.wm_ablation import ablate_attn_module, find_topk_attn, find_topk_intersection, from_labels_to_dict, from_dict_to_labels
