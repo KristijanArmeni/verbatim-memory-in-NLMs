@@ -14,8 +14,8 @@ from typing import List, Dict, Tuple, Any
 from tqdm import tqdm, trange
 
 # own modules
-from paths import get_paths, add_data_to_syspath   # project root must be in python path for this to work, it adds src/ to sys.path
-from utils import logger
+from wm_suite.paths import get_paths, add_data_to_syspath   # project root must be in python path for this to work, it adds src/ to sys.path
+from wm_suite.utils import logger
 
 add_data_to_syspath()  # add ./data to sys.path
 from wt103.dataset import WikiTextDataset
