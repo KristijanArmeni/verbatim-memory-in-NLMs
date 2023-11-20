@@ -17,15 +17,15 @@ from .stimuli import prefixes, prompts
 
 # ===== WRAPPERS FOR DATASET CONSTRUCTION ===== #
 
-def mark_subtoken_splits(tokens: List[str], 
-                         split_marker: str, 
-                         marker_logic: str, 
-                         eos_markers: List[str]) -> List:
+
+def mark_subtoken_splits(
+    tokens: List[str], split_marker: str, marker_logic: str, eos_markers: List[str]
+) -> List:
     """
     mark_subtoken_splits() keeps track of whether or not a token was subplit into subwords or not.
     Each token is counted and if it was split, the subtokens are counted as a single token.
     E.g. the tokens ["I", "saw", "a", "sp", "Ġarrow", "yesterday"] would be coded as [0, 1, 2, 3, 3, 4]
-    indicating that there are 4 unique tokens and that token nr 3 (sparrow) was split into two subtokens 
+    indicating that there are 4 unique tokens and that token nr 3 (sparrow) was split into two subtokens
     (sp + arrow).
 
     Parameters:
@@ -35,14 +35,14 @@ def mark_subtoken_splits(tokens: List[str],
     split_markers : string
         string denoting
 
-    Returns : 
+    Returns :
     -------
     ids : list
         list containing indices that mark groups (prefix, list1, prompt, list2) withing each list
-    
+
     Example:
     -------
-    ids = mark_subtoken_splits(tokens=["I", "saw", "a", "sp", "Ġarrow"], 
+    ids = mark_subtoken_splits(tokens=["I", "saw", "a", "sp", "Ġarrow"],
                                split_marker="Ġ",
                                marker_logic="outside",
                                eos_markers: ["<|endoftext|>", "<|endoftext|>"])
@@ -56,17 +56,23 @@ def mark_subtoken_splits(tokens: List[str],
     count_token = None
     if marker_logic == "outside":
         count_token = [split_marker in token for token in tokens]
-    # in other cases (e.g. for BERT), you have to stop counting when split_marker is present 
+    # in other cases (e.g. for BERT), you have to stop counting when split_marker is present
     elif marker_logic == "within":
-        count_token = [(split_marker not in token) and (token not in list(punctuation)+eos_markers) for token in tokens]
+        count_token = [
+            (split_marker not in token)
+            and (token not in list(punctuation) + eos_markers)
+            for token in tokens
+        ]
 
     # for tokenizers that do not do BPE tokenization we count each token and ignore punctuation plus eos markers
     if split_marker is None:
-        count_token = [(True and (token not in list(punctuation)+eos_markers)) for token in tokens]
+        count_token = [
+            (True and (token not in list(punctuation) + eos_markers))
+            for token in tokens
+        ]
 
     # loop over tokens and apply the counting logic
     for i in range(len(tokens)):
-
         # if the token is split, it does not gave the symbol for whitespace
         # if the word is at position 0, it also has to start a new token, so
         # count it
@@ -76,7 +82,7 @@ def mark_subtoken_splits(tokens: List[str],
         if tokens[i] in punctuation:
             ids.append(-1)  # code punctuation with -1
         elif tokens[i] in eos_markers:
-            ids.append(-2) # code eos strings with -2
+            ids.append(-2)  # code eos strings with -2
         else:
             ids.append(count)
 
@@ -84,9 +90,7 @@ def mark_subtoken_splits(tokens: List[str],
 
 
 class InputSequence(object):
-
     def __init__(self):
-
         self.str = None
         self.toks = None
         self.ids = None
@@ -98,21 +102,21 @@ class InputSequence(object):
         self.prompt = None
 
     def __repr__(self) -> str:
-        
         return f"InputSequence({self.stim_id:02d}, list_len = {self.list_len}, n_toks = {len(self.toks[0])})"
 
 
-def concat_and_tokenize_inputs(prefix:str,
-                               prompt:str, 
-                               word_list1:List[str], 
-                               word_list2:List[str],
-                               ngram_size:str, 
-                               bpe_split_marker:str, 
-                               marker_logic:str, 
-                               ismlm:bool,
-                               pretokenize_moses:bool=False,
-                               tokenizer=None) -> Tuple[List[torch.Tensor], Dict]:
-
+def concat_and_tokenize_inputs(
+    prefix: str,
+    prompt: str,
+    word_list1: List[str],
+    word_list2: List[str],
+    ngram_size: str,
+    bpe_split_marker: str,
+    marker_logic: str,
+    ismlm: bool,
+    pretokenize_moses: bool = False,
+    tokenizer=None,
+) -> Tuple[List[torch.Tensor], Dict]:
     """
     concat_and_tokenize_inputs() concatenates and tokenizes strings as inputs for wm_suite.Experiment() class
 
@@ -150,7 +154,7 @@ def concat_and_tokenize_inputs(prefix:str,
         "positionID": [],
         "subtok": [],
         "list_len": [],
-        }
+    }
 
     # join list elements into strings for tokenizer below
     input_seqs = [" " + ", ".join(tks) + "." for tks in word_list1]
@@ -174,7 +178,7 @@ def concat_and_tokenize_inputs(prefix:str,
 
     # pretokenize with moses and conver back to strings if need be
     if pretokenize_moses:
-        with MosesTokenizer('en') as pretokenize:
+        with MosesTokenizer("en") as pretokenize:
             prefix = " ".join(pretokenize(prefix))
             input_seqs = [" " + " ".join(pretokenize(list1)) for list1 in input_seqs]
             input_seqs2 = [" " + " ".join(pretokenize(list2)) for list2 in input_seqs2]
@@ -182,16 +186,23 @@ def concat_and_tokenize_inputs(prefix:str,
 
     # loop over trials
     for i in trange(len(input_seqs), desc="sequence: "):
-
         seq = InputSequence()
 
         seq.str = eos1 + " " + prefix + input_seqs[i] + " " + prompt + input_seqs2[i]
 
         # tokenize strings separately to be able to construct markers for prefix, word lists etc.
-        i1 = tokenizer.encode(eos1 + " " + prefix, add_special_tokens=False, return_tensors="pt")   # prefix IDs, add eos token
-        i2 = tokenizer.encode(input_seqs[i], add_special_tokens=False, return_tensors="pt")
-        i3 = tokenizer.encode(" " + prompt, add_special_tokens=False, return_tensors="pt")                       # prompt IDs
-        i4 = tokenizer.encode(input_seqs2[i] + eos2, add_special_tokens=False, return_tensors="pt")
+        i1 = tokenizer.encode(
+            eos1 + " " + prefix, add_special_tokens=False, return_tensors="pt"
+        )  # prefix IDs, add eos token
+        i2 = tokenizer.encode(
+            input_seqs[i], add_special_tokens=False, return_tensors="pt"
+        )
+        i3 = tokenizer.encode(
+            " " + prompt, add_special_tokens=False, return_tensors="pt"
+        )  # prompt IDs
+        i4 = tokenizer.encode(
+            input_seqs2[i] + eos2, add_special_tokens=False, return_tensors="pt"
+        )
 
         # compose the input ids tensors
         input_ids = torch.cat((i1, i2, i3, i4), dim=1)
@@ -201,8 +212,8 @@ def concat_and_tokenize_inputs(prefix:str,
         seq.toks = [tokenizer.convert_ids_to_tokens(e) for e in input_ids]
 
         # tokenize unmasked tokens to be able to compute loss later on
-        #if ismlm:
-        #    
+        # if ismlm:
+        #
         #    i4_ = tokenizer.encode(input_seqs2_[i] + eos2, add_special_tokens=False, return_tensors="pt")
         #    input_ids_unmasked = torch.cat((i1, i2, i3, i4_), dim=1)
         #    input_seqs_tokenized_unmasked.append(input_ids_unmasked)
@@ -214,16 +225,19 @@ def concat_and_tokenize_inputs(prefix:str,
         split_ids = []
 
         for j, ids in enumerate((i1, i2, i3, i4)):
-
             tmp = np.zeros(shape=ids.shape[1], dtype=int)  # code the trial structure
             tmp[:] = j
-            tmp2 = np.arange(ids.shape[1])                 # create token position index
+            tmp2 = np.arange(ids.shape[1])  # create token position index
             trials.append(tmp)
             positions.append(tmp2)
-            split_ids.append(mark_subtoken_splits(tokens=tokenizer.convert_ids_to_tokens(ids[0]),
-                                                  split_marker=bpe_split_marker,
-                                                  marker_logic=marker_logic,
-                                                  eos_markers=[eos1, eos2]))
+            split_ids.append(
+                mark_subtoken_splits(
+                    tokens=tokenizer.convert_ids_to_tokens(ids[0]),
+                    split_marker=bpe_split_marker,
+                    marker_logic=marker_logic,
+                    eos_markers=[eos1, eos2],
+                )
+            )
 
         metadata["trialID"].append(np.concatenate(trials).tolist())
         metadata["stimid"].append(i)
@@ -239,28 +253,26 @@ def concat_and_tokenize_inputs(prefix:str,
 
         input_seqs_new.append(seq)
 
-
     return input_seqs_new
 
 
 def sample_indices_by_group(groups: np.ndarray, seed: int) -> np.ndarray:
-
     """
     randomized_indices = sample_indices_by_group(groups, seed)
 
     Parameters:
     ----------
-        groups : np.array, 
+        groups : np.array,
             array defining group membership (e.g. [0, 0, 0, 1, 1, 1])
-        seed : 
+        seed :
             int, argument for np.random.RandomState
-    
+
     Returns:
     -------
         randomized_indices : np.array
             randomly sampled indices of groups.size
 
-    Helper function that creates randomized indices form np.arange(groups.size) by following 
+    Helper function that creates randomized indices form np.arange(groups.size) by following
     the structure of group elements in group. It ensures that every
     element groups is paired with an element outside its own group.
     """
@@ -274,11 +286,10 @@ def sample_indices_by_group(groups: np.ndarray, seed: int) -> np.ndarray:
     sample_size = np.sum(groups == 0)
 
     for group in np.unique(groups):
-
         # choose indices not from current group and not the ones already sampled
         candidate_pool = indices[(groups != group) & (indices != ignore_id)]
 
-        sel_ids = rng.choice(a=candidate_pool, size = sample_size)
+        sel_ids = rng.choice(a=candidate_pool, size=sample_size)
         out_ids[groups == group] = sel_ids
 
         # mark already selected indices
@@ -287,11 +298,9 @@ def sample_indices_by_group(groups: np.ndarray, seed: int) -> np.ndarray:
     return out_ids
 
 
-def ensure_list2_notequal(list1: List, 
-                          list2: List, 
-                          start_seed: int, 
-                          seed_increment: int) -> List:
-
+def ensure_list2_notequal(
+    list1: List, list2: List, start_seed: int, seed_increment: int
+) -> List:
     """
     Parameters:
     ----------
@@ -316,12 +325,13 @@ def ensure_list2_notequal(list1: List,
     else:
         # do this until elements of list1 and list2 are not equal
         while np.any(are_equal):
-
             rng = np.random.RandomState(seed)
 
             # create new permutations for l2 that are still equal
-            list2_new = [rng.permutation(l2).tolist() if l1 == l2 else l2
-                         for l1, l2 in zip(list1, list2)]
+            list2_new = [
+                rng.permutation(l2).tolist() if l1 == l2 else l2
+                for l1, l2 in zip(list1, list2)
+            ]
 
             # update the criterion condition (none should be equal)
             are_equal = [[l1 == l2] for l1, l2 in zip(list1, list2_new)]
@@ -333,44 +343,46 @@ def ensure_list2_notequal(list1: List,
 
 
 def make_word_lists(inputs_file: str, condition: str) -> Tuple[List, List]:
-
     logger.info("Loading {} ...".format(inputs_file))
     with open(inputs_file) as f:
-
         stim = json.load(f)
 
     word_lists1 = stim
 
     if condition == "permute":
-
         # This condition test for the effect of word order
         # Lists have the same words, but the word order is permuted
         # int the second one
-        word_lists2 = {key: [np.random.RandomState((543+j)*5).permutation(stim[key][j]).tolist()
-                    for j in range(len(stim[key]))]
-                    for key in stim.keys()}
+        word_lists2 = {
+            key: [
+                np.random.RandomState((543 + j) * 5).permutation(stim[key][j]).tolist()
+                for j in range(len(stim[key]))
+            ]
+            for key in stim.keys()
+        }
 
         for list_size in word_lists2.keys():
-
-            word_lists2[list_size] = ensure_list2_notequal(list1=word_lists1[list_size],
-                                                        list2=word_lists2[list_size],
-                                                        start_seed=123,
-                                                        seed_increment=10)
-
+            word_lists2[list_size] = ensure_list2_notequal(
+                list1=word_lists1[list_size],
+                list2=word_lists2[list_size],
+                start_seed=123,
+                seed_increment=10,
+            )
 
         # make sure control tokens do not appear in the target lists
         for k in stim.keys():
-            assert ~np.any([[t1 == t2] for t1, t2 in zip(word_lists1[k], word_lists2[k])])
+            assert ~np.any(
+                [[t1 == t2] for t1, t2 in zip(word_lists1[k], word_lists2[k])]
+            )
 
     elif condition == "control":
-
         # This serves as a control conditions
         # Here list length is the only common factor between two lists
 
         logger.info("Creating control condition...")
 
         n_items_per_group = 10
-        n_groups = len(word_lists1["n10"])//n_items_per_group
+        n_groups = len(word_lists1["n10"]) // n_items_per_group
         groups = np.repeat(np.arange(0, n_groups), n_items_per_group)
 
         ids = sample_indices_by_group(groups=groups, seed=12345)
@@ -379,8 +391,12 @@ def make_word_lists(inputs_file: str, condition: str) -> Tuple[List, List]:
 
         # make sure control tokens do not appear in the target lists
         for k in stim.keys():
-            assert ~np.any([set(t1).issubset(set(t2))
-                            for t1, t2 in zip(word_lists1[k], word_lists2[k])])
+            assert ~np.any(
+                [
+                    set(t1).issubset(set(t2))
+                    for t1, t2 in zip(word_lists1[k], word_lists2[k])
+                ]
+            )
 
     # this is repeat condition where the two lists are the same
     else:
@@ -389,18 +405,21 @@ def make_word_lists(inputs_file: str, condition: str) -> Tuple[List, List]:
     return word_lists1, word_lists2
 
 
-def get_input_sequences(condition:str="repeat", 
-                       scenario:str="sce1", 
-                       list_type:str="random",
-                       swap_lists:bool=False, 
-                       list_len: str="n3", 
-                       prompt_key: int="1", 
-                       tokenizer_name:str="gpt2",
-                       pretokenize_moses:bool=False):
-
+def get_input_sequences(
+    condition: str = "repeat",
+    scenario: str = "sce1",
+    list_type: str = "random",
+    swap_lists: bool = False,
+    list_len: str = "n3",
+    prompt_key: int = "1",
+    tokenizer_name: str = "gpt2",
+    pretokenize_moses: bool = False,
+):
     paths = get_paths()
 
-    logger.info(f"Creating input sequences for:\n{json.dumps({'condition': condition, 'scenario': scenario, 'list_len': list_len, 'prompt_key': prompt_key}, indent=4)}")
+    logger.info(
+        f"Creating input sequences for:\n{json.dumps({'condition': condition, 'scenario': scenario, 'list_len': list_len, 'prompt_key': prompt_key}, indent=4)}"
+    )
 
     # ===== DATA MANAGEMENT ===== #
 
@@ -408,17 +427,16 @@ def get_input_sequences(condition:str="repeat",
         input_filename = "random_lists.json"
     elif list_type == "categorized":
         input_filename = "categorized_lists.json"
-    
+
     # load the word lists in .json files
     fname = os.path.join(paths.data, "noun_lists", input_filename)
 
     word_lists1, word_lists2 = make_word_lists(fname, condition=condition)
 
-    #if needed, swap lists (useful for patching analyses)
+    # if needed, swap lists (useful for patching analyses)
     if swap_lists:
         word_lists2 = word_lists1
         _, word_lists1 = make_word_lists(fname, condition=condition)
-
 
     # ===== INITIATE EXPERIMENT CLASS ===== #
 
@@ -428,75 +446,88 @@ def get_input_sequences(condition:str="repeat",
 
     # set the flag for function below
     ismlm = False
-    #if argins.path_to_tokenizer in ['bert-base-uncased']:
+    # if argins.path_to_tokenizer in ['bert-base-uncased']:
     #    ismlm=True
 
     # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== #
 
     # this tells the bpe split counter what symbol to look for and how it codes for splits
-    bpe_split_marker_dict = {"gpt2": "Ġ",
-                             "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
-                             "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "Ġ",
-                             "bert-base-uncased": "##",
-                             "transfo-xl-wt103": None}
+    bpe_split_marker_dict = {
+        "gpt2": "Ġ",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "Ġ",
+        "bert-base-uncased": "##",
+        "transfo-xl-wt103": None,
+    }
 
     # this tells the bpe split counter how these symbols are used
-    marker_logic_dict = {"gpt2": "outside",
-                         "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
-                         "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "outside",
-                         "bert-base-uncased": "within",
-                         "transfo-xl-wt103": None}
+    marker_logic_dict = {
+        "gpt2": "outside",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "outside",
+        "bert-base-uncased": "within",
+        "transfo-xl-wt103": None,
+    }
 
     # this routing loops over prompts and prefixes
     # it keeps track of that in meta_data
     logger.info("Tokenizing and concatenating sequences...")
-    input_sequences  = concat_and_tokenize_inputs(prompt=prompts[scenario][prompt_key],
-                                                            prefix=prefixes[scenario]["1"],
-                                                            word_list1=word_lists1[list_len],
-                                                            word_list2=word_lists2[list_len],
-                                                            ngram_size=list_len.strip("n"),
-                                                            pretokenize_moses=pretokenize_moses,
-                                                            tokenizer=tokenizer,
-                                                            bpe_split_marker=bpe_split_marker_dict[tokenizer_name],
-                                                            marker_logic=marker_logic_dict[tokenizer_name],
-                                                            ismlm=ismlm)
+    input_sequences = concat_and_tokenize_inputs(
+        prompt=prompts[scenario][prompt_key],
+        prefix=prefixes[scenario]["1"],
+        word_list1=word_lists1[list_len],
+        word_list2=word_lists2[list_len],
+        ngram_size=list_len.strip("n"),
+        pretokenize_moses=pretokenize_moses,
+        tokenizer=tokenizer,
+        bpe_split_marker=bpe_split_marker_dict[tokenizer_name],
+        marker_logic=marker_logic_dict[tokenizer_name],
+        ismlm=ismlm,
+    )
 
     # add information about prompt and list lengths for each sequence
     for s in input_sequences:
         s.prompt = prompt_key
-    #meta_data["prompt"] = [prompt_key for _ in meta_data["list_len"]]
+    # meta_data["prompt"] = [prompt_key for _ in meta_data["list_len"]]
 
     return input_sequences
 
 
 first_sequence_nouns = {
-        "n1": 'Ġpatience',
-        "n2": 'Ġnotion',
-        "n3": 'Ġmovie',
-        "n4": 'Ġwomen',
-        "n5": "Ġcanoe",
-        "n6": 'Ġnovel',
-        "n7": 'Ġfolly',
-        "n8": 'Ġsilver',
-        "n9": 'Ġeagle',
-        "n10": 'Ġcenter',
-    }
+    "n1": "Ġpatience",
+    "n2": "Ġnotion",
+    "n3": "Ġmovie",
+    "n4": "Ġwomen",
+    "n5": "Ġcanoe",
+    "n6": "Ġnovel",
+    "n7": "Ġfolly",
+    "n8": "Ġsilver",
+    "n9": "Ġeagle",
+    "n10": "Ġcenter",
+}
 
 
-def get_query_target_indices(list_len:str, which:str) -> Tuple:
+def get_query_target_indices(list_len: str, which: str) -> Tuple:
     """
     A helper function to get the indices of the query and target words in the input sequence.
 
     """
 
-    seqs = get_input_sequences(condition="repeat", scenario="sce1", list_type="random", list_len=list_len, prompt_key="1", 
-                                     tokenizer_name="gpt2", pretokenize_moses=False)
+    seqs = get_input_sequences(
+        condition="repeat",
+        scenario="sce1",
+        list_type="random",
+        list_len=list_len,
+        prompt_key="1",
+        tokenizer_name="gpt2",
+        pretokenize_moses=False,
+    )
 
     # define indices based on tokens in the first sequences (has no BPE-split tokens)
     t = np.array(seqs[0].toks[0])
 
-    nouns = list(first_sequence_nouns.values())[0:int(list_len[-1])]
-    codes = list(first_sequence_nouns.keys())[0:int(list_len[-1])]
+    nouns = list(first_sequence_nouns.values())[0 : int(list_len[-1])]
+    codes = list(first_sequence_nouns.keys())[0 : int(list_len[-1])]
 
     if which == "match":
         query_ids = {c: (n, np.where(t == n)[0][-1]) for n, c in zip(nouns, codes)}
@@ -505,82 +536,131 @@ def get_query_target_indices(list_len:str, which:str) -> Tuple:
     elif which == "postmatch":
         increment = 1
         query_ids = {c: (n, np.where(t == n)[0][-1]) for n, c in zip(nouns, codes)}
-        target_ids = {c: (t[(np.where(t == n)[0][0] + increment)], (np.where(t == n)[0][0]) + increment) for n, c in zip(nouns, codes)}
+        target_ids = {
+            c: (
+                t[(np.where(t == n)[0][0] + increment)],
+                (np.where(t == n)[0][0]) + increment,
+            )
+            for n, c in zip(nouns, codes)
+        }
 
     elif which == "recent":
         increment = -1
         query_ids = {c: (n, np.where(t == n)[0][-1]) for n, c in zip(nouns, codes)}
-        target_ids = {c: (t[np.where(t == n)[0][0] + increment], (np.where(t == n)[0][-1] + increment)) for n, c in zip(nouns, codes)}
+        target_ids = {
+            c: (
+                t[np.where(t == n)[0][0] + increment],
+                (np.where(t == n)[0][-1] + increment),
+            )
+            for n, c in zip(nouns, codes)
+        }
 
     return {"queries": query_ids, "targets": target_ids}
 
 
-def get_inputs_targets_path_patching(batch_size:int=1):
-        
-    inps1 = get_input_sequences(condition="repeat", 
-                                scenario="sce1",
-                                list_type="random",
-                                list_len="n3",
-                                prompt_key="1"
-                                )
-
+def get_inputs_targets_path_patching(batch_size: int = 1):
+    inps1 = get_input_sequences(
+        condition="repeat",
+        scenario="sce1",
+        list_type="random",
+        list_len="n3",
+        prompt_key="1",
+    )
 
     # create corrupted run, by swapping the query and target words
-    inps2 = get_input_sequences(condition="control",
-                                swap_lists=True,
-                                scenario="sce1",
-                                list_type="random",
-                                list_len="n3",
-                                prompt_key="1"
-                                )
+    inps2 = get_input_sequences(
+        condition="control",
+        swap_lists=True,
+        scenario="sce1",
+        list_type="random",
+        list_len="n3",
+        prompt_key="1",
+    )
 
     indices = get_query_target_indices(list_len="n3", which="match")
-    colon_at_unsplit = indices["queries"]["n1"][-1] - 1  
+    colon_at_unsplit = indices["queries"]["n1"][-1] - 1
 
-    second_colon_idx = lambda x: np.where(np.array(x) == ':')[0][-1]
+    second_colon_idx = lambda x: np.where(np.array(x) == ":")[0][-1]
 
-    orig_inps_ids = torch.tensor([i for i, inps in enumerate(inps1) if second_colon_idx(inps.toks[0]) == colon_at_unsplit])   # clean
-    corr_inps_ids = torch.tensor([i for i, inps in enumerate(inps2) if second_colon_idx(inps.toks[0]) == colon_at_unsplit])  # corrupted
+    orig_inps_ids = torch.tensor(
+        [
+            i
+            for i, inps in enumerate(inps1)
+            if second_colon_idx(inps.toks[0]) == colon_at_unsplit
+        ]
+    )  # clean
+    corr_inps_ids = torch.tensor(
+        [
+            i
+            for i, inps in enumerate(inps2)
+            if second_colon_idx(inps.toks[0]) == colon_at_unsplit
+        ]
+    )  # corrupted
 
     # chunk inputs at second colon and stack into single tensor
-    orig_inps = torch.stack([inps1[i].ids[0][0:colon_at_unsplit + 1] for i in orig_inps_ids])
-    corr_inps = torch.stack([inps2[i].ids[0][0:colon_at_unsplit + 1] for i in corr_inps_ids])
+    orig_inps = torch.stack(
+        [inps1[i].ids[0][0 : colon_at_unsplit + 1] for i in orig_inps_ids]
+    )
+    corr_inps = torch.stack(
+        [inps2[i].ids[0][0 : colon_at_unsplit + 1] for i in corr_inps_ids]
+    )
 
-    nb = len(orig_inps_ids)//batch_size
-    resid = len(orig_inps_ids)%batch_size
+    nb = len(orig_inps_ids) // batch_size
+    resid = len(orig_inps_ids) % batch_size
     print(nb)
-    clean_inps_batches = {i//batch_size: orig_inps[i:i+batch_size, :] for i in range(0, nb*batch_size, batch_size)}
-    corr_inps_batches = {i//batch_size: corr_inps[i:i+batch_size, :] for i in range(0, nb*batch_size, batch_size)}
+    clean_inps_batches = {
+        i // batch_size: orig_inps[i : i + batch_size, :]
+        for i in range(0, nb * batch_size, batch_size)
+    }
+    corr_inps_batches = {
+        i // batch_size: corr_inps[i : i + batch_size, :]
+        for i in range(0, nb * batch_size, batch_size)
+    }
 
     if resid > 0:
-        clean_inps_batches[nb] = orig_inps[-resid:, :]   # zero-indexing
+        clean_inps_batches[nb] = orig_inps[-resid:, :]  # zero-indexing
         corr_inps_batches[nb] = corr_inps[-resid:, :]
 
     # to construct correct/incorrect target pairs,
     # use the indices of the first token in first list
     # (the one we expect to be predicted)
-    targets = {i//batch_size: torch.tensor(
-                            [
-                                [ids1[14].item(), ids2[14].item()] 
-                                for ids1, ids2 in zip(orig_inps[i:i+batch_size], corr_inps[i:i+batch_size])
-                            ]
-                    ) 
-            for i in range(0, nb*batch_size, batch_size)
+    targets = {
+        i // batch_size: torch.tensor(
+            [
+                [ids1[14].item(), ids2[14].item()]
+                for ids1, ids2 in zip(
+                    orig_inps[i : i + batch_size], corr_inps[i : i + batch_size]
+                )
+            ]
+        )
+        for i in range(0, nb * batch_size, batch_size)
     }
 
     if resid > 0:
-        targets[nb] = torch.tensor([[ids1[14], ids2[14]] for ids1, ids2 in zip(orig_inps[-resid:, :], corr_inps[-resid:, :])])  # zero-indexing
-
+        targets[nb] = torch.tensor(
+            [
+                [ids1[14], ids2[14]]
+                for ids1, ids2 in zip(orig_inps[-resid:, :], corr_inps[-resid:, :])
+            ]
+        )  # zero-indexing
 
     return (clean_inps_batches, corr_inps_batches), targets
 
 
 # ===== Setup for gpt2 ====== #
-def get_args_for_dev(setup=False, scenario="sce1", prompt_key="1", list_len="n5", condition="repeat", path_to_tokenizer="gpt2", 
-                     device="cuda", input_filename="random_lists.json", output_dir=None, output_filename=None ):
-
+def get_args_for_dev(
+    setup=False,
+    scenario="sce1",
+    prompt_key="1",
+    list_len="n5",
+    condition="repeat",
+    path_to_tokenizer="gpt2",
+    device="cuda",
+    input_filename="random_lists.json",
+    output_dir=None,
+    output_filename=None,
+):
     args = {
-
         "setup": setup,
         "scenario": scenario,
         "prompt_key": prompt_key,
@@ -590,57 +670,88 @@ def get_args_for_dev(setup=False, scenario="sce1", prompt_key="1", list_len="n5"
         "device": device,
         "input_filename": input_filename,
         "output_dir": output_dir,
-        "output_filename": output_filename
-
+        "output_filename": output_filename,
     }
 
     return args
 
-def main():
 
+def main():
     from types import SimpleNamespace
 
     sys.path.append("/home/ka2773/project/lm-mem/src/data/")
 
-
     # ===== INITIATIONS ===== #
 
     # collect input arguments
-    parser = argparse.ArgumentParser(description="surprisal.py runs perplexity experiment")
+    parser = argparse.ArgumentParser(
+        description="surprisal.py runs perplexity experiment"
+    )
 
-    parser.add_argument("--setup", action="store_true",
-                        help="downloads and places nltk model and Tokenizer")
-    parser.add_argument("--scenario", type=str, choices=["sce1", "sce1rnd", "sce2", "sce3", "sce4", "sce5", "sce6", "sce7"],
-                        help="str, which scenario to use")
+    parser.add_argument(
+        "--setup",
+        action="store_true",
+        help="downloads and places nltk model and Tokenizer",
+    )
+    parser.add_argument(
+        "--scenario",
+        type=str,
+        choices=["sce1", "sce1rnd", "sce2", "sce3", "sce4", "sce5", "sce6", "sce7"],
+        help="str, which scenario to use",
+    )
     parser.add_argument("--prompt_key", type=str, choices=["1", "2", "3", "4", "5"])
     parser.add_argument("--list_len", type=str, choices=["n3", "n5", "n7", "n10"])
-    parser.add_argument("--condition", type=str, choices=["repeat", "permute", "control"],
-                        help="str, 'permute' or 'repeat'; whether or not to permute the second word list")
+    parser.add_argument(
+        "--condition",
+        type=str,
+        choices=["repeat", "permute", "control"],
+        help="str, 'permute' or 'repeat'; whether or not to permute the second word list",
+    )
     # To download a different model look at https://huggingface.co/models?filter=gpt2
-    parser.add_argument("--pretokenize_moses", action="store_true",
-                        help="Whether or not to pretokenize the input text with MosesTokenizer('en')")
-    parser.add_argument("--path_to_tokenizer", type=str, default="gpt2",
-                        help="the path to tokenizer folder (expected to work with tokenizer.from_pretrained() method")
-    parser.add_argument("--device", type=str, choices=["cpu", "cuda"],
-                        help="whether to run on cpu or cuda")
-    parser.add_argument("--input_filename", type=str,
-                        help="str, the name of the .json file containing word lists")
-    parser.add_argument("--output_dir", type=str,
-                        help="str, the name of folder to write the output_filename in")
-    parser.add_argument("--output_filename", type=str,
-                        help="str, the name of the output file saving the dataframe")
+    parser.add_argument(
+        "--pretokenize_moses",
+        action="store_true",
+        help="Whether or not to pretokenize the input text with MosesTokenizer('en')",
+    )
+    parser.add_argument(
+        "--path_to_tokenizer",
+        type=str,
+        default="gpt2",
+        help="the path to tokenizer folder (expected to work with tokenizer.from_pretrained() method",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        choices=["cpu", "cuda"],
+        help="whether to run on cpu or cuda",
+    )
+    parser.add_argument(
+        "--input_filename",
+        type=str,
+        help="str, the name of the .json file containing word lists",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        help="str, the name of folder to write the output_filename in",
+    )
+    parser.add_argument(
+        "--output_filename",
+        type=str,
+        help="str, the name of the output file saving the dataframe",
+    )
 
     argins = parser.parse_args()
 
     # if needed for development create the argins namespace with some default values
-    #argins = SimpleNamespace(**get_args_for_dev(path_to_tokenizer="transfo-xl-wt103", 
-    #                                            output_dir="data/transformer_input_files", 
+    # argins = SimpleNamespace(**get_args_for_dev(path_to_tokenizer="transfo-xl-wt103",
+    #                                            output_dir="data/transformer_input_files",
     #                                            output_filename="transfo-xl-wt103"))
 
     # construct output file name and check that it existst
     print(argins.output_dir)
-    assert os.path.isdir(argins.output_dir)                                 # check that the folder exists
-    #outpath = os.path.join(savedir, argins.output_filename)
+    assert os.path.isdir(argins.output_dir)  # check that the folder exists
+    # outpath = os.path.join(savedir, argins.output_filename)
 
     logger.info("condition == {}".format(argins.condition))
     logger.info("scenario == {}".format(argins.scenario))
@@ -654,7 +765,6 @@ def main():
 
     word_lists1, word_lists2 = make_word_lists(fname, condition=argins.condition)
 
-
     # ===== INITIATE EXPERIMENT CLASS ===== #
 
     # setup the model
@@ -663,38 +773,44 @@ def main():
 
     # set the flag for function below
     ismlm = False
-    if argins.path_to_tokenizer in ['bert-base-uncased']:
-        ismlm=True
+    if argins.path_to_tokenizer in ["bert-base-uncased"]:
+        ismlm = True
 
     # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== #
 
     # this tells the bpe split counter what symbol to look for and how it codes for splits
-    bpe_split_marker_dict = {"gpt2": "Ġ",
-                             "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
-                             "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "Ġ",
-                             "bert-base-uncased": "##",
-                             "transfo-xl-wt103": None}
+    bpe_split_marker_dict = {
+        "gpt2": "Ġ",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "Ġ",
+        "bert-base-uncased": "##",
+        "transfo-xl-wt103": None,
+    }
 
     # this tells the bpe split counter how these symbols are used
-    marker_logic_dict = {"gpt2": "outside",
-                         "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
-                         "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "outside",
-                         "bert-base-uncased": "within",
-                         "transfo-xl-wt103": None}
+    marker_logic_dict = {
+        "gpt2": "outside",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
+        "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "outside",
+        "bert-base-uncased": "within",
+        "transfo-xl-wt103": None,
+    }
 
     # this routing loops over prompts and prefixes
     # it keeps track of that in meta_data
     logger.info("Tokenizing and concatenating sequences...")
-    input_sequences, meta_data = concat_and_tokenize_inputs(prompt=prompts[argins.scenario][argins.prompt_key],
-                                                            prefix=prefixes[argins.scenario]["1"],
-                                                            word_list1=word_lists1[argins.list_len],
-                                                            word_list2=word_lists2[argins.list_len],
-                                                            ngram_size=argins.list_len.strip("n"),
-                                                            pretokenize_moses=argins.pretokenize_moses,
-                                                            tokenizer=tokenizer,
-                                                            bpe_split_marker=bpe_split_marker_dict[argins.path_to_tokenizer],
-                                                            marker_logic=marker_logic_dict[argins.path_to_tokenizer],
-                                                            ismlm=ismlm)
+    input_sequences, meta_data = concat_and_tokenize_inputs(
+        prompt=prompts[argins.scenario][argins.prompt_key],
+        prefix=prefixes[argins.scenario]["1"],
+        word_list1=word_lists1[argins.list_len],
+        word_list2=word_lists2[argins.list_len],
+        ngram_size=argins.list_len.strip("n"),
+        pretokenize_moses=argins.pretokenize_moses,
+        tokenizer=tokenizer,
+        bpe_split_marker=bpe_split_marker_dict[argins.path_to_tokenizer],
+        marker_logic=marker_logic_dict[argins.path_to_tokenizer],
+        ismlm=ismlm,
+    )
 
     # add information about prompt and list lengths for each sequence
     meta_data["prompt"] = [argins.prompt_key for _ in meta_data["list_len"]]
@@ -710,6 +826,6 @@ def main():
     with open(savename, "w") as fh:
         json.dump(meta_data, fh, indent=4)
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     main()
