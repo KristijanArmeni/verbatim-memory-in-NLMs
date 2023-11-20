@@ -1,13 +1,15 @@
 import numpy as np
-from nltk import word_tokenize
 import string
 import os, json
+import nltk
 
 try:
     nltk.data.find("tokenizers/punkt/english.pickle")
 except LookupError:
     logging.info("Seting up nltk, downloading `punkt`")
     nltk.download("punkt")
+
+from nltk import word_tokenize
 
 # ===== FUNCTIONS ===== #
 
