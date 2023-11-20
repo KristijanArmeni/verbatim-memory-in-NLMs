@@ -11,9 +11,7 @@ from transformers import GPT2TokenizerFast, GPT2LMHeadModel
 # wm_suite (assumed you set PROJ_ROOT var and added it to path via set_path.sh)
 from wm_suite.wm_ablation import ablate_attn_module
 from wm_suite.wm_attention import find_cue_token_ids
-from wm_suite.io.prepare_transformer_inputs import mark_subtoken_splits, make_word_lists, concat_and_tokenize_inputs
-from wm_suite.io.stimuli import prefixes, prompts
-from wm_suite.wm_test_suite import merge_states
+from wm_suite.io.prepare_transformer_inputs import get_input_sequences
 
 import torch
 from tqdm import trange
@@ -62,7 +60,7 @@ def get_test_input_args():
     return inps
 
 
-def main(input_args=None):
+def main(input_args=None, devtesting=False):
 
     import argparse
 
@@ -80,16 +78,15 @@ def main(input_args=None):
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    #input_args = get_test_input_args()
+    if devtesting:
+        input_args = get_test_input_args()
 
     if input_args:
         argins = parser.parse_args(input_args)
     else:
         argins = parser.parse_args()
 
-    tokenizer = GPT2TokenizerFast.from_pretrained(argins.tokenizer)
     model = GPT2LMHeadModel.from_pretrained(argins.checkpoint)
-
 
     if argins.layer_head_dict:
 
@@ -99,38 +96,24 @@ def main(input_args=None):
 
     # ===== PREPARE INPUTS ===== #
 
-    # fname = os.path.join(data_dir, argins.input_filename)
-    word_lists1, word_lists2 = make_word_lists(argins.noun_list_file, condition="repeat")
+    input_sequences = get_input_sequences(condition="repeat", 
+                                          scenario="sce1", 
+                                          list_type = "random" if argins.noun_list_file == "random_lists.json" else "categorized", 
+                                          list_len=f"n{argins.list_len}", 
+                                          prompt_key=argins.prompt_len, 
+                                          tokenizer_name=argins.checkpoint,
+                                          pretokenize_moses=False)
 
-    # this routine loops over prompts and prefixes
-    # it keeps track of that in meta_data
-    logging.info("Tokenizing and concatenating sequences...")
-    scenario = "sce1"
-    prompt_len = argins.prompt_len
-    list_len = argins.list_len
-    input_sequences, input_sequences_info = concat_and_tokenize_inputs(prompt=prompts[scenario][prompt_len],
-                                                                       prefix=prefixes[scenario]["1"],
-                                                                       word_list1=word_lists1[f"n{list_len}"],
-                                                                       word_list2=word_lists2[f"n{list_len}"],
-                                                                       ngram_size=str(list_len),
-                                                                       pretokenize_moses=False,
-                                                                       tokenizer=tokenizer,
-                                                                       bpe_split_marker="Ġ",
-                                                                       marker_logic="outside",
-                                                                       ismlm=False)
+    for s in input_sequences:
+        s.prompt = argins.prompt_len
 
-    # add prompt field to the dict
-    input_sequences_info["prompt"] = [argins.prompt_len for _ in input_sequences_info['list_len']]
-
-
-    # find index of the query token (':') and add one, to make the first noutn end of the sequence
-    query_idxs = [find_cue_token_ids(np.array(markers))[1] + 1 for markers in input_sequences_info["trialID"]]
-
+    # find index of the query token (':') and add one, to make the first noun end of the sequence
+    query_idxs = [find_cue_token_ids(np.array(inp.trial_ids))[1] + 1 for inp in input_sequences]
 
     model.to(device)
 
     # sample inputs (sample +1 from query to have sequence include the first noun)
-    inputs = [inp[0, 0:(query_idxs[i]+1)].to(device) for i, inp in enumerate(input_sequences)]
+    inputs = [inp.ids[0, 0:(query_idxs[i]+1)].to(device) for i, inp in enumerate(input_sequences)]
 
     # get ranks and logits from the pre-final timestep (i.e. just before the first noun, which is the last item in the sequence)
     output = get_logit_rank(inputs, model, at_timestep=-2)
