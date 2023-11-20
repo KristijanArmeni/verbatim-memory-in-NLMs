@@ -23,8 +23,8 @@ from transformers import GPT2Config, GPT2TokenizerFast, GPT2LMHeadModel, \
                         EarlyStoppingCallback
 
 # own module
-sys.path.append("/home/ka2773/project/lm-mem/src")
-from data.wt103.dataset import WikiTextDataset
+#sys.path.append("/home/ka2773/project/lm-mem/src")
+from wm_suite.io.wt103.dataset import WikiTextDataset
 
 # ============================== #
 # ===== DATASET MANAGEMENT ===== #
