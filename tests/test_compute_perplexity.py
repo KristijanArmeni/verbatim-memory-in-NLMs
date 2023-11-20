@@ -7,7 +7,7 @@ from wm_suite.wm_test_suite import Experiment
 from models.transformer.train_gpt2_ import compute_perplexity
 import logging
 
-from data.wt103.dataset import WikiTextDataset
+from wm_suite.io.wt103.dataset import WikiTextDataset
 
 def test_compute_perplexity(transformer_test_data):
 

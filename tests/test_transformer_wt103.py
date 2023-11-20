@@ -6,8 +6,8 @@ from test_data import transformer_wt103_test_data
 from src.wm_suite.wm_test_suite import Experiment
 import logging
 import sys
-sys.path.append("/home/ka2773/project/lm-mem/src")
-from data.wt103.dataset import WikiTextDataset
+#sys.path.append("/home/ka2773/project/lm-mem/src")
+from wm_suite.io.wt103.dataset import WikiTextDataset
 
 def test_transformer_wt103_experiment(transformer_wt103_test_data):
 
