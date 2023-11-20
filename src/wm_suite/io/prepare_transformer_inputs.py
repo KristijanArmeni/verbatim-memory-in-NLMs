@@ -14,6 +14,7 @@ from ..paths import get_paths
 from ..utils import logger
 from .stimuli import prefixes, prompts
 
+
 # ===== WRAPPERS FOR DATASET CONSTRUCTION ===== #
 
 def mark_subtoken_splits(tokens: List[str], 
@@ -466,6 +467,112 @@ def get_input_sequences(condition:str="repeat",
     #meta_data["prompt"] = [prompt_key for _ in meta_data["list_len"]]
 
     return input_sequences
+
+
+first_sequence_nouns = {
+        "n1": 'Ġpatience',
+        "n2": 'Ġnotion',
+        "n3": 'Ġmovie',
+        "n4": 'Ġwomen',
+        "n5": "Ġcanoe",
+        "n6": 'Ġnovel',
+        "n7": 'Ġfolly',
+        "n8": 'Ġsilver',
+        "n9": 'Ġeagle',
+        "n10": 'Ġcenter',
+    }
+
+
+def get_query_target_indices(list_len:str, which:str) -> Tuple:
+    """
+    A helper function to get the indices of the query and target words in the input sequence.
+
+    """
+
+    seqs = get_input_sequences(condition="repeat", scenario="sce1", list_type="random", list_len=list_len, prompt_key="1", 
+                                     tokenizer_name="gpt2", pretokenize_moses=False)
+
+    # define indices based on tokens in the first sequences (has no BPE-split tokens)
+    t = np.array(seqs[0].toks[0])
+
+    nouns = list(first_sequence_nouns.values())[0:int(list_len[-1])]
+    codes = list(first_sequence_nouns.keys())[0:int(list_len[-1])]
+
+    if which == "match":
+        query_ids = {c: (n, np.where(t == n)[0][-1]) for n, c in zip(nouns, codes)}
+        target_ids = {c: (n, np.where(t == n)[0][0]) for n, c in zip(nouns, codes)}
+
+    elif which == "postmatch":
+        increment = 1
+        query_ids = {c: (n, np.where(t == n)[0][-1]) for n, c in zip(nouns, codes)}
+        target_ids = {c: (t[(np.where(t == n)[0][0] + increment)], (np.where(t == n)[0][0]) + increment) for n, c in zip(nouns, codes)}
+
+    elif which == "recent":
+        increment = -1
+        query_ids = {c: (n, np.where(t == n)[0][-1]) for n, c in zip(nouns, codes)}
+        target_ids = {c: (t[np.where(t == n)[0][0] + increment], (np.where(t == n)[0][-1] + increment)) for n, c in zip(nouns, codes)}
+
+    return {"queries": query_ids, "targets": target_ids}
+
+
+def get_inputs_targets_path_patching(batch_size:int=1):
+        
+    inps1 = get_input_sequences(condition="repeat", 
+                                scenario="sce1",
+                                list_type="random",
+                                list_len="n3",
+                                prompt_key="1"
+                                )
+
+
+    # create corrupted run, by swapping the query and target words
+    inps2 = get_input_sequences(condition="control",
+                                swap_lists=True,
+                                scenario="sce1",
+                                list_type="random",
+                                list_len="n3",
+                                prompt_key="1"
+                                )
+
+    indices = get_query_target_indices(list_len="n3", which="match")
+    colon_at_unsplit = indices["queries"]["n1"][-1] - 1  
+
+    second_colon_idx = lambda x: np.where(np.array(x) == ':')[0][-1]
+
+    orig_inps_ids = torch.tensor([i for i, inps in enumerate(inps1) if second_colon_idx(inps.toks[0]) == colon_at_unsplit])   # clean
+    corr_inps_ids = torch.tensor([i for i, inps in enumerate(inps2) if second_colon_idx(inps.toks[0]) == colon_at_unsplit])  # corrupted
+
+    # chunk inputs at second colon and stack into single tensor
+    orig_inps = torch.stack([inps1[i].ids[0][0:colon_at_unsplit + 1] for i in orig_inps_ids])
+    corr_inps = torch.stack([inps2[i].ids[0][0:colon_at_unsplit + 1] for i in corr_inps_ids])
+
+    nb = len(orig_inps_ids)//batch_size
+    resid = len(orig_inps_ids)%batch_size
+    print(nb)
+    clean_inps_batches = {i//batch_size: orig_inps[i:i+batch_size, :] for i in range(0, nb*batch_size, batch_size)}
+    corr_inps_batches = {i//batch_size: corr_inps[i:i+batch_size, :] for i in range(0, nb*batch_size, batch_size)}
+
+    if resid > 0:
+        clean_inps_batches[nb] = orig_inps[-resid:, :]   # zero-indexing
+        corr_inps_batches[nb] = corr_inps[-resid:, :]
+
+    # to construct correct/incorrect target pairs,
+    # use the indices of the first token in first list
+    # (the one we expect to be predicted)
+    targets = {i//batch_size: torch.tensor(
+                            [
+                                [ids1[14].item(), ids2[14].item()] 
+                                for ids1, ids2 in zip(orig_inps[i:i+batch_size], corr_inps[i:i+batch_size])
+                            ]
+                    ) 
+            for i in range(0, nb*batch_size, batch_size)
+    }
+
+    if resid > 0:
+        targets[nb] = torch.tensor([[ids1[14], ids2[14]] for ids1, ids2 in zip(orig_inps[-resid:, :], corr_inps[-resid:, :])])  # zero-indexing
+
+
+    return (clean_inps_batches, corr_inps_batches), targets
 
 
 # ===== Setup for gpt2 ====== #
