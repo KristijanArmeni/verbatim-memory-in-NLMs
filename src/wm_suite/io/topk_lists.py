@@ -1,4 +1,3 @@
-
 import json, os
 import logging
 import numpy as np
@@ -7,7 +6,6 @@ from wm_suite.wm_ablation import find_topk_attn, from_dict_to_labels
 
 
 cfg = {
-
     "p1": {
         "attn_w": PATHS.attn_w,
         "matching_toi": [13],
@@ -23,20 +21,19 @@ cfg = {
         "recent_toi": [45, 44, 43],
         "attn_threshold": 0,
     },
-
     "p1_t1": {
         "attn_w": PATHS.attn_w,
         "matching_toi": [13],
         "postmatch_toi": [14],
         "recent_toi": [44],
         "attn_threshold": 0.2,
-    }
+    },
 }
 
 save_joint = False
 
-def main(input_args=None):
 
+def main(input_args=None):
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -54,11 +51,16 @@ def main(input_args=None):
     attn = dict(np.load(config["attn_w"]))["data"]
 
     for k in [20]:
-         
         print(k)
         # MATCHING HEADS
         toi = config["matching_toi"]
-        lh_dict, _, _ = find_topk_attn(attn, topk=k, attn_threshold=config['attn_threshold'], tokens_of_interest=toi, seed=12345)
+        lh_dict, _, _ = find_topk_attn(
+            attn,
+            topk=k,
+            attn_threshold=config["attn_threshold"],
+            tokens_of_interest=toi,
+            seed=12345,
+        )
         lh_list = from_dict_to_labels(lh_dict)
 
         outdict = {
@@ -68,14 +70,25 @@ def main(input_args=None):
             "lh_dict": lh_dict,
         }
 
-        fn = os.path.join(PATHS.root, "data", "topk_heads", f"top_{k:02d}_attn{config['attn_threshold']:.1f}_matching_{args.query_id}.json")
+        fn = os.path.join(
+            PATHS.root,
+            "data",
+            "topk_heads",
+            f"top_{k:02d}_attn{config['attn_threshold']:.1f}_matching_{args.query_id}.json",
+        )
         logging.info(f"Saving {fn}")
         with open(fn, "w") as fh:
             json.dump(outdict, fh, indent=4)
 
         # POSTMATCH HEADS
         toi = config["postmatch_toi"]
-        lh_dict, _, _ = find_topk_attn(attn, topk=k, attn_threshold=config['attn_threshold'], tokens_of_interest=toi, seed=12345)
+        lh_dict, _, _ = find_topk_attn(
+            attn,
+            topk=k,
+            attn_threshold=config["attn_threshold"],
+            tokens_of_interest=toi,
+            seed=12345,
+        )
         lh_list = from_dict_to_labels(lh_dict)
 
         outdict = {
@@ -85,14 +98,25 @@ def main(input_args=None):
             "lh_dict": lh_dict,
         }
 
-        fn = os.path.join(PATHS.root, "data", "topk_heads", f"top_{k:02d}_attn{config['attn_threshold']:.1f}_postmatch_{args.query_id}.json")
+        fn = os.path.join(
+            PATHS.root,
+            "data",
+            "topk_heads",
+            f"top_{k:02d}_attn{config['attn_threshold']:.1f}_postmatch_{args.query_id}.json",
+        )
         logging.info(f"Saving {fn}")
         with open(fn, "w") as fh:
             json.dump(outdict, fh, indent=4)
 
         # RECENT-TOKENS HEADS
         toi = config["recent_toi"]
-        lh_dict, _, _ = find_topk_attn(attn, topk=k, attn_threshold=config['attn_threshold'], tokens_of_interest=toi, seed=12345)
+        lh_dict, _, _ = find_topk_attn(
+            attn,
+            topk=k,
+            attn_threshold=config["attn_threshold"],
+            tokens_of_interest=toi,
+            seed=12345,
+        )
         lh_list = from_dict_to_labels(lh_dict)
 
         outdict = {
@@ -102,7 +126,12 @@ def main(input_args=None):
             "lh_dict": lh_dict,
         }
 
-        fn = os.path.join(PATHS.root, "data", "topk_heads", f"top_{k:02d}_attn{config['attn_threshold']:.1f}_recent_{args.query_id}.json")
+        fn = os.path.join(
+            PATHS.root,
+            "data",
+            "topk_heads",
+            f"top_{k:02d}_attn{config['attn_threshold']:.1f}_recent_{args.query_id}.json",
+        )
         logging.info(f"Saving {fn}")
         with open(fn, "w") as fh:
             json.dump(outdict, fh, indent=4)
@@ -112,4 +141,3 @@ def main(input_args=None):
 
 if __name__ == "__main__":
     main()
-
