@@ -29,11 +29,12 @@ import os
 from types import SimpleNamespace
 import yaml
 import logging
+from pathlib import Path
 
 logger = logging.getLogger("wm_suite.utils")
 
 
-DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+DATA_PATH = Path(__file__).parent.parent.parent / "data"
 
 
 def add_pathsconfig_to_environ():

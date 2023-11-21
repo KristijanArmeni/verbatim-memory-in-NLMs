@@ -52,7 +52,7 @@ def transformer_wt103_test_data():
                                              word_list1=test_lists,
                                              word_list2=test_lists,
                                              ngram_size="3",
-                                             tokenizer=GPT2TokenizerFast.from_pretrained("/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer"),
+                                             tokenizer=GPT2TokenizerFast.from_pretrained("Kristijan/wikitext-103_tokenizer_v2"),
                                              bpe_split_marker="Ġ",
                                              marker_logic="outside",
                                              ismlm=False)

@@ -128,99 +128,99 @@ def test_attn_ablation():
     assert np.where(np.array(intact_vs_11))[0][0] == 11    # only hidden states at layer eleven should be different from intact model
 
     # ===== PLOTS ===== #
-    savedir = "/home/ka2773/project/lm-mem/src/tests/fig"
+    #savedir = "/home/ka2773/project/lm-mem/src/tests/fig"
 
-    ticklabels = [e.strip("Ġ") for e in tokenizer.convert_ids_to_tokens(inputs)]
+    #ticklabels = [e.strip("Ġ") for e in tokenizer.convert_ids_to_tokens(inputs)]
 
-    l, h = 11, 8
-    fig = plot_attentions(data, layer=l, head=h, ticklabels=ticklabels)
-    fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
+    #l, h = 11, 8
+    #fig = plot_attentions(data, layer=l, head=h, ticklabels=ticklabels)
+    #fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
 
-    l, h = 6, 8
-    fig = plot_attentions(data, layer=l, head=h, ticklabels=ticklabels)
-    fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
+    #l, h = 6, 8
+    #fig = plot_attentions(data, layer=l, head=h, ticklabels=ticklabels)
+    #fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
 
-    l, h = 2, 8
-    fig = plot_attentions(data, layer=l, head=h, ticklabels=ticklabels)
-    fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
+    #l, h = 2, 8
+    #fig = plot_attentions(data, layer=l, head=h, ticklabels=ticklabels)
+    #fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
 
-    plt.close("all")
+    #plt.close("all")
 
     del model, model0, model1, model2, data
 
 
     # ===== TEST INDIVIDUAL HEAD ABLATIONS ===== #
 
-    model = GPT2LMHeadModel.from_pretrained("gpt2")
-    model2 = GPT2LMHeadModel.from_pretrained("gpt2")
-    model3 = GPT2LMHeadModel.from_pretrained("gpt2")
+    #model = GPT2LMHeadModel.from_pretrained("gpt2")
+    #model2 = GPT2LMHeadModel.from_pretrained("gpt2")
+    #model3 = GPT2LMHeadModel.from_pretrained("gpt2")
 
 
-    layer = 1
-    lh_dict = {layer: list(range(12))}
-    model2 = ablate_attn_module(model2, layer_head_dict=lh_dict, ablation_type="zero")
-    model3 = ablate_attn_module(model3, layer_head_dict=lh_dict, ablation_type="shuffle")
+    #ayer = 1
+    #lh_dict = {layer: list(range(12))}
+    #model2 = ablate_attn_module(model2, layer_head_dict=lh_dict, ablation_type="zero")
+    #model3 = ablate_attn_module(model3, layer_head_dict=lh_dict, ablation_type="shuffle")
 
-    data2 = []
-    for m in (model, model2, model3):
-        m.eval()
-        data2.append(m(inputs, output_attentions=True).attentions)
+    #data2 = []
+    #for m in (model, model2, model3):
+    #    m.eval()
+    #    data2.append(m(inputs, output_attentions=True).attentions)
 
-    l, h = 11, 8
-    fig = plot_attentions(data2, layer=l, head=h, ticklabels=ticklabels)
-    fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
+    #l, h = 11, 8
+    #fig = plot_attentions(data2, layer=l, head=h, ticklabels=ticklabels)
+    #fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
 
-    plt.close()
+    #plt.close()#
 
-    l, h = 6, 8
-    fig = plot_attentions(data2, layer=l, head=h, ticklabels=ticklabels)
-    fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
+    #l, h = 6, 8
+    #fig = plot_attentions(data2, layer=l, head=h, ticklabels=ticklabels)
+    #fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
 
-    plt.close()
+    #plt.close()
 
-    l, h = 1, 8
-    fig = plot_attentions(data2, layer=l, head=h, ticklabels=ticklabels)
-    fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
+    #l, h = 1, 8
+    #fig = plot_attentions(data2, layer=l, head=h, ticklabels=ticklabels)
+    #fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
 
-    plt.close()
+    #plt.close()
 
-    del model, model2, model3, data2
+    #del model, model2, model3, data2
 
 
     # ===== TEST INDIVIDUAL HEAD ABLATIONS ===== #
 
-    model1 = GPT2LMHeadModel.from_pretrained("gpt2")
-    model2 = GPT2LMHeadModel.from_pretrained("gpt2")
+    #model1 = GPT2LMHeadModel.from_pretrained("gpt2")
+    #model2 = GPT2LMHeadModel.from_pretrained("gpt2")
 
-    layer = 0
-    lh_dict = {layer: [0]}
-    model1 = ablate_attn_module(model1, layer_head_dict=lh_dict, ablation_type="zero")
+    #layer = 0
+    #lh_dict = {layer: [0]}
+    #model1 = ablate_attn_module(model1, layer_head_dict=lh_dict, ablation_type="zero")
 
-    data3 = []
-    for m in (model1, model2):
-        m.eval()
-        data3.append(m(inputs, output_attentions=True).attentions)
+    #data3 = []
+    #for m in (model1, model2):
+    #    m.eval()
+    #    data3.append(m(inputs, output_attentions=True).attentions)
 
-    fig = plot_head_attentions(data3[0], layer=0, heads=[0, 1, 2], ticklabels=ticklabels)
-    fig.suptitle(f"Single head ablation (abl. L.{int(layer)+1}-H.{heads[0]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_head-abl-{int(layer)+1}-{heads[0]}.png"), dpi=300)
+    #fig = plot_head_attentions(data3[0], layer=0, heads=[0, 1, 2], ticklabels=ticklabels)
+    #fig.suptitle(f"Single head ablation (abl. L.{int(layer)+1}-H.{heads[0]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_head-abl-{int(layer)+1}-{heads[0]}.png"), dpi=300)
 
-    fig = plot_head_attentions(data3[1], layer=0, heads=[0, 1, 2], ticklabels=ticklabels)
-    fig.suptitle(f"Unablated heads")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"unablated_heads-{int(layer)+1}-{heads[0]}.png"), dpi=300)
+    #fig = plot_head_attentions(data3[1], layer=0, heads=[0, 1, 2], ticklabels=ticklabels)
+    #fig.suptitle(f"Unablated heads")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"unablated_heads-{int(layer)+1}-{heads[0]}.png"), dpi=300)
 
-    plt.close()
+    #plt.close()
