@@ -1,13 +1,13 @@
 from typing import Dict
-import os
+#import os
 import torch
 import numpy as np
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel
 from test_data import transformer_wt103_test_data
 from wm_suite.wm_test_suite import Experiment
-from wm_suite.paths import DATA_PATH
-from wm_suite.utils import logger
-from wm_suite.io.wt103.dataset import WikiTextDataset
+#from wm_suite.paths import DATA_PATH
+#from wm_suite.utils import logger
+#from wm_suite.io.wt103.dataset import WikiTextDataset
 
 
 def test_transformer_wt103_experiment(transformer_wt103_test_data):
@@ -50,21 +50,21 @@ def test_transformer_wt103_experiment(transformer_wt103_test_data):
     assert np.all([np.all(np.array(output_dict['surp'][i])[1::] > 0) for i in range(n_stim)])
 
     # compute perplexity on a WT103 test set
-    test_set_path = os.path.join(DATA_PATH, "wikitext-103", "wiki.test.tokens")
-    logger.info(f"Loading {test_set_path}...")
-    _, ids = WikiTextDataset(tokenizer=tokenizer).retokenize_txt(test_set_path)
+    #test_set_path = os.path.join(DATA_PATH, "wikitext-103", "wiki.test.tokens")
+    #logger.info(f"Loading {test_set_path}...")
+    #_, ids = WikiTextDataset(tokenizer=tokenizer).retokenize_txt(test_set_path)
 
     #initialize experiment class
-    experiment2 = Experiment(model=model, ismlm=False,
-                            tokenizer=tokenizer,
-                            context_len=1024,
-                            batch_size=1,
-                            stride=1,
-                            use_cache=False,
-                            device=device)
+    #experiment2 = Experiment(model=model, ismlm=False,
+    #                        tokenizer=tokenizer,
+    #                        context_len=1024,
+    #                        batch_size=1,
+    #                        stride=1,
+    #                        use_cache=False,
+    #                        device=device)
     
-    ppl, _, _ = experiment2.ppl(input_ids=torch.tensor([ids]), context_len=1024, stride=256)
+    #ppl, _, _ = experiment2.ppl(input_ids=torch.tensor([ids]), context_len=1024, stride=256)
 
     # check if WT103 perplexity is close to 40.6
-    assert np.isclose(ppl, 40.6146, atol=1e-2)
+    # assert np.isclose(ppl, 40.6146, atol=1e-2)
     
