@@ -13,11 +13,8 @@ from torch.nn import CrossEntropyLoss
 from tqdm import tqdm, trange
 from nltk import word_tokenize, sent_tokenize
 from types import SimpleNamespace
-import sys
 
 # own modules
-sys.path.append("/home/ka2773/project/lm-mem/src/src/wm_suite/")
-sys.path.append("/home/ka2773/project/lm-mem/src/src/wm_suite/awd_lstm")
 from models.rnn.model import RNNModel
 from models.awd_lstm.model import RNNModel as AWD_RNNModel
 from models.awd_lstm.utils import repackage_hidden, batchify

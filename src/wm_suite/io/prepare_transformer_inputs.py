@@ -10,7 +10,7 @@ from typing import List, Tuple, Dict
 from string import punctuation
 from mosestokenizer import MosesTokenizer
 
-from ..paths import get_paths
+from ..paths import get_paths, DATA_PATH
 from ..utils import logger
 from .stimuli import prefixes, prompts
 
@@ -677,7 +677,6 @@ def get_args_for_dev(
 
 
 def main():
-    from types import SimpleNamespace
 
     sys.path.append("/home/ka2773/project/lm-mem/src/data/")
 
@@ -761,7 +760,7 @@ def main():
     # ===== DATA MANAGEMENT ===== #
 
     # load the word lists in .json files
-    fname = os.path.join(data_dir, argins.input_filename)
+    fname = os.path.join(DATA_PATH, argins.input_filename)
 
     word_lists1, word_lists2 = make_word_lists(fname, condition=argins.condition)
 

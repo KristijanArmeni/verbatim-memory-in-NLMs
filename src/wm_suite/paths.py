@@ -33,6 +33,9 @@ import logging
 logger = logging.getLogger("wm_suite.utils")
 
 
+DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+
+
 def add_pathsconfig_to_environ():
     if "PATHSCONFIG" not in os.environ:
         path_to_config_toml = os.path.join(
