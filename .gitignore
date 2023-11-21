@@ -6,9 +6,8 @@
 *.pdf
 # ignore data folder
 data 
-
-models/rnn/wandb
-
+dump
+src/wm_suite/models/rnn/wandb
 train_gpt2_jobs.sh  # ignore the high-level script with login key info
 /wandb/
 /notebooks/
