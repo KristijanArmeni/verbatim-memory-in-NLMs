@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/KristijanArmeni/verbatim-memory-in-NLMs.svg?style=shield)](https://app.circleci.com/pipelines/github/KristijanArmeni/verbatim-memory-in-NLMs)
+
 # Characterizing Short-term Memory In Neural Language Models
 
 ![thumbnail](thumbnail_2x.png)
