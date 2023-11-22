@@ -798,6 +798,12 @@ def main(input_args: List = None, devtesting: bool = False):
         help="str, the name of the output file saving the dataframe",
     )
     parser.add_argument(
+        "--revision",
+        default="main",
+        type=str,
+        help="str, a revision of a model",
+    )
+    parser.add_argument(
         "--aggregate_output",
         action="store_true",
         help="whether or not to only output aggregated dataframe",
