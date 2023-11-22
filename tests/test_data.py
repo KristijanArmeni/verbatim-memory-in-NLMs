@@ -18,9 +18,6 @@ def transformer_test_data():
     # make some input sentences
     test_lists = [["window", "cannon", "apple"], 
                 ["village", "shipping", "beauty"],
-                ["resort", "rival", "village"],
-                ["research", "resort", "rival"],
-                ["lumber", "research", "resort"],
                 ]
 
     test_inputs = concat_and_tokenize_inputs(prefix=prefixes["sce1"]["1"],

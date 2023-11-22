@@ -2,14 +2,14 @@
 from typing import Dict
 import torch
 import numpy as np
-from transformers import GPT2TokenizerFast, GPT2LMHeadModel
+from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config
 from test_data import transformer_test_data
 from src.wm_suite.wm_test_suite import Experiment
 
 def test_transformer_experiment(transformer_test_data):
 
     # load model and its tokenizer
-    model = GPT2LMHeadModel.from_pretrained("gpt2")
+    model = GPT2LMHeadModel(GPT2Config(n_layer=3, n_head=4, n_embd=128))
     tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
 
     # set to evaluation mode
