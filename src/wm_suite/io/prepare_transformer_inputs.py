@@ -506,7 +506,7 @@ def get_query_target_indices(list_len: str, which: str) -> Tuple:
 
     # define indices based on tokens in the first sequences (has no
     # BPE-split tokens)
-    t = np.array(seqs[0].toks[0])
+    t = np.array(seqs[0].toks)
 
     nouns = list(first_sequence_nouns.values())[0 : int(list_len[-1])]
     codes = list(first_sequence_nouns.keys())[0 : int(list_len[-1])]
@@ -568,14 +568,14 @@ def get_inputs_targets_path_patching(batch_size: int = 1):
         [
             i
             for i, inps in enumerate(inps1)
-            if second_colon_idx(inps.toks[0]) == colon_at_unsplit
+            if second_colon_idx(inps.toks) == colon_at_unsplit
         ]
     )  # clean
     corr_inps_ids = torch.tensor(
         [
             i
             for i, inps in enumerate(inps2)
-            if second_colon_idx(inps.toks[0]) == colon_at_unsplit
+            if second_colon_idx(inps.toks) == colon_at_unsplit
         ]
     )  # corrupted
 
