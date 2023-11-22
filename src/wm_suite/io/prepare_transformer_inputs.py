@@ -156,8 +156,8 @@ def assemble_sequence(tokenizer, prefix, list1, prompt, list2):
     input_ids = tokenized["input_ids"]
 
     char_codes = np.zeros(len(seq), dtype=np.int64) - 1
-    for idx, match in enumerate(re.finditer(r"\w+", seq), 1):
-        char_codes[match.start() : match.end()] = idx
+    for idx, match_ in enumerate(re.finditer(r"\w*-?\w+-?'?\w*'?", seq), 1):
+        char_codes[match_.start() : match_.end()] = idx
 
     token_codes = []
     word_codes = []
