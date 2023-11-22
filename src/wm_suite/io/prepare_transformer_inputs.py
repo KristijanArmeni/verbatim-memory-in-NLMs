@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 from string import punctuation
 from typing import Dict, List, Tuple
@@ -106,15 +107,70 @@ class InputSequence(object):
         return f"InputSequence({self.stim_id:02d}, list_len = {self.list_len}, n_toks = {len(self.toks[0])})"
 
 
+def assemble_sequence(tokenizer, prefix, list1, prompt, list2):
+    seq_parts = []
+    seq_codes = []
+
+    def clen():
+        return len(seq_parts[-1])
+
+    # prefix
+    seq_parts.append(prefix + " ")
+    seq_codes.extend([0] * clen())
+    # items
+    for item in list1[:-1]:
+        seq_parts.append(item)
+        seq_codes.extend([1] * clen())
+        seq_parts.append(", ")
+        seq_codes.extend([-1] * clen())
+    seq_parts.append(list1[-1])
+    seq_codes.extend([1] * clen())
+    seq_parts.append(".")
+    seq_codes.extend([-1] * clen())
+    # prompt
+    seq_parts.append(" " + prompt + " ")
+    seq_codes.extend([2] * clen())
+    # items2
+    for item in list2[:-1]:
+        seq_parts.append(item)
+        seq_codes.extend([3] * clen())
+        seq_parts.append(", ")
+        seq_codes.extend([-1] * clen())
+    seq_parts.append(list2[-1])
+    seq_codes.extend([3] * clen())
+    seq_parts.append(".")
+    seq_codes.extend([-1] * clen())
+    seq = "".join(seq_parts)
+    tokenized = tokenizer(seq, return_offsets_mapping=True)
+    offsets = tokenized["offset_mapping"]
+    input_ids = tokenized["input_ids"]
+
+    char_codes = np.zeros(len(seq), dtype=np.int64) - 1
+    for idx, match in enumerate(re.finditer(r"\w+", seq), 1):
+        char_codes[match.start() : match.end()] = idx
+
+    token_codes = []
+    word_codes = []
+    for a, b in offsets:
+        # c = -1 if a == b else seq_codes[a]
+        # print(a, b, seq[a:b], c, char_codes[a:b])
+        if a == b:
+            token_codes.append(-1)
+            word_codes.append(-1)
+        else:
+            assert all(c == seq_codes[a] for c in seq_codes[a:b])
+            token_codes.append(seq_codes[a])
+            word_codes.append(char_codes[a])
+
+    return seq, input_ids, token_codes, word_codes
+
+
 def concat_and_tokenize_inputs(
     prefix: str,
     prompt: str,
     word_list1: List[str],
     word_list2: List[str],
     ngram_size: str,
-    bpe_split_marker: str,
-    marker_logic: str,
-    ismlm: bool,
     pretokenize_moses: bool = False,
     tokenizer=None,
 ) -> Tuple[List[torch.Tensor], Dict]:
@@ -148,7 +204,7 @@ def concat_and_tokenize_inputs(
         dict containing information about stimuli, it contains fields 'stimid', 'trialID', 'positionID', 'subtok', 'list_len'
 
     """
-
+    input_seqs_new = []
     metadata = {
         "stimid": [],
         "trialID": [],
@@ -157,102 +213,40 @@ def concat_and_tokenize_inputs(
         "list_len": [],
     }
 
-    # join list elements into strings for tokenizer below
-    input_seqs = [" " + ", ".join(tks) + "." for tks in word_list1]
-
-    if ismlm:
-        input_seqs2 = [" " + ", ".join(tks) + "." for tks in word_list2]
-        eos1 = "[CLS]"
-        eos2 = "[SEP]"
-    else:
-        input_seqs2 = [" " + ", ".join(tks) + "." for tks in word_list2]
-        eos1 = tokenizer.eos_token
-        eos2 = tokenizer.eos_token
-
-    logger.info(f"Using {eos1} and {eos2} as start and end eos tokens, respectively")
     if pretokenize_moses:
-        logger.info(f"Pretokenizing input sequenes with MosesTokenizer('en') ...")
-
-    # list storing outputs
-    input_seqs_tokenized = []
-    input_seqs_new = []
-
-    # pretokenize with moses and conver back to strings if need be
-    if pretokenize_moses:
+        logger.info("Pretokenizing input sequenes with MosesTokenizer('en') ...")
         with MosesTokenizer("en") as pretokenize:
-            prefix = " ".join(pretokenize(prefix))
-            input_seqs = [" " + " ".join(pretokenize(list1)) for list1 in input_seqs]
-            input_seqs2 = [" " + " ".join(pretokenize(list2)) for list2 in input_seqs2]
-            prompt = " ".join(pretokenize(prompt))
+            prefix = " ".join(pretokenize(prefix)) + " "
+            prompt = " ".join(pretokenize(prompt)) + " "
+            word_list1 = [
+                [" ".join(pretokenize(w)) for w in words] for words in word_list1
+            ]
+            word_list2 = [
+                [" ".join(pretokenize(w)) for w in words] for words in word_list2
+            ]
 
     # loop over trials
-    for i in trange(len(input_seqs), desc="sequence: "):
-        seq = InputSequence()
-
-        seq.str = eos1 + " " + prefix + input_seqs[i] + " " + prompt + input_seqs2[i]
-
-        # tokenize strings separately to be able to construct markers for prefix, word lists etc.
-        i1 = tokenizer.encode(
-            eos1 + " " + prefix, add_special_tokens=False, return_tensors="pt"
-        )  # prefix IDs, add eos token
-        i2 = tokenizer.encode(
-            input_seqs[i], add_special_tokens=False, return_tensors="pt"
-        )
-        i3 = tokenizer.encode(
-            " " + prompt, add_special_tokens=False, return_tensors="pt"
-        )  # prompt IDs
-        i4 = tokenizer.encode(
-            input_seqs2[i] + eos2, add_special_tokens=False, return_tensors="pt"
+    for words1, words2 in zip(word_list1, word_list2):
+        inp_seq = InputSequence()
+        seq, input_ids, token_codes, word_codes = assemble_sequence(
+            tokenizer, prefix, words1, prompt, words2
         )
 
-        # compose the input ids tensors
-        input_ids = torch.cat((i1, i2, i3, i4), dim=1)
-
-        input_seqs_tokenized.append(input_ids)
-        seq.ids = input_ids
-        seq.toks = [tokenizer.convert_ids_to_tokens(e) for e in input_ids]
-
-        # tokenize unmasked tokens to be able to compute loss later on
-        # if ismlm:
-        #
-        #    i4_ = tokenizer.encode(input_seqs2_[i] + eos2, add_special_tokens=False, return_tensors="pt")
-        #    input_ids_unmasked = torch.cat((i1, i2, i3, i4_), dim=1)
-        #    input_seqs_tokenized_unmasked.append(input_ids_unmasked)
-
-        # construct IDs for prefix, word lists and individual tokens
-        # useful for data vizualization etc.
-        trials = []
-        positions = []
-        split_ids = []
-
-        for j, ids in enumerate((i1, i2, i3, i4)):
-            tmp = np.zeros(shape=ids.shape[1], dtype=int)  # code the trial structure
-            tmp[:] = j
-            tmp2 = np.arange(ids.shape[1])  # create token position index
-            trials.append(tmp)
-            positions.append(tmp2)
-            split_ids.append(
-                mark_subtoken_splits(
-                    tokens=tokenizer.convert_ids_to_tokens(ids[0]),
-                    split_marker=bpe_split_marker,
-                    marker_logic=marker_logic,
-                    eos_markers=[eos1, eos2],
-                )
-            )
-
-        metadata["trialID"].append(np.concatenate(trials).tolist())
-        metadata["stimid"].append(i)
-        metadata["positionID"].append(np.concatenate(positions).tolist())
-        metadata["subtok"].append(np.concatenate(split_ids).tolist())
+        inp_seq.str = seq
+        inp_seq.ids = torch.tensor(input_ids, dtype=torch.int64)
+        inp_seq.toks = tokenizer.convert_ids_to_tokens(input_ids)
+        metadata["trialID"] = token_codes
+        metadata["stimid"].append(len(metadata["stimid"]))
+        # metadata["positionID"].append(np.concatenate(positions).tolist())
+        metadata["subtok"] = word_codes
         metadata["list_len"].append(ngram_size)
 
-        seq.list_len = ngram_size
-        seq.stim_id = i
-        seq.trial_ids = np.concatenate(trials).tolist()
-        seq.position_ids = np.concatenate(positions).tolist()
-        seq.subtok_ids = np.concatenate(split_ids).tolist()
+        inp_seq.list_len = ngram_size
+        inp_seq.stim_id = metadata["stimid"]
+        inp_seq.trial_ids = token_codes
+        inp_seq.subtok_ids = word_codes
 
-        input_seqs_new.append(seq)
+        input_seqs_new.append(inp_seq)
 
     return input_seqs_new
 
@@ -481,9 +475,6 @@ def get_input_sequences(
         ngram_size=list_len.strip("n"),
         pretokenize_moses=pretokenize_moses,
         tokenizer=tokenizer,
-        bpe_split_marker=bpe_split_marker_dict[tokenizer_name],
-        marker_logic=marker_logic_dict[tokenizer_name],
-        ismlm=ismlm,
     )
 
     # add information about prompt and list lengths for each sequence
@@ -807,9 +798,6 @@ def main():
         ngram_size=argins.list_len.strip("n"),
         pretokenize_moses=argins.pretokenize_moses,
         tokenizer=tokenizer,
-        bpe_split_marker=bpe_split_marker_dict[argins.path_to_tokenizer],
-        marker_logic=marker_logic_dict[argins.path_to_tokenizer],
-        ismlm=ismlm,
     )
 
     # add information about prompt and list lengths for each sequence
