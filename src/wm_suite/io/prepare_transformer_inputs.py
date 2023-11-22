@@ -1,16 +1,17 @@
-import json
-import sys, os
 import argparse
+import json
+import os
+import sys
+from string import punctuation
+from typing import Dict, List, Tuple
+
 import numpy as np
 from transformers import GPT2TokenizerFast
 import torch
-from torch.nn import functional as F
 from tqdm import trange
-from typing import List, Tuple, Dict
-from string import punctuation
 from mosestokenizer import MosesTokenizer
 
-from ..paths import get_paths, DATA_PATH
+from ..paths import DATA_PATH, get_paths
 from ..utils import logger
 from .stimuli import prefixes, prompts
 
