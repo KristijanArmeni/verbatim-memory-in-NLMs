@@ -1251,11 +1251,11 @@ def main(input_args: List = None, devtesting: bool = False):
         logger.info("Saving {}".format(os.path.join(outpath)))
 
         # save the full, non-aggregated dataframe
-        if type(output) == pd.DataFrame:
+        if isinstance(output, pd.DataFrame):
             output.to_csv(outpath, sep="\t")
 
         # or save the aggregatec metrics in json
-        elif type(output) is dict:
+        elif isinstance(output, dict):
             with open(outpath, "w") as fh:
                 json.dump(output, fh, indent=4)
 
