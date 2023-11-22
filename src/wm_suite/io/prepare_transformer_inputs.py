@@ -168,6 +168,11 @@ def assemble_sequence(tokenizer, prefix, list1, prompt, list2):
             token_codes.append(-1)
             word_codes.append(-1)
         else:
+            if seq[a] == " ":
+                a = a + 1
+            if seq[b] == " ":
+                b = b - 1
+            assert b > a
             assert all(c == seq_codes[a] for c in seq_codes[a:b])
             token_codes.append(seq_codes[a])
             word_codes.append(char_codes[a])
