@@ -252,13 +252,12 @@ def concat_and_tokenize_inputs(
         inp_seq.ids = torch.tensor(input_ids, dtype=torch.int64)
         inp_seq.toks = tokenizer.convert_ids_to_tokens(input_ids)
         metadata["trialID"] = token_codes
-        metadata["stimid"].append(len(metadata["stimid"]))
-        # metadata["positionID"].append(np.concatenate(positions).tolist())
+        metadata["stimid"].append(len(input_seqs_new))
         metadata["subtok"] = word_codes
         metadata["list_len"].append(ngram_size)
 
         inp_seq.list_len = ngram_size
-        inp_seq.stim_id = metadata["stimid"]
+        inp_seq.stim_id = len(input_seqs_new)
         inp_seq.trial_ids = token_codes
         inp_seq.subtok_ids = word_codes
 
