@@ -120,6 +120,7 @@ class InputSequence(object):
 def assemble_sequence(tokenizer, prefix, list1, prompt, list2):
     seq_parts = []
     seq_codes = []
+    token_strings = []
 
     def clen():
         return len(seq_parts[-1])
@@ -168,6 +169,7 @@ def assemble_sequence(tokenizer, prefix, list1, prompt, list2):
             token_codes.append(-1)
             word_codes.append(-1)
         else:
+            token_strings.append(seq[a:b])
             if seq[a] == " ":
                 a = a + 1
             if seq[b - 1] == " ":
@@ -177,7 +179,14 @@ def assemble_sequence(tokenizer, prefix, list1, prompt, list2):
             token_codes.append(seq_codes[a])
             word_codes.append(char_codes[a])
 
-    return seq, input_ids, token_codes, word_codes
+    inp_seq = InputSequence()
+    inp_seq.str = seq
+    inp_seq.ids = torch.tensor(input_ids, dtype=torch.int64)
+    inp_seq.toks = token_strings
+    inp_seq.trial_ids = token_codes
+    inp_seq.subtok_ids = word_codes
+
+    return inp_seq
 
 
 def concat_and_tokenize_inputs(
@@ -248,23 +257,15 @@ def concat_and_tokenize_inputs(
 
     # loop over trials
     for words1, words2 in zip(word_list1, word_list2):
-        inp_seq = InputSequence()
-        seq, input_ids, token_codes, word_codes = assemble_sequence(
-            tokenizer, prefix, words1, prompt, words2
-        )
+        inp_seq = assemble_sequence(tokenizer, prefix, words1, prompt, words2)
 
-        inp_seq.str = seq
-        inp_seq.ids = torch.tensor(input_ids, dtype=torch.int64)
-        inp_seq.toks = tokenizer.convert_ids_to_tokens(input_ids)
-        metadata["trialID"] = token_codes
+        metadata["trialID"] = inp_seq.trial_ids
         metadata["stimid"].append(len(input_seqs_new))
-        metadata["subtok"] = word_codes
+        metadata["subtok"] = inp_seq.subtok_ids
         metadata["list_len"].append(ngram_size)
 
         inp_seq.list_len = ngram_size
         inp_seq.stim_id = len(input_seqs_new)
-        inp_seq.trial_ids = token_codes
-        inp_seq.subtok_ids = word_codes
 
         input_seqs_new.append(inp_seq)
 
