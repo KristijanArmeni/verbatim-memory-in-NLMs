@@ -170,7 +170,7 @@ def assemble_sequence(tokenizer, prefix, list1, prompt, list2):
         else:
             if seq[a] == " ":
                 a = a + 1
-            if seq[b] == " ":
+            if seq[b - 1] == " ":
                 b = b - 1
             assert b > a
             assert all(c == seq_codes[a] for c in seq_codes[a:b])
