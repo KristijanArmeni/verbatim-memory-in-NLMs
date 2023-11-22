@@ -23,11 +23,14 @@ def mark_subtoken_splits(
     tokens: List[str], split_marker: str, marker_logic: str, eos_markers: List[str]
 ) -> List:
     """
-    mark_subtoken_splits() keeps track of whether or not a token was subplit into subwords or not.
-    Each token is counted and if it was split, the subtokens are counted as a single token.
-    E.g. the tokens ["I", "saw", "a", "sp", "Ġarrow", "yesterday"] would be coded as [0, 1, 2, 3, 3, 4]
-    indicating that there are 4 unique tokens and that token nr 3 (sparrow) was split into two subtokens
-    (sp + arrow).
+    mark_subtoken_splits() keeps track of whether or not a token was
+    subplit into subwords or not.
+    Each token is counted and if it was split, the subtokens are
+    counted as a single token.
+    E.g. the tokens ["I", "saw", "a", "sp", "Ġarrow", "yesterday"]
+    would be coded as [0, 1, 2, 3, 3, 4] indicating that there are 4
+    unique tokens and that token nr 3 (sparrow) was split into two
+    subtokens (sp + arrow).
 
     Parameters:
     ----------
@@ -39,7 +42,8 @@ def mark_subtoken_splits(
     Returns :
     -------
     ids : list
-        list containing indices that mark groups (prefix, list1, prompt, list2) withing each list
+        list containing indices that mark groups (prefix, list1,
+        prompt, list2) withing each list
 
     Example:
     -------
@@ -52,12 +56,14 @@ def mark_subtoken_splits(
     ids = []
     count = 0
 
-    # some tokenizers will mark a split by omitting the split_marker, in this case
-    # you have to stop counting when split_marker is missing
+    # some tokenizers will mark a split by omitting the split_marker,
+    # in this case you have to stop counting when split_marker is
+    # missing
     count_token = None
     if marker_logic == "outside":
         count_token = [split_marker in token for token in tokens]
-    # in other cases (e.g. for BERT), you have to stop counting when split_marker is present
+    # in other cases (e.g. for BERT), you have to stop counting when
+    # split_marker is present
     elif marker_logic == "within":
         count_token = [
             (split_marker not in token)
@@ -65,7 +71,8 @@ def mark_subtoken_splits(
             for token in tokens
         ]
 
-    # for tokenizers that do not do BPE tokenization we count each token and ignore punctuation plus eos markers
+    # for tokenizers that do not do BPE tokenization we count each
+    # token and ignore punctuation plus eos markers
     if split_marker is None:
         count_token = [
             (True and (token not in list(punctuation) + eos_markers))
@@ -173,8 +180,8 @@ def concat_and_tokenize_inputs(
     pretokenize_moses: bool = False,
     tokenizer=None,
 ) -> Tuple[List[torch.Tensor], Dict]:
-    """
-    concat_and_tokenize_inputs() concatenates and tokenizes strings as inputs for wm_suite.Experiment() class
+    """concat_and_tokenize_inputs() concatenates and tokenizes
+    strings as inputs for wm_suite.Experiment() class
 
     Parameters:
     ----------
@@ -183,17 +190,23 @@ def concat_and_tokenize_inputs(
     prompt : str
         a string that follows the second noun list
     word_list1 : list of lists
-        a list of lists, each element in the list is a list of nouns, these lists are first lists in the sequence
+        a list of lists, each element in the list is a list of nouns,
+        these lists are first lists in the sequence
     word_list2 : list
-        a list of lists, each element in the list is alist of nouns, these lists are second lists in the sequence
+        a list of lists, each element in the list is alist of nouns,
+        these lists are second lists in the sequence
     ngram_size : str
-        a string indicating number of elements in entries of word_list1 and word_list2
+        a string indicating number of elements in entries of
+        word_list1 and word_list2
     bpe_split_marker : str
-        a string that is used by HuggingFace tokenizer classes to mark tokens that were split into BPEs
+        a string that is used by HuggingFace tokenizer classes to mark
+        tokens that were split into BPEs
     marker_logic : str ("outside", "within")
-        string indicating whether bpe_split_marker indicates outer BPE tokens in split tokens (like GPT2) or inner (like BERT)
+        string indicating whether bpe_split_marker indicates outer BPE
+        tokens in split tokens (like GPT2) or inner (like BERT)
     ismlm : boolean
-        inicates whether or not the current model is a masked language model or not
+        inicates whether or not the current model is a masked language
+        model or not
 
     Returns:
     -------
@@ -266,9 +279,10 @@ def sample_indices_by_group(groups: np.ndarray, seed: int) -> np.ndarray:
         randomized_indices : np.array
             randomly sampled indices of groups.size
 
-    Helper function that creates randomized indices form np.arange(groups.size) by following
-    the structure of group elements in group. It ensures that every
-    element groups is paired with an element outside its own group.
+    Helper function that creates randomized indices form
+    np.arange(groups.size) by following the structure of group
+    elements in group. It ensures that every element groups is paired
+    with an element outside its own group.
     """
 
     out_ids = np.zeros(groups.shape, dtype=int)
@@ -443,9 +457,9 @@ def get_input_sequences(
     # if argins.path_to_tokenizer in ['bert-base-uncased']:
     #    ismlm=True
 
-    # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== #
-
-    # this tells the bpe split counter what symbol to look for and how it codes for splits
+    # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== # this
+    # tells the bpe split counter what symbol to look for and how it
+    # codes for splits
     bpe_split_marker_dict = {
         "gpt2": "Ġ",
         "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
@@ -499,9 +513,8 @@ first_sequence_nouns = {
 
 
 def get_query_target_indices(list_len: str, which: str) -> Tuple:
-    """
-    A helper function to get the indices of the query and target words in the input sequence.
-
+    """A helper function to get the indices of the query and target
+    words in the input sequence.
     """
 
     seqs = get_input_sequences(
@@ -514,7 +527,8 @@ def get_query_target_indices(list_len: str, which: str) -> Tuple:
         pretokenize_moses=False,
     )
 
-    # define indices based on tokens in the first sequences (has no BPE-split tokens)
+    # define indices based on tokens in the first sequences (has no
+    # BPE-split tokens)
     t = np.array(seqs[0].toks[0])
 
     nouns = list(first_sequence_nouns.values())[0 : int(list_len[-1])]
@@ -612,9 +626,9 @@ def get_inputs_targets_path_patching(batch_size: int = 1):
         clean_inps_batches[nb] = orig_inps[-resid:, :]  # zero-indexing
         corr_inps_batches[nb] = corr_inps[-resid:, :]
 
-    # to construct correct/incorrect target pairs,
-    # use the indices of the first token in first list
-    # (the one we expect to be predicted)
+    # to construct correct/incorrect target pairs, use the indices of
+    # the first token in first list (the one we expect to be
+    # predicted)
     targets = {
         i // batch_size: torch.tensor(
             [
@@ -668,7 +682,6 @@ def get_args_for_dev(
 
 
 def main():
-
     sys.path.append("/home/ka2773/project/lm-mem/src/data/")
 
     # ===== INITIATIONS ===== #
@@ -768,7 +781,8 @@ def main():
 
     # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== #
 
-    # this tells the bpe split counter what symbol to look for and how it codes for splits
+    # this tells the bpe split counter what symbol to look for and how
+    # it codes for splits
     bpe_split_marker_dict = {
         "gpt2": "Ġ",
         "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
