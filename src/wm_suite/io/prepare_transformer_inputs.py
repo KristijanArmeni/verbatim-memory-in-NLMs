@@ -7,10 +7,9 @@ from string import punctuation
 from typing import Dict, List, Tuple
 
 import numpy as np
-from transformers import GPT2TokenizerFast
 import torch
-from tqdm import trange
 from mosestokenizer import MosesTokenizer
+from transformers import AutoTokenizer
 
 from ..paths import DATA_PATH, get_paths
 from ..utils import logger
@@ -437,7 +436,7 @@ def get_input_sequences(
 
     # setup the model
     logger.info("Loading tokenizer {}".format(tokenizer_name))
-    tokenizer = GPT2TokenizerFast.from_pretrained(tokenizer_name)
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
     # set the flag for function below
     ismlm = False
@@ -760,7 +759,7 @@ def main():
 
     # setup the model
     logger.info("Loading tokenizer {}".format(argins.path_to_tokenizer))
-    tokenizer = GPT2TokenizerFast.from_pretrained(argins.path_to_tokenizer)
+    tokenizer = AutoTokenizer.from_pretrained(argins.path_to_tokenizer)
 
     # set the flag for function below
     ismlm = False
