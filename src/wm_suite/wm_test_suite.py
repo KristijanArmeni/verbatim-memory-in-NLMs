@@ -6,11 +6,11 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config
 import torch
 from scipy.stats import bootstrap, median_abs_deviation
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm, trange
+from transformers import AutoModelForCausalLM, AutoTokenizer, GPT2Config
 
 # own modules
 from wm_suite.paths import (
@@ -825,24 +825,26 @@ def main(input_args: List = None, devtesting: bool = False):
 
     # setup the model
     logger.info("Loading tokenizer {}".format(argins.tokenizer))
-    tokenizer = GPT2TokenizerFast.from_pretrained(argins.tokenizer)
+    tokenizer = AutoTokenizer.from_pretrained(argins.tokenizer)
 
     # pretrained models
     logger.info("Using {} model".format(argins.model_type))
     logger.info("Loading checkpoint {}".format(argins.checkpoint))
-    model = GPT2LMHeadModel.from_pretrained(argins.checkpoint)
+    model = AutoModelForCausalLM.from_pretrained(
+        argins.checkpoint, revision=argins.revision
+    )
 
     ismlm = False
 
     if argins.checkpoint == "gpt2":
-        model = GPT2LMHeadModel.from_pretrained("gpt2")
-        tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
+        model = AutoModelForCausalLM.from_pretrained("gpt2")
+        tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
     # or initialize a random model
     if argins.model_type == "random":
         # initialize with random weights
         torch.manual_seed(argins.model_seed)
-        model = GPT2LMHeadModel(config=GPT2Config())
+        model = AutoModelForCausalLM.from_config(GPT2Config())
 
     # permute the weights of gpt-small
     elif argins.model_type == "random-att":
