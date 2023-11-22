@@ -110,7 +110,11 @@ class InputSequence(object):
         self.prompt = None
 
     def __repr__(self) -> str:
-        return f"InputSequence({self.stim_id:02d}, list_len = {self.list_len}, n_toks = {len(self.toks[0])})"
+        return (
+            f"InputSequence({self.stim_id:02d}, "
+            f"list_len={self.list_len}, "
+            f"n_toks={len(self.toks)})"
+        )
 
 
 def assemble_sequence(tokenizer, prefix, list1, prompt, list2):
