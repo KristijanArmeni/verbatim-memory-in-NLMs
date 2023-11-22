@@ -452,33 +452,7 @@ def get_input_sequences(
     logger.info("Loading tokenizer {}".format(tokenizer_name))
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
-    # set the flag for function below
-    ismlm = False
-    # if argins.path_to_tokenizer in ['bert-base-uncased']:
-    #    ismlm=True
-
     # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== # this
-    # tells the bpe split counter what symbol to look for and how it
-    # codes for splits
-    bpe_split_marker_dict = {
-        "gpt2": "Ġ",
-        "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
-        "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "Ġ",
-        "bert-base-uncased": "##",
-        "transfo-xl-wt103": None,
-    }
-
-    # this tells the bpe split counter how these symbols are used
-    marker_logic_dict = {
-        "gpt2": "outside",
-        "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
-        "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "outside",
-        "bert-base-uncased": "within",
-        "transfo-xl-wt103": None,
-    }
-
-    # this routing loops over prompts and prefixes
-    # it keeps track of that in meta_data
     logger.info("Tokenizing and concatenating sequences...")
     input_sequences = concat_and_tokenize_inputs(
         prompt=prompts[scenario][prompt_key],
