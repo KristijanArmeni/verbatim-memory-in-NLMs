@@ -12,29 +12,22 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm, trange
 from transformers import AutoModelForCausalLM, AutoTokenizer, GPT2Config
 
-# own modules
-from wm_suite.paths import (
-    get_paths,
-    add_data_to_syspath,
-)  # project root must be in python path for this to work, it adds src/ to sys.path
-from wm_suite.utils import logger
-
-# add_data_to_syspath()  # add ./data to sys.path
-from wm_suite.io.wt103.dataset import WikiTextDataset
 from wm_suite.io.prepare_transformer_inputs import (
-    mark_subtoken_splits,
     get_input_sequences,
+    mark_subtoken_splits,
 )
-from wm_suite.io.stimuli import prefixes, prompts
+from wm_suite.io.test_ds import get_test_data
+from wm_suite.io.wt103.dataset import WikiTextDataset
+from wm_suite.paths import get_paths
+from wm_suite.utils import logger
+from wm_suite.viz.func import filter_and_aggregate
 from wm_suite.wm_ablation import (
     ablate_attn_module,
     find_topk_attn,
     find_topk_intersection,
-    from_labels_to_dict,
     from_dict_to_labels,
+    from_labels_to_dict,
 )
-from wm_suite.io.test_ds import get_test_data
-from wm_suite.viz.func import filter_and_aggregate
 
 
 PATHS = get_paths()
@@ -58,9 +51,9 @@ class SimpleDataset(Dataset):
 
 
 def code_relative_markers(markers: npt.ArrayLike) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Helper function to code the position of timesteps relative to lists of nouns within each sequences.
-    These markers are used for aggregating prior to visualization.
+    """Helper function to code the position of timesteps relative to
+    lists of nouns within each sequences.  These markers are used for
+    aggregating prior to visualization.
 
     Parameters
     ----------
@@ -104,7 +97,8 @@ def merge_states(
 
     """
 
-    # find which tokens where split by looking at indices that occur more than once (i.e. for each BPE subword)
+    # find which tokens where split by looking at indices that occur
+    # more than once (i.e. for each BPE subword)
     # example: [0, 1, 2, 3, 3, 4] --> token 3 was split into two subwords
     u, c = np.unique(bpe_split_indices, return_counts=True)
 
@@ -121,7 +115,8 @@ def merge_states(
         if (np.diff(sel) == 1).all():
             logger.info(f"Merging tokens {new_tokens[sel]} at positions {sel}")
 
-            # replace first subword token by the mean of all subwords and delete the rest
+            # replace first subword token by the mean of all subwords
+            # and delete the rest
             x[sel[0], ...] = mergefun(x[sel, ...], axis=0)  # shape = (tokens, ...)
             x[sel[1::], ...] = np.nan  #
 
@@ -139,8 +134,8 @@ def merge_states(
 
 class Experiment(object):
 
-    """
-    Experiment() class contains wrapper methods to run experiments with transformer models.
+    """Experiment() class contains wrapper methods to run experiments
+    with transformer models.
 
     Attributes
     ----------
@@ -157,7 +152,8 @@ class Experiment(object):
     batch_size : int
         the number of sequences evaluated in parallel
     use_cache : bool
-        whether or not to reuse key-value matrices from previous time-steps in transformers
+        whether or not to reuse key-value matrices from previous
+        time-steps in transformers
     loss_fct_batched : instace of `torch.nn.CrossEntropyLoss(reduction="none")`
 
 
@@ -203,7 +199,8 @@ class Experiment(object):
         Parameters
         ----------
         model (required) : nn.Module
-            pytorch module representing the model (is moved to self.device upon initialization)
+            pytorch module representing the model (is moved to
+            self.device upon initialization)
         ismlm (optional) : bool
             whether the model is a masked language model or not (default = False)
         device : str
@@ -211,11 +208,13 @@ class Experiment(object):
         tokenizer (required) : PreTrainedTokenizer()
             tokenizer class from HuggingFace (https://huggingface.co/transformers/v4.6.0/main_classes/tokenizer.html#transformers.PreTrainedTokenizer)
         context_len : int
-            the length of context window for computing transformer surprisal (default = 1024)
+            the length of context window for computing transformer
+            surprisal (default = 1024)
         batch_size : int
             the number of sequences evaluated in parallel
         use_cache : bool
-            whether or not to reuse key-value matrices from previous time-steps in transformers
+            whether or not to reuse key-value matrices from previous
+            time-steps in transformers
 
         """
 
@@ -245,9 +244,11 @@ class Experiment(object):
         input_ids (required) : torch.tensor
             indices representing tokens to be fed as input to model
         context_len (required) : int
-            the length (in number of tokens) of past tokens used for computing negative log likelihood
+            the length (in number of tokens) of past tokens used for
+            computing negative log likelihood
         stride (required) : int
-            the step (in number of tokens) in between two subsequent loops for computing perplexity
+            the step (in number of tokens) in between two subsequent
+            loops for computing perplexity
 
         Returns
         -------
@@ -258,7 +259,8 @@ class Experiment(object):
         """
 
         llh = []  # variable storing token-by-token neg ll
-        tokens = []  # variable storing token strings to have along with -ll in the output
+        # variable storing token strings to have along with -ll in the output
+        tokens = []
 
         # loop over tokens in input sequence
         for i in trange(0, input_ids.size(1), stride, desc="Computing perplexity: "):
@@ -272,7 +274,8 @@ class Experiment(object):
             # select the current input index span
             sel_input_ids = input_ids[:, begin_loc:end_loc].clone().to(self.device)
 
-            # mask the final token in sequence if we're testing bert, so that we get prediction only for that token
+            # mask the final token in sequence if we're testing bert,
+            # so that we get prediction only for that token
             if self.ismlm:
                 sel_input_ids[0, -1] = self.tokenizer.convert_tokens_to_ids("[MASK]")
 
@@ -382,7 +385,8 @@ class Experiment(object):
             # select the current input index span
             selected_input_ids = input_ids[:, beg_loc:end_loc].to(self.device)
 
-            # mask the final token in sequence if we're testing MLM, so that we get prediction only for that token
+            # mask the final token in sequence if we're testing MLM,
+            # so that we get prediction only for that token
             if self.ismlm:
                 selected_input_ids[:, -1] = self.tokenizer.convert_tokens_to_ids(
                     "[MASK]"
@@ -421,8 +425,9 @@ class Experiment(object):
                 for batch_idx, nll_val in enumerate(losses):
                     llhs[batch_idx].append(nll_val.item())
 
-                # Save past attention keys for speedup
-                # TODO: cannot handle if past_key_values becomes longer than context_length yet
+                # Save past attention keys for speedup TODO: cannot
+                # handle if past_key_values becomes longer than
+                # context_length yet
 
         # Handle padded sequences
         final_llhs = []
@@ -517,8 +522,8 @@ class Experiment(object):
         return outputs
 
     def start(self, input_sequences: List[torch.Tensor]) -> Dict[str, List[any]]:
-        """
-        experiment.start() will call the [wm_suite.Experiment][] method on `input_sequences`
+        """experiment.start() will call the [wm_suite.Experiment][]
+        method on `input_sequences`
 
         """
 
@@ -811,7 +816,8 @@ def main(input_args: List = None, devtesting: bool = False):
     else:
         argins = parser.parse_args()
 
-    # if test run, populate input arguments manually (these are corresponding to choices in wm_suite.io.test_ds.get_test_data())
+    # if test run, populate input arguments manually (these are
+    # corresponding to choices in wm_suite.io.test_ds.get_test_data())
     if argins.test_run:
         logger.info("Doing a test run...")
         argins.scenario = "sce1"
@@ -896,14 +902,16 @@ def main(input_args: List = None, devtesting: bool = False):
             else:
                 seed = 12345  # use a seed just to find_topk_attn runs
 
-            # if specified, find heads that fall both in induciton and matching heads
+            # if specified, find heads that fall both in induciton and
+            # matching heads
             if argins.ablate_topk_heads == "induction-matching-intersect":
                 lh_dict = find_topk_intersection(
                     attn_dict["data"], tois=([13], [14, 16, 18]), topk=20, seed=12345
                 )
 
             elif argins.ablate_topk_heads == "matching-bottom5":
-                # find effect of ablation of onlyt the last 5 matching heads (seems to have disproportionaly strong effect)
+                # find effect of ablation of onlyt the last 5 matching
+                # heads (seems to have disproportionaly strong effect)
                 top15_matching, _, _ = find_topk_attn(
                     attn_dict["data"], topk=15, tokens_of_interest=[13], seed=12345
                 )
@@ -938,7 +946,8 @@ def main(input_args: List = None, devtesting: bool = False):
             logger.info(f"Ablating {argins.ablate_topk_heads} random heads")
             layer_head_dict = lh_dict_ctrl
 
-        # ablate heads by setting GPT2Attention() classes in selected layers to GPT2AttentionAblated()
+        # ablate heads by setting GPT2Attention() classes in selected
+        # layers to GPT2AttentionAblated()
         model = ablate_attn_module(
             model, layer_head_dict=layer_head_dict, ablation_type="zero"
         )
@@ -1018,7 +1027,8 @@ def main(input_args: List = None, devtesting: bool = False):
     # merge tokens and surprisals that were splits into BPE tokens
     output_dict = experiment.merge_bpe_splits(output_dict)
 
-    # find timesteps that correspond to punctuation, end of string and empty slots
+    # find timesteps that correspond to punctuation, end of string and
+    # empty slots
     punct_symbols = [
         np.array([s.strip("Ġ") in punctuation for s in l]) for l in output_dict["token"]
     ]  # find positions of punctuation symbols
@@ -1036,7 +1046,8 @@ def main(input_args: List = None, devtesting: bool = False):
         for x, y, z in zip(punct_symbols, eos_symbols, empty_symbols)
     ]
 
-    # create nan arrays that are going to be populated with markers and will have nan values elsewhere
+    # create nan arrays that are going to be populated with markers
+    # and will have nan values elsewhere
     output_dict["marker_pos"] = [
         np.full(shape=len(s), fill_value=np.nan) for s in output_dict["token"]
     ]
