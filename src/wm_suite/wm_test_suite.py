@@ -450,15 +450,15 @@ class Experiment(object):
         """Converts list of sequences into a padded torch Tensor and its lengths"""
 
         # get lengths of all sequences
-        sequence_lengths = [len(sequence[0]) for sequence in sequence_list]
+        sequence_lengths = [len(sequence) for sequence in sequence_list]
 
         batched_sequence = torch.nn.utils.rnn.pad_sequence(
-            [sequence[0] for sequence in sequence_list],
+            sequence_list,
             batch_first=True,
             padding_value=self.tokenizer.encode(self.tokenizer.unk_token)[0],
         )
         target_sequence = torch.nn.utils.rnn.pad_sequence(
-            [sequence[0] for sequence in sequence_list],
+            sequence_list,
             batch_first=True,
             padding_value=self.loss_fct_batched.ignore_index,
         )
@@ -516,7 +516,7 @@ class Experiment(object):
         # store tokens
         if self.stride == 1:
             outputs["token"] = [
-                self.tokenizer.convert_ids_to_tokens(e[0]) for e in input_sequences
+                self.tokenizer.convert_ids_to_tokens(e) for e in input_sequences
             ]
 
         return outputs
