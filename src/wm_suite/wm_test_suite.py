@@ -833,7 +833,11 @@ def main(input_args: List = None, devtesting: bool = False):
     # ===== INITIATE MODEL AND TOKANIZER CLASS ===== #
 
     # declare device and paths
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if argins.device == "cuda" and not torch.cuda.is_available():
+        logger.warning("CUDA is not available, falling back to CPU!")
+        device = torch.device("cpu")
+    else:
+        device = torch.device(argins.device)
 
     # setup the model
     logger.info("Loading tokenizer {}".format(argins.tokenizer))
