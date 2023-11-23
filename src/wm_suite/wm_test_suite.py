@@ -12,10 +12,7 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm, trange
 from transformers import AutoModelForCausalLM, AutoTokenizer, GPT2Config
 
-from wm_suite.io.prepare_transformer_inputs import (
-    get_input_sequences,
-    mark_subtoken_splits,
-)
+from wm_suite.io.prepare_transformer_inputs import get_input_sequences
 from wm_suite.io.test_ds import get_test_data
 from wm_suite.io.wt103.dataset import WikiTextDataset
 from wm_suite.paths import get_paths
@@ -689,7 +686,6 @@ def get_input_args_for_testing():
 # ===== RUNTIME CODE WRAPPER ===== #
 def main(input_args: List = None, devtesting: bool = False):
     from ast import literal_eval
-    from string import punctuation
 
     # ===== INITIATIONS ===== #
     # collect input arguments
