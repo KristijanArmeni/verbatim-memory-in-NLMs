@@ -513,12 +513,6 @@ class Experiment(object):
             outputs["sequence_ppl"].extend(ppls)
             outputs["surp"].extend(surprisals)
 
-        # store tokens
-        if self.stride == 1:
-            outputs["token"] = [
-                self.tokenizer.convert_ids_to_tokens(e) for e in input_sequences
-            ]
-
         return outputs
 
     def start(self, input_sequences: List[torch.Tensor]) -> Dict[str, List[any]]:
@@ -532,26 +526,22 @@ class Experiment(object):
 
     def merge_bpe_splits(self, outputs: Dict) -> Dict:
         for i in range(len(outputs["surp"])):
-            s = outputs["surp"][i]
-            t = outputs["token"][i]
-
-            r = mark_subtoken_splits(
-                t,
-                split_marker="Ġ",
-                marker_logic="outside",
-                eos_markers=["<|endoftext|>", "<|endoftext|>"],
-            )
-
-            x, t1, _ = merge_states(
-                np.expand_dims(np.array(s), axis=1),
-                bpe_split_indices=np.array(r),
-                tokens=t,
-                mergefun=np.sum,
-            )
-
-            outputs["surp"][i] = np.squeeze(x)  # add merged (summed) surprisal
-            outputs["token"][i] = t1  # add merged strings
-
+            subtok_id_arr = np.array(outputs["subtok_ids"][i])
+            # np.abs prevents matching on -1
+            (pos,) = np.where(subtok_id_arr[:-1] == np.abs(subtok_id_arr[1:]))
+            pos += 1
+            # go backwards so we do not invalidate later positions
+            for ix in pos[::-1].tolist():
+                surp = outputs["surp"][i]
+                surp[ix - 1] = surp[ix - 1] + surp[ix]
+                outputs["surp"][i] = surp[:ix] + surp[ix + 1 :]
+                token = outputs["token"][i]
+                token[ix - 1] = token[ix - 1] + token[ix]
+                outputs["token"][i] = token[:ix] + token[ix + 1 :]
+                st_ids = outputs["subtok_ids"][i]
+                outputs["subtok_ids"][i] = st_ids[:ix] + st_ids[ix + 1 :]
+                t_ids = outputs["trial_ids"][i]
+                outputs["trial_ids"][i] = t_ids[:ix] + t_ids[ix + 1 :]
         return outputs
 
 
@@ -1003,9 +993,13 @@ def main(input_args: List = None, devtesting: bool = False):
     )
 
     # run experiment
-    output_dict = experiment.start(
-        input_sequences=[sequence.ids for sequence in input_sequences]
-    )
+    output_dict = experiment.start(input_sequences=[s.ids for s in input_sequences])
+    # store tokens
+    if experiment.stride == 1:
+        output_dict["token"] = [s.toks for s in input_sequences]
+
+    output_dict["subtok_ids"] = [s.subtok_ids for s in input_sequences]
+    output_dict["trial_ids"] = [s.trial_ids for s in input_sequences]
 
     # ===== WT-103 PERPLEXITY ===== #
     ppl = torch.tensor(torch.nan)
@@ -1036,44 +1030,21 @@ def main(input_args: List = None, devtesting: bool = False):
 
     # merge tokens and surprisals that were splits into BPE tokens
     output_dict = experiment.merge_bpe_splits(output_dict)
-
-    # find timesteps that correspond to punctuation, end of string and
-    # empty slots
-    punct_symbols = [
-        np.array([s.strip("Ġ") in punctuation for s in l]) for l in output_dict["token"]
-    ]  # find positions of punctuation symbols
-    eos_symbols = [
-        np.array([s.strip("Ġ") in tokenizer.eos_token for s in l])
-        for l in output_dict["token"]
-    ]  # find positions for end of text symbols
-    empty_symbols = [
-        np.array([s.strip("Ġ") == "" for s in l]) for l in output_dict["token"]
-    ]  # make sure to track empty strings after merging
-
-    # create a joint boolean, per sequence
-    timesteps = [
-        [(~punct & ~eos & ~empty) for punct, eos, empty in zip(x, y, z)]
-        for x, y, z in zip(punct_symbols, eos_symbols, empty_symbols)
-    ]
-
-    # create nan arrays that are going to be populated with markers
-    # and will have nan values elsewhere
     output_dict["marker_pos"] = [
         np.full(shape=len(s), fill_value=np.nan) for s in output_dict["token"]
     ]
     output_dict["marker_pos_rel"] = [
         np.full(shape=len(s), fill_value=np.nan) for s in output_dict["token"]
     ]
-
-    # now create absolute and relative markers for each sequence
-    for i, markers in enumerate([sequence.trial_ids for sequence in input_sequences]):
-        sel = timesteps[i]
-        output_dict["marker_pos"][i][sel] = code_relative_markers(
-            np.array(markers)[sel]
-        )[0]
-        output_dict["marker_pos_rel"][i][sel] = code_relative_markers(
-            np.array(markers)[sel]
-        )[1]
+    for i, marker_pos in enumerate(output_dict["marker_pos"]):
+        subtok_id_arr = np.array(output_dict["subtok_ids"][i])
+        (nnan_pos,) = np.where(subtok_id_arr > 0)
+        marker_pos[nnan_pos] = np.arange(len(nnan_pos)) + 1
+    for i, marker_pos_r in enumerate(output_dict["marker_pos_rel"]):
+        trial_id_arr = np.array(output_dict["trial_ids"][i])
+        (nnan_pos,) = np.where(trial_id_arr == 3)
+        offset = output_dict["marker_pos"][i][nnan_pos[0]]
+        marker_pos_r[:] = output_dict["marker_pos"][i] - offset
 
     experiment.model.to("cpu")
 
@@ -1135,16 +1106,15 @@ def main(input_args: List = None, devtesting: bool = False):
         [
             argins.list_type for _ in range(len(input_sequences))
         ],  # "random" | "categorized"
-        [sequence.trial_ids for sequence in input_sequences],
+        [trial_id for trial_id in output_dict["trial_ids"]],
         [sequence.position_ids for sequence in input_sequences],
-        [sequence.subtok_ids for sequence in input_sequences],
+        [subtok_id for subtok_id in output_dict["subtok_ids"]],
         [sequence.list_len for sequence in input_sequences],
         [sequence.prompt for sequence in input_sequences],
     ]
 
     # put everything into a dataframe
     logger.info("Converting to dataframe...")
-
     output_df = outputs2dataframe(colnames, arrays, metacols, metarrays)
 
     for col in ("prompt_len", "list_len"):
