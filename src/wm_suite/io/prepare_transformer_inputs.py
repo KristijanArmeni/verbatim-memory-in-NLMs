@@ -11,7 +11,7 @@ import torch
 from mosestokenizer import MosesTokenizer
 from transformers import AutoTokenizer
 
-from ..paths import DATA_PATH, get_paths
+from ..paths import DATA_PATH, NOUNS_PATH, get_paths
 from ..utils import logger
 from .stimuli import prefixes, prompts
 
@@ -446,7 +446,7 @@ def get_input_sequences(
         input_filename = "categorized_lists.json"
 
     # load the word lists in .json files
-    fname = os.path.join(paths.data, "noun_lists", input_filename)
+    fname = os.path.join(NOUNS_PATH, input_filename)
 
     word_lists1, word_lists2 = make_word_lists(fname, condition=condition)
 
