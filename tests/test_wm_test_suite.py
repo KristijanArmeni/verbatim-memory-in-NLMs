@@ -1,4 +1,3 @@
-import os
 from src.wm_suite import wm_test_suite
 from wm_suite.paths import get_paths
 
