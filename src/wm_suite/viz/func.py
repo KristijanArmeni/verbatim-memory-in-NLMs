@@ -64,8 +64,6 @@ def filter_and_aggregate(
         the first element is the dataframe with aggregated surprisal values, the second is the dataframe with
 
     """
-    # unpack the dictionaries for each variable    
-    #import pdb; pdb.set_trace()
 
     # check that there is only one model id in datain
     # (code is expected to be called with only one model at a time)
@@ -85,7 +83,6 @@ def filter_and_aggregate(
         & (positions)
     )
 
-    import pdb; pdb.set_trace()    
     if sum(sel) == 0:
         raise ValueError(
             "No rows were selected.Check selection conditions."+
