@@ -253,60 +253,38 @@ class Experiment(object):
         tokens :
 
         """
+        assert not self.ismlm
 
-        llh = []  # variable storing token-by-token neg ll
-        # variable storing token strings to have along with -ll in the output
-        tokens = []
+        nll = []  # variable storing token-by-token neg ll
+        # set model to evaluation mode
+        self.model.eval()
+        loss_fn = torch.nn.CrossEntropyLoss(reduction="none")
 
-        # loop over tokens in input sequence
-        for i in trange(0, input_ids.size(1), stride, desc="Computing perplexity: "):
-            # define the start and endpoints of input indices for current loop
-            begin_loc = max(
-                i + stride - context_len, 0
-            )  # define the non-negative onset location
-            end_loc = min(i + stride, input_ids.size(1))
-            trg_len = end_loc - i  # may be different from stride on last loop
-
-            # select the current input index span
-            sel_input_ids = input_ids[:, begin_loc:end_loc].clone().to(self.device)
-
-            # mask the final token in sequence if we're testing bert,
-            # so that we get prediction only for that token
-            if self.ismlm:
-                sel_input_ids[0, -1] = self.tokenizer.convert_tokens_to_ids("[MASK]")
-
-            # use unmasked tokens as targets for loss if provided
-            target_ids = input_ids[:, begin_loc:end_loc].to(self.device).clone()
-
-            # do not compute the loss on  tokens (-100) that are used for context
-            target_ids[:, :-trg_len] = -100
-
-            # if i in range(0, 5):
-            #    print(f"inputs: {sel_input_ids}")
-            #    print(f"targets: {target_ids}")
-
-            # set model to evaluation mode
-            self.model.eval()
-
-            # get model output
-            with torch.no_grad():
-                # compute neg log likelihood over target ids (n+1 in our case)
-                # indices are shifted under the hood by model.__call__()
-                outputs = self.model(sel_input_ids, labels=target_ids)
-
-                log_likelihood = (
-                    outputs.loss.item() * trg_len
-                )  # not sure about this multiplication here (undoing averaging?)
-
-                llh.append(log_likelihood)
-                if stride == 1:
-                    toks = self.tokenizer.decode(target_ids[0][-stride::])
-                    tokens.append(toks)  # store the last token (target_id)
-
-        # compute perplexity, divide by the lenth of the sequence
-        # use np.nansum as token at position 0 will have -LL of nan
-        ppl = torch.exp(torch.tensor(np.nansum(llh)) / (end_loc - 1)).cpu()
-        return ppl, llh, tokens
+        # decoder only model (GPT) - perplexity of a sequence that fits the
+        # model context can be calculated in a single pass; if it is
+        # larger, we run the model using sliding window approach
+        # (moving it by stride to speed things up a bit by sacrifising
+        # some precision)
+        # initial sequence
+        sequence_len = input_ids.size(1)
+        start_pos = 0
+        end_pos = min(sequence_len, context_len)
+        positions_to_evaluate = [(start_pos, end_pos)]
+        while end_pos < sequence_len:
+            start_pos = end_pos
+            end_pos = end_pos + stride
+            positions_to_evaluate.append((start_pos, end_pos))
+        with torch.no_grad():
+            for start_pos, end_pos in positions_to_evaluate:
+                output = self.model(input_ids[:, start_pos:end_pos])
+                shift_logits = output.logits[:, :-1, :].contiguous()
+                labels = input_ids[:, start_pos + 1 : end_pos].contiguous()
+                losses = loss_fn(
+                    shift_logits.view(-1, shift_logits.size(-1)), labels.view(-1)
+                )
+                nll.extend(losses.cpu().numpy().tolist())
+        ppl = np.exp(np.mean(nll)).item()
+        return ppl, nll
 
     def ppl_batched(
         self,
@@ -331,116 +309,29 @@ class Experiment(object):
                 "higher values are not accepted currently"
             )
 
-        # to match every token need to insert <eos> token artificially at beginning
-        llhs = [
-            [
-                np.nan,
-            ]
-            for _ in range(batch_size)
-        ]  # variable storing token-by-token neg log likelihoods
-
-        # set model to evaluation mode
+        nlls = [[np.nan] for i in range(batch_size)]
         self.model.eval()
-        self.model.to(self.device)
-
-        if self.use_cache:
-            end_loop_idx = input_ids.size(1) - 1
-            past_key_values = None
-
-            # if we're (re)using cache, then we can only select current input slice
-            # in this case stride and context_len are ignored
-            beg_loc_fun = lambda i, stride=None, context_len=None: i
-            end_loc_fun = lambda i, stride=None, max_loc=None: i + 1
-            tgt_beg_loc_fun = lambda i, stride=None, context_len=None: i + 1
-            tgt_end_loc_fun = lambda i, stride=None, context_len=None: i + 2
-
-        else:
-            past_key_values = None
-            end_loop_idx = input_ids.size(1) - 1
-            beg_loc_fun = lambda i, stride, context_len: max(
-                i + stride - context_len, 0
-            )
-            end_loc_fun = lambda i, stride, max_loc: min(i + stride, max_loc)
-
-            # we have to shift targets for one time step forward
-            tgt_beg_loc_fun = (
-                lambda i, stride, context_len: max((i + stride - context_len), 0) + 1
-            )
-            tgt_end_loc_fun = lambda i, stride, max_loc: min(i + stride, max_loc) + 1
-
-        # loop over tokens in input sequence
-        for idx in range(0, end_loop_idx):
-            # compute begining and end indices for context tokens
-            beg_loc = beg_loc_fun(idx, stride, context_len)
-            end_loc = end_loc_fun(idx, stride, end_loop_idx)
-            tgt_beg_loc = tgt_beg_loc_fun(idx, stride, context_len)
-            tgt_end_loc = tgt_end_loc_fun(idx, stride, end_loop_idx)
-
-            trg_len = end_loc - idx  # may be different from stride on last loop
-
-            # select the current input index span
-            selected_input_ids = input_ids[:, beg_loc:end_loc].to(self.device)
-
-            # mask the final token in sequence if we're testing MLM,
-            # so that we get prediction only for that token
-            if self.ismlm:
-                selected_input_ids[:, -1] = self.tokenizer.convert_tokens_to_ids(
-                    "[MASK]"
+        loss_fn = torch.nn.CrossEntropyLoss(reduction="none")
+        sequence_len = input_ids.size(1)
+        start_pos = 0
+        end_pos = min(sequence_len, context_len)
+        positions_to_evaluate = [(start_pos, end_pos)]
+        while end_pos < sequence_len:
+            start_pos = end_pos
+            end_pos = end_pos + stride
+            positions_to_evaluate.append((start_pos, end_pos))
+        with torch.no_grad():
+            for start_pos, end_pos in positions_to_evaluate:
+                output = self.model(input_ids[:, start_pos:end_pos])
+                shift_logits = output.logits[:, :-1, :].contiguous()
+                labels = input_ids[:, start_pos + 1 : end_pos].contiguous()
+                losses = loss_fn(
+                    shift_logits.view(-1, shift_logits.size(-1)), labels.view(-1)
                 )
-
-            # targets are shifted by 1 token forward
-            target_ids = targets[:, tgt_beg_loc:tgt_end_loc].to(self.device)
-            target_ids[:, :-trg_len] = self.loss_fct_batched.ignore_index
-
-            # print(selected_input_ids)
-            # print(target_ids)
-
-            # get model output
-            with torch.no_grad():
-                # compute logits and use cache if provided
-                outputs = self.model(
-                    input_ids=selected_input_ids,
-                )
-
-                # print(outputs.logits.shape)
-                # print(outputs.logits[:, -1, 0:10])
-                # print(outputs.logits[:, 0, 0:10])
-
-                if self.use_cache:
-                    past_key_values = outputs.past_key_values
-                del selected_input_ids
-
-                # compute loss per every sequence in batch shape = (batch, sequence_len)
-                losses = self.loss_fct_batched(
-                    outputs.logits[:, -1, :].view(-1, outputs.logits.size(-1)),
-                    target_ids[:, -1].view(-1),
-                )
-                # del outputs
-                del target_ids
-
-                for batch_idx, nll_val in enumerate(losses):
-                    llhs[batch_idx].append(nll_val.item())
-
-                # Save past attention keys for speedup TODO: cannot
-                # handle if past_key_values becomes longer than
-                # context_length yet
-
-        # Handle padded sequences
-        final_llhs = []
-        for batch_idx, llh_vals in enumerate(llhs):
-            # Cut them off at appropriate length
-            final_llhs.append(llh_vals[: seq_lens[batch_idx]])
-
-        # compute perplexity, divide by the lenth of the sequence
-        # use np.nansum as token at position 0 will have -LL of nan
-        ppls = []
-        for batch_idx, llh_vals in enumerate(final_llhs):
-            ppls.append(
-                torch.exp(torch.tensor(np.nansum(llh_vals)) / (len(llh_vals) - 1))
-                .cpu()
-                .item()
-            )
-        return ppls, final_llhs
+                for ix in range(batch_size):
+                    nlls[ix].extend(losses.cpu().numpy().tolist())
+        ppl = [np.exp(np.nanmean(nll)).item() for nll in nlls]
+        return ppl, nlls
 
     def get_batch(self, sequence_list: List[torch.Tensor]) -> Tuple[torch.Tensor]:
         """Converts list of sequences into a padded torch Tensor and its lengths"""
