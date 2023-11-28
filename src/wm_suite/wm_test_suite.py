@@ -4,7 +4,6 @@ import os
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
-import numpy.typing as npt
 import pandas as pd
 import torch
 from scipy.stats import bootstrap, median_abs_deviation
