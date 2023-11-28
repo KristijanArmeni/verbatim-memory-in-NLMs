@@ -67,14 +67,14 @@ def test_compute_perplexity(transformer_test_data):
     values1 = output_dict1['sequence_ppl']
     values2 = output_dict2['sequence_ppl']
 
-    assert_allclose(values1, values2, atol=1e-2)
+    assert_allclose(values1, values2, rtol=1e-6)
 
     values1 = output_dict1['sequence_ppl']
     values2 = ppl
-    assert_allclose(values1, values2, atol=1e-2)
+    assert_allclose(values1, values2, rtol=1e-6)
 
     values1 = ppl
     values2 = ppl2
     logging.info(values1)
     logging.info(values2)
-    assert_allclose(values1, values2, atol=1e-2)
+    assert_allclose(values1, values2, rtol=1e-6)
