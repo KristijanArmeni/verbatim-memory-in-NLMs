@@ -51,7 +51,7 @@ def test_compute_perplexity(transformer_test_data):
     # using experiment.ppl()
     ppl2 = []
     for inp in inputs:
-        ppl2.append(experiment.ppl(input_ids=inp.ids.unsqueeze(0), context_len=1024, stride=1)[0].item())
+        ppl2.append(experiment.ppl(input_ids=inp.ids.unsqueeze(0), context_len=1024, stride=1)[0])
 
     # using compute_perplexity()
     ppl = []
@@ -61,7 +61,7 @@ def test_compute_perplexity(transformer_test_data):
                                      tokenizer=tokenizer, 
                                      context_len=1024, 
                                      stride=1, 
-                                     device=device)[0].item())
+                                     device=device)[0])
 
     # check that all give the same result to at least 2 decimal places
     values1 = output_dict1['sequence_ppl']
