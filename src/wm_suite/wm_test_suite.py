@@ -251,7 +251,7 @@ class Experiment(object):
                     shift_logits.view(-1, shift_logits.size(-1)), labels.view(-1)
                 )
                 nll.extend(losses.cpu().numpy().tolist())
-        ppl = np.exp(np.mean(nll)).item()
+        ppl = np.exp(np.nanmean(nll)).item()
         return ppl, nll
 
     def ppl_batched(
@@ -584,7 +584,7 @@ def main(input_args: List = None, devtesting: bool = False):
         default="pretrained",
         help="model label controlling which checkpoint to load",
     )
-    parser.add_argument("--model_id", type=str, default="")
+    parser.add_argument("--model_id", type=str)
     parser.add_argument("--compute_wt103_ppl", action="store_true")
 
     # ablation params
@@ -674,6 +674,8 @@ def main(input_args: List = None, devtesting: bool = False):
         argins.scenario = "sce1"
         argins.list_len = 3
         argins.prompt_len = "1"
+        argins.list_type = "random"
+        argins.condition = "repeat"
 
     # ===== INITIATE MODEL AND TOKANIZER CLASS ===== #
 
@@ -988,7 +990,6 @@ def main(input_args: List = None, devtesting: bool = False):
     output_df = output_df.rename(
         columns={"trialID": "marker", "stimID": "stimid", "scenario": "context"}
     )
-    output_df["model_id"] = argins.model_id
 
     output_df.attrs = {"wt103_ppl": np.round(ppl.cpu().item(), 2), "argins": argins}
 
@@ -1005,6 +1006,17 @@ def main(input_args: List = None, devtesting: bool = False):
                 "marker_pos_rel": literal_eval(argins.aggregate_positions)
             },  # average over first timestep
         ]
+
+        # compute repeat surprisal
+        output_agg, _ = filter_and_aggregate(
+            output_df,
+            independent_var = "list_len",
+            list_len_val = [int(argins.list_len)],
+            prompt_len_val = [int(argins.prompt_len)],
+            context_val = ["intact"],
+            list_positions = literal_eval(argins.aggregate_positions),
+            aggregating_metric="mean",
+        )
 
         # create dict for storing output measures
         outdict = {
@@ -1028,15 +1040,6 @@ def main(input_args: List = None, devtesting: bool = False):
             },  # reapeat surprisal
             "model_id": None,
         }
-
-        # compute repeat surprisal
-        output_agg, _ = filter_and_aggregate(
-            output_df,
-            model=argins.model_type,
-            model_id=output_df.model_id.unique().item(),
-            groups=variables,
-            aggregating_metric="mean",
-        )
 
         x1 = output_agg.x1.to_numpy()
         x2 = output_agg.x2.to_numpy()

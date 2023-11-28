@@ -9,8 +9,7 @@ import matplotlib
 import pandas as pd
 import logging
 from typing import List, Dict, Tuple
-
-logger = logging.getLogger("wm_suite.utils")
+from ..utils import logger
 
 
 def set_manuscript_style(style=None):
@@ -36,9 +35,11 @@ def set_manuscript_style(style=None):
 
 def filter_and_aggregate(
     datain: pd.DataFrame,
-    model: str,
-    model_id: str,
-    groups: List[Dict],
+    independent_var: str,
+    list_len_val,
+    prompt_len_val,
+    context_val,
+    list_positions,
     aggregating_metric: str,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -63,43 +64,46 @@ def filter_and_aggregate(
         the first element is the dataframe with aggregated surprisal values, the second is the dataframe with
 
     """
-    # unpack the dictionaries for each variable
-    d1, d2, d3, d4 = groups
+    # unpack the dictionaries for each variable    
+    #import pdb; pdb.set_trace()
 
-    # define variables for querying below
-    var1 = list(d1.keys())[0]  # e.g. .prompt_len
-    var2 = list(d2.keys())[0]  # e.g. .list_len
-    var3 = list(d3.keys())[0]  # e.g. .context
-    var4 = list(d4.keys())[0]  # e.g. .token_positions
+    # check that there is only one model id in datain
+    # (code is expected to be called with only one model at a time)
+    assert len(datain.model.unique()) == 1, "More than one model type in datain"
 
     # select the groups based on variable values
+    positions = (datain.marker_pos_rel1.isin(list_positions)) | \
+                (datain.marker_pos_rel2.isin(list_positions))
+
     sel = (
-        (datain[var1].isin(d1[var1]))
-        & (datain[var2].isin(d2[var2]))
+        (datain.list_len.isin(list_len_val))
+        & (datain.prompt_len.isin(prompt_len_val))
         & (datain.second_list.isin(["repeat", "permute", "control"]))
         & (datain.list.isin(["random", "categorized"]))
-        & (datain[var3].isin(d3[var3]))
-        & (datain.model_id == model_id)
-        & (datain.model == model)
+        & (datain.context.isin(context_val))
         & (datain.marker.isin([1, 3]))
-        & (datain[var4].isin(d4[var4]))
+        & (positions)
     )
 
+    import pdb; pdb.set_trace()    
     if sum(sel) == 0:
-        logging.info(
-            f"No rows were selected.\nModel id: {model_id}\nmodel: {model}\nCheck selection conditions."
+        raise ValueError(
+            "No rows were selected.Check selection conditions."+
+            f"list_len_val={list_len_val}, prompt_len_val={prompt_len_val}, context_val={context_val}, list_positions={list_positions}"
         )
-        print("This is the input data frame:\n", datain.head())
 
     d = datain.loc[sel].copy()
 
+    groups = {"list_len": list_len_val, "prompt_len": prompt_len_val, "context": context_val}
+    ivar = groups[independent_var]
+
     ## Aggregate
     # average separately across markers per list_len, stimulus id (sentid), model (lstm or gpt2), marker (1 or 3), list (random, categorized) and second list (repeated, permuted or control)
-    units = [var1, "stimid", "model", "marker", "list", "second_list"]
+    units = [independent_var, "stimid", "model", "marker", "list", "second_list"]
 
-    logging.info(f"Manipulated variable == {var1}")
-    logging.info(f"Aggregating function == {aggregating_metric}")
-    logging.info(f"Aggregating over tokens separately per these variables: {units}")
+    logger.info(f"Manipulated variable == {independent_var}")
+    logger.info(f"Aggregating function == {aggregating_metric}")
+    logger.info(f"Aggregating over tokens separately per these variables: {units}")
 
     # aggregate with .groupby and .agg
     dagg = (
@@ -117,8 +121,7 @@ def filter_and_aggregate(
     dataout = relative_change_wrapper(
         df_agg=dagg,
         groups=[
-            {"model": [model]},
-            d1,  # this is the manipulated variable
+            {independent_var: groups[independent_var]},  # this is the manipulated variable
             {"second_list": ["repeat", "permute", "control"]},
             {"list": ["categorized", "random"]},
         ],
@@ -193,60 +196,57 @@ def relative_change_wrapper(
         dataframe with relative change values. Has columns 'x1', 'x2', 'x_del', 'x_perc'.
     """
     # unpack the dicts
-    g1, g2, g3, g4 = groups
+    g1, g2, g3 = groups
 
     # define columns for data
     col1 = list(g1.keys())[0]
     col2 = list(g2.keys())[0]
     col3 = list(g3.keys())[0]
-    col4 = list(g4.keys())[0]
 
     # apply relative change computation and apply to
     df_list = []
     for val1 in list(g1.values())[0]:
         for val2 in list(g2.values())[0]:
             for val3 in list(g3.values())[0]:
-                for val4 in list(g4.values())[0]:
-                    # initialize output dataframe
-                    cols = ["x1", "x2", "x_del"]
-                    df = pd.DataFrame(columns=cols)
+                # initialize output dataframe
+                cols = ["x1", "x2", "x_del"]
+                df = pd.DataFrame(columns=cols)
 
-                    # select the correct rows
-                    select = (
-                        (df_agg.loc[:, col1] == val1)
-                        & (df_agg.loc[:, col2] == val2)
-                        & (df_agg.loc[:, col3] == val3)
-                        & (df_agg.loc[:, col4] == val4)
-                    )
+                # select the correct rows
+                select = (
+                    (df_agg.loc[:, col1] == val1)
+                    & (df_agg.loc[:, col2] == val2)
+                    & (df_agg.loc[:, col3] == val3)
+                )
 
-                    tmp = df_agg.loc[select].copy()
+                tmp = df_agg.loc[select].copy()
 
-                    # get vectors with aggregated surprisal values from first and second list
-                    x1 = tmp.loc[
-                        tmp.marker == 1, compared_col
-                    ].to_numpy()  # average per sentence surprisal on first list
-                    x2 = tmp.loc[
-                        tmp.marker == 3, compared_col
-                    ].to_numpy()  # average per sentence surprisal on second list
-                    labels1 = tmp.loc[
-                        tmp.marker == 1
-                    ].stimid.to_numpy()  # use sentence id for checking that we are comparing the same sentences
-                    labels2 = tmp.loc[tmp.marker == 3].stimid.to_numpy()
+                # get vectors with aggregated surprisal values from first and second list
+                x1 = tmp.loc[
+                    tmp.marker == 1, compared_col
+                ].to_numpy()  # average per sentence surprisal on first list
+                x2 = tmp.loc[
+                    tmp.marker == 3, compared_col
+                ].to_numpy()  # average per sentence surprisal on second list
+                labels1 = tmp.loc[
+                    tmp.marker == 1
+                ].stimid.to_numpy()  # use sentence id for checking that we are comparing the same sentences
+                labels2 = tmp.loc[tmp.marker == 3].stimid.to_numpy()
 
-                    # compute change and populate output dfs
-                    x_del, x_perc = get_relative_change(
-                        x1=x1, x2=x2, labels1=labels1, labels2=labels2
-                    )
+                # compute change and populate output dfs
+                x_del, x_perc = get_relative_change(
+                    x1=x1, x2=x2, labels1=labels1, labels2=labels2
+                )
 
-                    df["x1"], df["x2"], df["x_del"], df["x_perc"] = (
-                        x1,
-                        x2,
-                        x_del,
-                        x_perc,
-                    )
-                    df[col1], df[col2], df[col3], df[col4] = val1, val2, val3, val4
+                df["x1"], df["x2"], df["x_del"], df["x_perc"] = (
+                    x1,
+                    x2,
+                    x_del,
+                    x_perc,
+                )
+                df[col1], df[col2], df[col3] = val1, val2, val3
 
-                    df_list.append(df)
+                df_list.append(df)
 
     return pd.concat(df_list)
 
