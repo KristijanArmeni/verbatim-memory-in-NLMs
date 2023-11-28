@@ -295,10 +295,10 @@ class Experiment(object):
                 shift_logits = output.logits[:, :-1, :].contiguous()
                 labels = input_ids[:, start_pos + 1 : end_pos].contiguous()
                 losses = loss_fn(
-                    shift_logits.view(-1, shift_logits.size(-1)), labels.view(-1)
+                    shift_logits.transpose(1, -1).contiguous(), labels.contiguous()
                 )
                 for ix in range(batch_size):
-                    nlls[ix].extend(losses.cpu().numpy().tolist())
+                    nlls[ix].extend(losses[ix].cpu().numpy().tolist())
         ppl = [np.exp(np.nanmean(nll)).item() for nll in nlls]
         return ppl, nlls
 
