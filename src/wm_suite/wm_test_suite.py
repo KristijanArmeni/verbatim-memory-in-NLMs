@@ -1014,9 +1014,6 @@ def main(input_args: List = None, devtesting: bool = False):
 
     output_df.attrs = {"wt103_ppl": np.round(ppl.cpu().item(), 2), "argins": argins}
 
-    # drop nan rows (merged BPE timesteps)
-    output_df = output_df.loc[~output_df.token.str.strip("Ġ").isin([""]), :]
-
     # this is the variable that is returned
     output = output_df
 
