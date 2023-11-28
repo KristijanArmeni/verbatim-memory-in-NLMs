@@ -46,38 +46,6 @@ class SimpleDataset(Dataset):
 # ===== HELPER FUNCTION FOR MERGING BPE SPLIT TOKENS ===== #
 
 
-def code_relative_markers(markers: npt.ArrayLike) -> Tuple[np.ndarray, np.ndarray]:
-    """Helper function to code the position of timesteps relative to
-    lists of nouns within each sequences.  These markers are used for
-    aggregating prior to visualization.
-
-    Parameters
-    ----------
-    markers : np.ndarray or array-like
-
-    Returns
-    -------
-    Tuple[np.ndarray, np.ndarray]
-
-    """
-    marker_pos, marker_pos_rel = [], []
-
-    codes = np.unique(markers)
-    for c in codes:
-        sel = markers[markers == c]
-
-        if c in [0, 2]:
-            # start with 1, reverse and make it negative
-            marker_pos_rel.append(-1 * (np.arange(0, len(sel)) + 1)[::-1])
-        else:
-            marker_pos_rel.append(np.arange(0, len(sel)))
-
-        # code marker position without negative indices
-        marker_pos.append(np.arange(0, len(sel)))
-
-    return np.hstack(marker_pos), np.hstack(marker_pos_rel)
-
-
 def merge_states(
     x: np.ndarray, bpe_split_indices: np.ndarray, tokens: np.ndarray, mergefun=np.mean
 ):
@@ -302,6 +270,7 @@ class Experiment(object):
         batch_size = len(seq_lens)
 
         assert batch_size == self.batch_size
+        assert not self.ismlm
 
         if stride > 1:
             raise ValueError(
@@ -906,7 +875,7 @@ def main(input_args: List = None, devtesting: bool = False):
             device=device,
         )
 
-        ppl, _, _ = experiment2.ppl(
+        ppl, _ = experiment2.ppl(
             input_ids=torch.tensor([ids]), context_len=1024, stride=256
         )
 
@@ -919,14 +888,22 @@ def main(input_args: List = None, devtesting: bool = False):
     output_dict["marker_pos"] = [
         np.full(shape=len(s), fill_value=np.nan) for s in output_dict["token"]
     ]
-    output_dict["marker_pos_rel"] = [
+    output_dict["marker_pos_rel1"] = [
+        np.full(shape=len(s), fill_value=np.nan) for s in output_dict["token"]
+    ]
+    output_dict["marker_pos_rel2"] = [
         np.full(shape=len(s), fill_value=np.nan) for s in output_dict["token"]
     ]
     for i, marker_pos in enumerate(output_dict["marker_pos"]):
         subtok_id_arr = np.array(output_dict["subtok_ids"][i])
         (nnan_pos,) = np.where(subtok_id_arr > 0)
         marker_pos[nnan_pos] = np.arange(len(nnan_pos)) + 1
-    for i, marker_pos_r in enumerate(output_dict["marker_pos_rel"]):
+    for i, marker_pos_r in enumerate(output_dict["marker_pos_rel1"]):
+        trial_id_arr = np.array(output_dict["trial_ids"][i])
+        (nnan_pos,) = np.where(trial_id_arr == 1)
+        offset = output_dict["marker_pos"][i][nnan_pos[0]]
+        marker_pos_r[:] = output_dict["marker_pos"][i] - offset
+    for i, marker_pos_r in enumerate(output_dict["marker_pos_rel2"]):
         trial_id_arr = np.array(output_dict["trial_ids"][i])
         (nnan_pos,) = np.where(trial_id_arr == 3)
         offset = output_dict["marker_pos"][i][nnan_pos[0]]
@@ -957,7 +934,7 @@ def main(input_args: List = None, devtesting: bool = False):
 
     # ===== FORMAT AND SAVE OUTPUT FILES ===== #
 
-    colnames = ["token", "surp", "marker_pos", "marker_pos_rel"]
+    colnames = ["token", "surp", "marker_pos", "marker_pos_rel1", "marker_pos_rel2"]
     metacols = [
         "ppl",
         "scenario",
@@ -978,7 +955,8 @@ def main(input_args: List = None, devtesting: bool = False):
         output_dict["token"],
         output_dict["surp"],
         output_dict["marker_pos"],
-        output_dict["marker_pos_rel"],
+        output_dict["marker_pos_rel1"],
+        output_dict["marker_pos_rel2"],
     ]
 
     metarrays = [
