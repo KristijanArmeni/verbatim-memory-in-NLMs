@@ -1106,7 +1106,7 @@ def main(input_args: List = None, devtesting: bool = False):
 
         # save the full, non-aggregated dataframe
         if isinstance(output, pd.DataFrame):
-            output.to_csv(outpath, sep="\t")
+            output.to_csv(outpath, sep="\t", na_rep="NULL")
 
         # or save the aggregatec metrics in json
         elif isinstance(output, dict):
