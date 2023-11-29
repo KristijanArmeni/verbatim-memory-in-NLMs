@@ -1,6 +1,4 @@
-from typing import Dict
 import torch
-import numpy as np
 from numpy.testing import assert_allclose
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config
 from test_data import transformer_test_data
@@ -53,30 +51,30 @@ def test_compute_perplexity(transformer_test_data):
     # using experiment.ppl()
     ppl2 = []
     for inp in inputs:
-        ppl2.append(experiment.ppl(input_ids=inp.ids, context_len=1024, stride=1)[0].item())
+        ppl2.append(experiment.ppl(input_ids=inp.ids.unsqueeze(0), context_len=1024, stride=1)[0])
 
     # using compute_perplexity()
     ppl = []
     for inp in inputs:
         ppl.append(compute_perplexity(model=model, 
-                                     input_ids=inp.ids, 
+                                     input_ids=inp.ids.unsqueeze(0), 
                                      tokenizer=tokenizer, 
                                      context_len=1024, 
                                      stride=1, 
-                                     device=device)[0].item())
+                                     device=device)[0])
 
     # check that all give the same result to at least 2 decimal places
     values1 = output_dict1['sequence_ppl']
     values2 = output_dict2['sequence_ppl']
 
-    assert_allclose(values1, values2, atol=1e-2)
+    assert_allclose(values1, values2, rtol=1e-6)
 
     values1 = output_dict1['sequence_ppl']
     values2 = ppl
-    assert_allclose(values1, values2, atol=1e-2)
+    assert_allclose(values1, values2, rtol=1e-6)
 
     values1 = ppl
     values2 = ppl2
     logging.info(values1)
     logging.info(values2)
-    assert_allclose(values1, values2, atol=1e-2)
+    assert_allclose(values1, values2, rtol=1e-6)

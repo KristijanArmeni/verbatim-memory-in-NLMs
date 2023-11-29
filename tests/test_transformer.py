@@ -35,10 +35,11 @@ def test_transformer_experiment(transformer_test_data):
     n_stim = len(inputs)
 
     # check markers, should be only values 0, 1, 2, 3
-    assert np.array_equal(np.unique(inputs[0].trial_ids), [0, 1, 2, 3])
+    assert np.array_equal(np.unique(inputs[0].trial_ids), [-1, 0, 1, 2, 3])
 
     # check that there are 4 subsequences in positionID field, they start with 0-index
-    assert len(np.where(np.array(inputs[0].position_ids) == 0)[0]) == 4
+    # TEMP: position_ids were not used, so they're dropped
+    #assert len(np.where(np.array(inputs[0].position_ids) == 0)[0]) == 4
 
     assert isinstance(output_dict, Dict)
 

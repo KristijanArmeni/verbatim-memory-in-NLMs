@@ -35,7 +35,7 @@ logger = logging.getLogger("wm_suite.utils")
 
 
 DATA_PATH = Path(__file__).parent.parent.parent / "data"
-
+NOUNS_PATH = DATA_PATH / "noun_lists"
 
 def add_pathsconfig_to_environ():
     if "PATHSCONFIG" not in os.environ:

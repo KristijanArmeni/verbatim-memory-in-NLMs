@@ -1,41 +1,29 @@
+import argparse
 import json
 import os
-import argparse
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
-import numpy.typing as npt
-from scipy.stats import bootstrap, median_abs_deviation
 import pandas as pd
-from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config
 import torch
-from torch.utils.data import Dataset, DataLoader
-
-from tqdm import trange
-from typing import List, Dict, Tuple, Any
+from scipy.stats import bootstrap, median_abs_deviation
+from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm, trange
+from transformers import AutoModelForCausalLM, AutoTokenizer, GPT2Config
 
-# own modules
-from wm_suite.paths import (
-    get_paths,
-    add_data_to_syspath,
-)  # project root must be in python path for this to work, it adds src/ to sys.path
-from wm_suite.utils import logger
-
-# add_data_to_syspath()  # add ./data to sys.path
+from wm_suite.io.prepare_transformer_inputs import get_input_sequences
+from wm_suite.io.test_ds import get_test_data
 from wm_suite.io.wt103.dataset import WikiTextDataset
-from wm_suite.io.prepare_transformer_inputs import (
-    mark_subtoken_splits,
-    get_input_sequences,
-)
-from wm_suite.io.stimuli import prefixes, prompts
+from wm_suite.paths import get_paths
+from wm_suite.utils import logger
+from wm_suite.viz.func import filter_and_aggregate
 from wm_suite.wm_ablation import (
     ablate_attn_module,
     find_topk_attn,
     find_topk_intersection,
-    from_labels_to_dict,
     from_dict_to_labels,
+    from_labels_to_dict,
 )
-from wm_suite.io.test_ds import get_test_data
-from wm_suite.viz.func import filter_and_aggregate
 
 
 PATHS = get_paths()
@@ -58,38 +46,6 @@ class SimpleDataset(Dataset):
 # ===== HELPER FUNCTION FOR MERGING BPE SPLIT TOKENS ===== #
 
 
-def code_relative_markers(markers: npt.ArrayLike) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Helper function to code the position of timesteps relative to lists of nouns within each sequences.
-    These markers are used for aggregating prior to visualization.
-
-    Parameters
-    ----------
-    markers : np.ndarray or array-like
-
-    Returns
-    -------
-    Tuple[np.ndarray, np.ndarray]
-
-    """
-    marker_pos, marker_pos_rel = [], []
-
-    codes = np.unique(markers)
-    for c in codes:
-        sel = markers[markers == c]
-
-        if c in [0, 2]:
-            # start with 1, reverse and make it negative
-            marker_pos_rel.append(-1 * (np.arange(0, len(sel)) + 1)[::-1])
-        else:
-            marker_pos_rel.append(np.arange(0, len(sel)))
-
-        # code marker position without negative indices
-        marker_pos.append(np.arange(0, len(sel)))
-
-    return np.hstack(marker_pos), np.hstack(marker_pos_rel)
-
-
 def merge_states(
     x: np.ndarray, bpe_split_indices: np.ndarray, tokens: np.ndarray, mergefun=np.mean
 ):
@@ -105,7 +61,8 @@ def merge_states(
 
     """
 
-    # find which tokens where split by looking at indices that occur more than once (i.e. for each BPE subword)
+    # find which tokens where split by looking at indices that occur
+    # more than once (i.e. for each BPE subword)
     # example: [0, 1, 2, 3, 3, 4] --> token 3 was split into two subwords
     u, c = np.unique(bpe_split_indices, return_counts=True)
 
@@ -122,7 +79,8 @@ def merge_states(
         if (np.diff(sel) == 1).all():
             logger.info(f"Merging tokens {new_tokens[sel]} at positions {sel}")
 
-            # replace first subword token by the mean of all subwords and delete the rest
+            # replace first subword token by the mean of all subwords
+            # and delete the rest
             x[sel[0], ...] = mergefun(x[sel, ...], axis=0)  # shape = (tokens, ...)
             x[sel[1::], ...] = np.nan  #
 
@@ -140,8 +98,8 @@ def merge_states(
 
 class Experiment(object):
 
-    """
-    Experiment() class contains wrapper methods to run experiments with transformer models.
+    """Experiment() class contains wrapper methods to run experiments
+    with transformer models.
 
     Attributes
     ----------
@@ -158,7 +116,8 @@ class Experiment(object):
     batch_size : int
         the number of sequences evaluated in parallel
     use_cache : bool
-        whether or not to reuse key-value matrices from previous time-steps in transformers
+        whether or not to reuse key-value matrices from previous
+        time-steps in transformers
     loss_fct_batched : instace of `torch.nn.CrossEntropyLoss(reduction="none")`
 
 
@@ -204,7 +163,8 @@ class Experiment(object):
         Parameters
         ----------
         model (required) : nn.Module
-            pytorch module representing the model (is moved to self.device upon initialization)
+            pytorch module representing the model (is moved to
+            self.device upon initialization)
         ismlm (optional) : bool
             whether the model is a masked language model or not (default = False)
         device : str
@@ -212,11 +172,13 @@ class Experiment(object):
         tokenizer (required) : PreTrainedTokenizer()
             tokenizer class from HuggingFace (https://huggingface.co/transformers/v4.6.0/main_classes/tokenizer.html#transformers.PreTrainedTokenizer)
         context_len : int
-            the length of context window for computing transformer surprisal (default = 1024)
+            the length of context window for computing transformer
+            surprisal (default = 1024)
         batch_size : int
             the number of sequences evaluated in parallel
         use_cache : bool
-            whether or not to reuse key-value matrices from previous time-steps in transformers
+            whether or not to reuse key-value matrices from previous
+            time-steps in transformers
 
         """
 
@@ -246,9 +208,11 @@ class Experiment(object):
         input_ids (required) : torch.tensor
             indices representing tokens to be fed as input to model
         context_len (required) : int
-            the length (in number of tokens) of past tokens used for computing negative log likelihood
+            the length (in number of tokens) of past tokens used for
+            computing negative log likelihood
         stride (required) : int
-            the step (in number of tokens) in between two subsequent loops for computing perplexity
+            the step (in number of tokens) in between two subsequent
+            loops for computing perplexity
 
         Returns
         -------
@@ -257,58 +221,38 @@ class Experiment(object):
         tokens :
 
         """
+        assert not self.ismlm
 
-        llh = []  # variable storing token-by-token neg ll
-        tokens = []  # variable storing token strings to have along with -ll in the output
+        nll = []  # variable storing token-by-token neg ll
+        # set model to evaluation mode
+        self.model.eval()
+        loss_fn = torch.nn.CrossEntropyLoss(reduction="none")
 
-        # loop over tokens in input sequence
-        for i in trange(0, input_ids.size(1), stride, desc="Computing perplexity: "):
-            # define the start and endpoints of input indices for current loop
-            begin_loc = max(
-                i + stride - context_len, 0
-            )  # define the non-negative onset location
-            end_loc = min(i + stride, input_ids.size(1))
-            trg_len = end_loc - i  # may be different from stride on last loop
-
-            # select the current input index span
-            sel_input_ids = input_ids[:, begin_loc:end_loc].clone().to(self.device)
-
-            # mask the final token in sequence if we're testing bert, so that we get prediction only for that token
-            if self.ismlm:
-                sel_input_ids[0, -1] = self.tokenizer.convert_tokens_to_ids("[MASK]")
-
-            # use unmasked tokens as targets for loss if provided
-            target_ids = input_ids[:, begin_loc:end_loc].to(self.device).clone()
-
-            # do not compute the loss on  tokens (-100) that are used for context
-            target_ids[:, :-trg_len] = -100
-
-            # if i in range(0, 5):
-            #    print(f"inputs: {sel_input_ids}")
-            #    print(f"targets: {target_ids}")
-
-            # set model to evaluation mode
-            self.model.eval()
-
-            # get model output
-            with torch.no_grad():
-                # compute neg log likelihood over target ids (n+1 in our case)
-                # indices are shifted under the hood by model.__call__()
-                outputs = self.model(sel_input_ids, labels=target_ids)
-
-                log_likelihood = (
-                    outputs.loss.item() * trg_len
-                )  # not sure about this multiplication here (undoing averaging?)
-
-                llh.append(log_likelihood)
-                if stride == 1:
-                    toks = self.tokenizer.decode(target_ids[0][-stride::])
-                    tokens.append(toks)  # store the last token (target_id)
-
-        # compute perplexity, divide by the lenth of the sequence
-        # use np.nansum as token at position 0 will have -LL of nan
-        ppl = torch.exp(torch.tensor(np.nansum(llh)) / (end_loc - 1)).cpu()
-        return ppl, llh, tokens
+        # decoder only model (GPT) - perplexity of a sequence that fits the
+        # model context can be calculated in a single pass; if it is
+        # larger, we run the model using sliding window approach
+        # (moving it by stride to speed things up a bit by sacrifising
+        # some precision)
+        # initial sequence
+        sequence_len = input_ids.size(1)
+        start_pos = 0
+        end_pos = min(sequence_len, context_len)
+        positions_to_evaluate = [(start_pos, end_pos)]
+        while end_pos < sequence_len:
+            start_pos = end_pos
+            end_pos = end_pos + stride
+            positions_to_evaluate.append((start_pos, end_pos))
+        with torch.no_grad():
+            for start_pos, end_pos in positions_to_evaluate:
+                output = self.model(input_ids[:, start_pos:end_pos])
+                shift_logits = output.logits[:, :-1, :].contiguous()
+                labels = input_ids[:, start_pos + 1 : end_pos].contiguous()
+                losses = loss_fn(
+                    shift_logits.view(-1, shift_logits.size(-1)), labels.view(-1)
+                )
+                nll.extend(losses.cpu().numpy().tolist())
+        ppl = np.exp(np.nanmean(nll)).item()
+        return ppl, nll
 
     def ppl_batched(
         self,
@@ -326,6 +270,7 @@ class Experiment(object):
         batch_size = len(seq_lens)
 
         assert batch_size == self.batch_size
+        assert not self.ismlm
 
         if stride > 1:
             raise ValueError(
@@ -333,128 +278,43 @@ class Experiment(object):
                 "higher values are not accepted currently"
             )
 
-        # to match every token need to insert <eos> token artificially at beginning
-        llhs = [
-            [
-                np.nan,
-            ]
-            for _ in range(batch_size)
-        ]  # variable storing token-by-token neg log likelihoods
-
-        # set model to evaluation mode
+        nlls = [[np.nan] for i in range(batch_size)]
         self.model.eval()
-        self.model.to(self.device)
-
-        if self.use_cache:
-            end_loop_idx = input_ids.size(1) - 1
-            past_key_values = None
-
-            # if we're (re)using cache, then we can only select current input slice
-            # in this case stride and context_len are ignored
-            beg_loc_fun = lambda i, stride=None, context_len=None: i
-            end_loc_fun = lambda i, stride=None, max_loc=None: i + 1
-            tgt_beg_loc_fun = lambda i, stride=None, context_len=None: i + 1
-            tgt_end_loc_fun = lambda i, stride=None, context_len=None: i + 2
-
-        else:
-            past_key_values = None
-            end_loop_idx = input_ids.size(1) - 1
-            beg_loc_fun = lambda i, stride, context_len: max(
-                i + stride - context_len, 0
-            )
-            end_loc_fun = lambda i, stride, max_loc: min(i + stride, max_loc)
-
-            # we have to shift targets for one time step forward
-            tgt_beg_loc_fun = (
-                lambda i, stride, context_len: max((i + stride - context_len), 0) + 1
-            )
-            tgt_end_loc_fun = lambda i, stride, max_loc: min(i + stride, max_loc) + 1
-
-        # loop over tokens in input sequence
-        for idx in range(0, end_loop_idx):
-            # compute begining and end indices for context tokens
-            beg_loc = beg_loc_fun(idx, stride, context_len)
-            end_loc = end_loc_fun(idx, stride, end_loop_idx)
-            tgt_beg_loc = tgt_beg_loc_fun(idx, stride, context_len)
-            tgt_end_loc = tgt_end_loc_fun(idx, stride, end_loop_idx)
-
-            trg_len = end_loc - idx  # may be different from stride on last loop
-
-            # select the current input index span
-            selected_input_ids = input_ids[:, beg_loc:end_loc].to(self.device)
-
-            # mask the final token in sequence if we're testing MLM, so that we get prediction only for that token
-            if self.ismlm:
-                selected_input_ids[:, -1] = self.tokenizer.convert_tokens_to_ids(
-                    "[MASK]"
+        loss_fn = torch.nn.CrossEntropyLoss(reduction="none")
+        sequence_len = input_ids.size(1)
+        start_pos = 0
+        end_pos = min(sequence_len, context_len)
+        positions_to_evaluate = [(start_pos, end_pos)]
+        while end_pos < sequence_len:
+            start_pos = end_pos
+            end_pos = end_pos + stride
+            positions_to_evaluate.append((start_pos, end_pos))
+        with torch.no_grad():
+            for start_pos, end_pos in positions_to_evaluate:
+                output = self.model(input_ids[:, start_pos:end_pos])
+                shift_logits = output.logits[:, :-1, :].contiguous()
+                labels = input_ids[:, start_pos + 1 : end_pos].contiguous()
+                losses = loss_fn(
+                    shift_logits.transpose(1, -1).contiguous(), labels.contiguous()
                 )
-
-            # targets are shifted by 1 token forward
-            target_ids = targets[:, tgt_beg_loc:tgt_end_loc].to(self.device)
-            target_ids[:, :-trg_len] = self.loss_fct_batched.ignore_index
-
-            # print(selected_input_ids)
-            # print(target_ids)
-
-            # get model output
-            with torch.no_grad():
-                # compute logits and use cache if provided
-                outputs = self.model(
-                    input_ids=selected_input_ids,
-                )
-
-                # print(outputs.logits.shape)
-                # print(outputs.logits[:, -1, 0:10])
-                # print(outputs.logits[:, 0, 0:10])
-
-                if self.use_cache:
-                    past_key_values = outputs.past_key_values
-                del selected_input_ids
-
-                # compute loss per every sequence in batch shape = (batch, sequence_len)
-                losses = self.loss_fct_batched(
-                    outputs.logits[:, -1, :].view(-1, outputs.logits.size(-1)),
-                    target_ids[:, -1].view(-1),
-                )
-                # del outputs
-                del target_ids
-
-                for batch_idx, nll_val in enumerate(losses):
-                    llhs[batch_idx].append(nll_val.item())
-
-                # Save past attention keys for speedup
-                # TODO: cannot handle if past_key_values becomes longer than context_length yet
-
-        # Handle padded sequences
-        final_llhs = []
-        for batch_idx, llh_vals in enumerate(llhs):
-            # Cut them off at appropriate length
-            final_llhs.append(llh_vals[: seq_lens[batch_idx]])
-
-        # compute perplexity, divide by the lenth of the sequence
-        # use np.nansum as token at position 0 will have -LL of nan
-        ppls = []
-        for batch_idx, llh_vals in enumerate(final_llhs):
-            ppls.append(
-                torch.exp(torch.tensor(np.nansum(llh_vals)) / (len(llh_vals) - 1))
-                .cpu()
-                .item()
-            )
-        return ppls, final_llhs
+                for ix in range(batch_size):
+                    nlls[ix].extend(losses[ix].cpu().numpy().tolist())
+        ppl = [np.exp(np.nanmean(nll)).item() for nll in nlls]
+        return ppl, nlls
 
     def get_batch(self, sequence_list: List[torch.Tensor]) -> Tuple[torch.Tensor]:
         """Converts list of sequences into a padded torch Tensor and its lengths"""
 
         # get lengths of all sequences
-        sequence_lengths = [len(sequence[0]) for sequence in sequence_list]
+        sequence_lengths = [len(sequence) for sequence in sequence_list]
 
         batched_sequence = torch.nn.utils.rnn.pad_sequence(
-            [sequence[0] for sequence in sequence_list],
+            sequence_list,
             batch_first=True,
             padding_value=self.tokenizer.encode(self.tokenizer.unk_token)[0],
         )
         target_sequence = torch.nn.utils.rnn.pad_sequence(
-            [sequence[0] for sequence in sequence_list],
+            sequence_list,
             batch_first=True,
             padding_value=self.loss_fct_batched.ignore_index,
         )
@@ -509,17 +369,11 @@ class Experiment(object):
             outputs["sequence_ppl"].extend(ppls)
             outputs["surp"].extend(surprisals)
 
-        # store tokens
-        if self.stride == 1:
-            outputs["token"] = [
-                self.tokenizer.convert_ids_to_tokens(e[0]) for e in input_sequences
-            ]
-
         return outputs
 
     def start(self, input_sequences: List[torch.Tensor]) -> Dict[str, List[any]]:
-        """
-        experiment.start() will call the [wm_suite.Experiment][] method on `input_sequences`
+        """experiment.start() will call the [wm_suite.Experiment][]
+        method on `input_sequences`
 
         """
 
@@ -528,26 +382,22 @@ class Experiment(object):
 
     def merge_bpe_splits(self, outputs: Dict) -> Dict:
         for i in range(len(outputs["surp"])):
-            s = outputs["surp"][i]
-            t = outputs["token"][i]
-
-            r = mark_subtoken_splits(
-                t,
-                split_marker="Ġ",
-                marker_logic="outside",
-                eos_markers=["<|endoftext|>", "<|endoftext|>"],
-            )
-
-            x, t1, _ = merge_states(
-                np.expand_dims(np.array(s), axis=1),
-                bpe_split_indices=np.array(r),
-                tokens=t,
-                mergefun=np.sum,
-            )
-
-            outputs["surp"][i] = np.squeeze(x)  # add merged (summed) surprisal
-            outputs["token"][i] = t1  # add merged strings
-
+            subtok_id_arr = np.array(outputs["subtok_ids"][i])
+            # np.abs prevents matching on -1
+            (pos,) = np.where(subtok_id_arr[:-1] == np.abs(subtok_id_arr[1:]))
+            pos += 1
+            # go backwards so we do not invalidate later positions
+            for ix in pos[::-1].tolist():
+                surp = outputs["surp"][i]
+                surp[ix - 1] = surp[ix - 1] + surp[ix]
+                outputs["surp"][i] = surp[:ix] + surp[ix + 1 :]
+                token = outputs["token"][i]
+                token[ix - 1] = token[ix - 1] + token[ix]
+                outputs["token"][i] = token[:ix] + token[ix + 1 :]
+                st_ids = outputs["subtok_ids"][i]
+                outputs["subtok_ids"][i] = st_ids[:ix] + st_ids[ix + 1 :]
+                t_ids = outputs["trial_ids"][i]
+                outputs["trial_ids"][i] = t_ids[:ix] + t_ids[ix + 1 :]
         return outputs
 
 
@@ -695,7 +545,6 @@ def get_input_args_for_testing():
 # ===== RUNTIME CODE WRAPPER ===== #
 def main(input_args: List = None, devtesting: bool = False):
     from ast import literal_eval
-    from string import punctuation
 
     # ===== INITIATIONS ===== #
     # collect input arguments
@@ -735,7 +584,7 @@ def main(input_args: List = None, devtesting: bool = False):
         default="pretrained",
         help="model label controlling which checkpoint to load",
     )
-    parser.add_argument("--model_id", type=str, default="")
+    parser.add_argument("--model_id", type=str)
     parser.add_argument("--compute_wt103_ppl", action="store_true")
 
     # ablation params
@@ -794,6 +643,12 @@ def main(input_args: List = None, devtesting: bool = False):
         help="str, the name of the output file saving the dataframe",
     )
     parser.add_argument(
+        "--revision",
+        default="main",
+        type=str,
+        help="str, a revision of a model",
+    )
+    parser.add_argument(
         "--aggregate_output",
         action="store_true",
         help="whether or not to only output aggregated dataframe",
@@ -812,38 +667,47 @@ def main(input_args: List = None, devtesting: bool = False):
     else:
         argins = parser.parse_args()
 
-    # if test run, populate input arguments manually (these are corresponding to choices in wm_suite.io.test_ds.get_test_data())
+    # if test run, populate input arguments manually (these are
+    # corresponding to choices in wm_suite.io.test_ds.get_test_data())
     if argins.test_run:
         logger.info("Doing a test run...")
         argins.scenario = "sce1"
         argins.list_len = 3
         argins.prompt_len = "1"
+        argins.list_type = "random"
+        argins.condition = "repeat"
 
     # ===== INITIATE MODEL AND TOKANIZER CLASS ===== #
 
     # declare device and paths
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if argins.device == "cuda" and not torch.cuda.is_available():
+        logger.warning("CUDA is not available, falling back to CPU!")
+        device = torch.device("cpu")
+    else:
+        device = torch.device(argins.device)
 
     # setup the model
     logger.info("Loading tokenizer {}".format(argins.tokenizer))
-    tokenizer = GPT2TokenizerFast.from_pretrained(argins.tokenizer)
+    tokenizer = AutoTokenizer.from_pretrained(argins.tokenizer)
 
     # pretrained models
     logger.info("Using {} model".format(argins.model_type))
     logger.info("Loading checkpoint {}".format(argins.checkpoint))
-    model = GPT2LMHeadModel.from_pretrained(argins.checkpoint)
+    model = AutoModelForCausalLM.from_pretrained(
+        argins.checkpoint, revision=argins.revision
+    )
 
     ismlm = False
 
     if argins.checkpoint == "gpt2":
-        model = GPT2LMHeadModel.from_pretrained("gpt2")
-        tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
+        model = AutoModelForCausalLM.from_pretrained("gpt2")
+        tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
     # or initialize a random model
     if argins.model_type == "random":
         # initialize with random weights
         torch.manual_seed(argins.model_seed)
-        model = GPT2LMHeadModel(config=GPT2Config())
+        model = AutoModelForCausalLM.from_config(GPT2Config())
 
     # permute the weights of gpt-small
     elif argins.model_type == "random-att":
@@ -895,14 +759,16 @@ def main(input_args: List = None, devtesting: bool = False):
             else:
                 seed = 12345  # use a seed just to find_topk_attn runs
 
-            # if specified, find heads that fall both in induciton and matching heads
+            # if specified, find heads that fall both in induciton and
+            # matching heads
             if argins.ablate_topk_heads == "induction-matching-intersect":
                 lh_dict = find_topk_intersection(
                     attn_dict["data"], tois=([13], [14, 16, 18]), topk=20, seed=12345
                 )
 
             elif argins.ablate_topk_heads == "matching-bottom5":
-                # find effect of ablation of onlyt the last 5 matching heads (seems to have disproportionaly strong effect)
+                # find effect of ablation of onlyt the last 5 matching
+                # heads (seems to have disproportionaly strong effect)
                 top15_matching, _, _ = find_topk_attn(
                     attn_dict["data"], topk=15, tokens_of_interest=[13], seed=12345
                 )
@@ -937,7 +803,8 @@ def main(input_args: List = None, devtesting: bool = False):
             logger.info(f"Ablating {argins.ablate_topk_heads} random heads")
             layer_head_dict = lh_dict_ctrl
 
-        # ablate heads by setting GPT2Attention() classes in selected layers to GPT2AttentionAblated()
+        # ablate heads by setting GPT2Attention() classes in selected
+        # layers to GPT2AttentionAblated()
         model = ablate_attn_module(
             model, layer_head_dict=layer_head_dict, ablation_type="zero"
         )
@@ -983,9 +850,13 @@ def main(input_args: List = None, devtesting: bool = False):
     )
 
     # run experiment
-    output_dict = experiment.start(
-        input_sequences=[sequence.ids for sequence in input_sequences]
-    )
+    output_dict = experiment.start(input_sequences=[s.ids for s in input_sequences])
+    # store tokens
+    if experiment.stride == 1:
+        output_dict["token"] = [s.toks for s in input_sequences]
+
+    output_dict["subtok_ids"] = [s.subtok_ids for s in input_sequences]
+    output_dict["trial_ids"] = [s.trial_ids for s in input_sequences]
 
     # ===== WT-103 PERPLEXITY ===== #
     ppl = torch.tensor(torch.nan)
@@ -1006,7 +877,7 @@ def main(input_args: List = None, devtesting: bool = False):
             device=device,
         )
 
-        ppl, _, _ = experiment2.ppl(
+        ppl, _ = experiment2.ppl(
             input_ids=torch.tensor([ids]), context_len=1024, stride=256
         )
 
@@ -1016,42 +887,29 @@ def main(input_args: List = None, devtesting: bool = False):
 
     # merge tokens and surprisals that were splits into BPE tokens
     output_dict = experiment.merge_bpe_splits(output_dict)
-
-    # find timesteps that correspond to punctuation, end of string and empty slots
-    punct_symbols = [
-        np.array([s.strip("Ġ") in punctuation for s in l]) for l in output_dict["token"]
-    ]  # find positions of punctuation symbols
-    eos_symbols = [
-        np.array([s.strip("Ġ") in tokenizer.eos_token for s in l])
-        for l in output_dict["token"]
-    ]  # find positions for end of text symbols
-    empty_symbols = [
-        np.array([s.strip("Ġ") == "" for s in l]) for l in output_dict["token"]
-    ]  # make sure to track empty strings after merging
-
-    # create a joint boolean, per sequence
-    timesteps = [
-        [(~punct & ~eos & ~empty) for punct, eos, empty in zip(x, y, z)]
-        for x, y, z in zip(punct_symbols, eos_symbols, empty_symbols)
-    ]
-
-    # create nan arrays that are going to be populated with markers and will have nan values elsewhere
     output_dict["marker_pos"] = [
         np.full(shape=len(s), fill_value=np.nan) for s in output_dict["token"]
     ]
-    output_dict["marker_pos_rel"] = [
+    output_dict["marker_pos_rel1"] = [
         np.full(shape=len(s), fill_value=np.nan) for s in output_dict["token"]
     ]
-
-    # now create absolute and relative markers for each sequence
-    for i, markers in enumerate([sequence.trial_ids for sequence in input_sequences]):
-        sel = timesteps[i]
-        output_dict["marker_pos"][i][sel] = code_relative_markers(
-            np.array(markers)[sel]
-        )[0]
-        output_dict["marker_pos_rel"][i][sel] = code_relative_markers(
-            np.array(markers)[sel]
-        )[1]
+    output_dict["marker_pos_rel2"] = [
+        np.full(shape=len(s), fill_value=np.nan) for s in output_dict["token"]
+    ]
+    for i, marker_pos in enumerate(output_dict["marker_pos"]):
+        subtok_id_arr = np.array(output_dict["subtok_ids"][i])
+        (nnan_pos,) = np.where(subtok_id_arr > 0)
+        marker_pos[nnan_pos] = np.arange(len(nnan_pos)) + 1
+    for i, marker_pos_r in enumerate(output_dict["marker_pos_rel1"]):
+        trial_id_arr = np.array(output_dict["trial_ids"][i])
+        (nnan_pos,) = np.where(trial_id_arr == 1)
+        offset = output_dict["marker_pos"][i][nnan_pos[0]]
+        marker_pos_r[:] = output_dict["marker_pos"][i] - offset
+    for i, marker_pos_r in enumerate(output_dict["marker_pos_rel2"]):
+        trial_id_arr = np.array(output_dict["trial_ids"][i])
+        (nnan_pos,) = np.where(trial_id_arr == 3)
+        offset = output_dict["marker_pos"][i][nnan_pos[0]]
+        marker_pos_r[:] = output_dict["marker_pos"][i] - offset
 
     experiment.model.to("cpu")
 
@@ -1078,7 +936,7 @@ def main(input_args: List = None, devtesting: bool = False):
 
     # ===== FORMAT AND SAVE OUTPUT FILES ===== #
 
-    colnames = ["token", "surp", "marker_pos", "marker_pos_rel"]
+    colnames = ["token", "surp", "marker_pos", "marker_pos_rel1", "marker_pos_rel2"]
     metacols = [
         "ppl",
         "scenario",
@@ -1099,7 +957,8 @@ def main(input_args: List = None, devtesting: bool = False):
         output_dict["token"],
         output_dict["surp"],
         output_dict["marker_pos"],
-        output_dict["marker_pos_rel"],
+        output_dict["marker_pos_rel1"],
+        output_dict["marker_pos_rel2"],
     ]
 
     metarrays = [
@@ -1113,16 +972,15 @@ def main(input_args: List = None, devtesting: bool = False):
         [
             argins.list_type for _ in range(len(input_sequences))
         ],  # "random" | "categorized"
-        [sequence.trial_ids for sequence in input_sequences],
+        [trial_id for trial_id in output_dict["trial_ids"]],
         [sequence.position_ids for sequence in input_sequences],
-        [sequence.subtok_ids for sequence in input_sequences],
+        [subtok_id for subtok_id in output_dict["subtok_ids"]],
         [sequence.list_len for sequence in input_sequences],
         [sequence.prompt for sequence in input_sequences],
     ]
 
     # put everything into a dataframe
     logger.info("Converting to dataframe...")
-
     output_df = outputs2dataframe(colnames, arrays, metacols, metarrays)
 
     for col in ("prompt_len", "list_len"):
@@ -1132,12 +990,8 @@ def main(input_args: List = None, devtesting: bool = False):
     output_df = output_df.rename(
         columns={"trialID": "marker", "stimID": "stimid", "scenario": "context"}
     )
-    output_df["model_id"] = argins.model_id
 
     output_df.attrs = {"wt103_ppl": np.round(ppl.cpu().item(), 2), "argins": argins}
-
-    # drop nan rows (merged BPE timesteps)
-    output_df = output_df.loc[~output_df.token.str.strip("Ġ").isin([""]), :]
 
     # this is the variable that is returned
     output = output_df
@@ -1152,6 +1006,17 @@ def main(input_args: List = None, devtesting: bool = False):
                 "marker_pos_rel": literal_eval(argins.aggregate_positions)
             },  # average over first timestep
         ]
+
+        # compute repeat surprisal
+        output_agg, _ = filter_and_aggregate(
+            output_df,
+            independent_var = "list_len",
+            list_len_val = [int(argins.list_len)],
+            prompt_len_val = [int(argins.prompt_len)],
+            context_val = ["intact"],
+            list_positions = literal_eval(argins.aggregate_positions),
+            aggregating_metric="mean",
+        )
 
         # create dict for storing output measures
         outdict = {
@@ -1175,15 +1040,6 @@ def main(input_args: List = None, devtesting: bool = False):
             },  # reapeat surprisal
             "model_id": None,
         }
-
-        # compute repeat surprisal
-        output_agg, _ = filter_and_aggregate(
-            output_df,
-            model=argins.model_type,
-            model_id=output_df.model_id.unique().item(),
-            groups=variables,
-            aggregating_metric="mean",
-        )
 
         x1 = output_agg.x1.to_numpy()
         x2 = output_agg.x2.to_numpy()
@@ -1252,11 +1108,11 @@ def main(input_args: List = None, devtesting: bool = False):
         logger.info("Saving {}".format(os.path.join(outpath)))
 
         # save the full, non-aggregated dataframe
-        if type(output) == pd.DataFrame:
-            output.to_csv(outpath, sep="\t")
+        if isinstance(output, pd.DataFrame):
+            output.to_csv(outpath, sep="\t", na_rep="NULL")
 
         # or save the aggregatec metrics in json
-        elif type(output) is dict:
+        elif isinstance(output, dict):
             with open(outpath, "w") as fh:
                 json.dump(output, fh, indent=4)
 

@@ -1,16 +1,17 @@
-import json
-import sys, os
 import argparse
-import numpy as np
-from transformers import GPT2TokenizerFast
-import torch
-from torch.nn import functional as F
-from tqdm import trange
-from typing import List, Tuple, Dict
+import json
+import os
+import re
+import sys
 from string import punctuation
-from mosestokenizer import MosesTokenizer
+from typing import Dict, List, Tuple
 
-from ..paths import get_paths, DATA_PATH
+import numpy as np
+import torch
+from mosestokenizer import MosesTokenizer
+from transformers import AutoTokenizer
+
+from ..paths import DATA_PATH, NOUNS_PATH, get_paths
 from ..utils import logger
 from .stimuli import prefixes, prompts
 
@@ -22,11 +23,14 @@ def mark_subtoken_splits(
     tokens: List[str], split_marker: str, marker_logic: str, eos_markers: List[str]
 ) -> List:
     """
-    mark_subtoken_splits() keeps track of whether or not a token was subplit into subwords or not.
-    Each token is counted and if it was split, the subtokens are counted as a single token.
-    E.g. the tokens ["I", "saw", "a", "sp", "Ġarrow", "yesterday"] would be coded as [0, 1, 2, 3, 3, 4]
-    indicating that there are 4 unique tokens and that token nr 3 (sparrow) was split into two subtokens
-    (sp + arrow).
+    mark_subtoken_splits() keeps track of whether or not a token was
+    subplit into subwords or not.
+    Each token is counted and if it was split, the subtokens are
+    counted as a single token.
+    E.g. the tokens ["I", "saw", "a", "sp", "Ġarrow", "yesterday"]
+    would be coded as [0, 1, 2, 3, 3, 4] indicating that there are 4
+    unique tokens and that token nr 3 (sparrow) was split into two
+    subtokens (sp + arrow).
 
     Parameters:
     ----------
@@ -38,7 +42,8 @@ def mark_subtoken_splits(
     Returns :
     -------
     ids : list
-        list containing indices that mark groups (prefix, list1, prompt, list2) withing each list
+        list containing indices that mark groups (prefix, list1,
+        prompt, list2) withing each list
 
     Example:
     -------
@@ -51,12 +56,14 @@ def mark_subtoken_splits(
     ids = []
     count = 0
 
-    # some tokenizers will mark a split by omitting the split_marker, in this case
-    # you have to stop counting when split_marker is missing
+    # some tokenizers will mark a split by omitting the split_marker,
+    # in this case you have to stop counting when split_marker is
+    # missing
     count_token = None
     if marker_logic == "outside":
         count_token = [split_marker in token for token in tokens]
-    # in other cases (e.g. for BERT), you have to stop counting when split_marker is present
+    # in other cases (e.g. for BERT), you have to stop counting when
+    # split_marker is present
     elif marker_logic == "within":
         count_token = [
             (split_marker not in token)
@@ -64,7 +71,8 @@ def mark_subtoken_splits(
             for token in tokens
         ]
 
-    # for tokenizers that do not do BPE tokenization we count each token and ignore punctuation plus eos markers
+    # for tokenizers that do not do BPE tokenization we count each
+    # token and ignore punctuation plus eos markers
     if split_marker is None:
         count_token = [
             (True and (token not in list(punctuation) + eos_markers))
@@ -102,7 +110,83 @@ class InputSequence(object):
         self.prompt = None
 
     def __repr__(self) -> str:
-        return f"InputSequence({self.stim_id:02d}, list_len = {self.list_len}, n_toks = {len(self.toks[0])})"
+        return (
+            f"InputSequence({self.stim_id:02d}, "
+            f"list_len={self.list_len}, "
+            f"n_toks={len(self.toks)})"
+        )
+
+
+def assemble_sequence(tokenizer, prefix, list1, prompt, list2):
+    seq_parts = []
+    seq_codes = []
+    token_strings = []
+
+    def clen():
+        return len(seq_parts[-1])
+
+    # prefix
+    seq_parts.append(prefix + " ")
+    seq_codes.extend([0] * clen())
+    # items
+    for item in list1[:-1]:
+        seq_parts.append(item)
+        seq_codes.extend([1] * clen())
+        seq_parts.append(", ")
+        seq_codes.extend([-1] * clen())
+    seq_parts.append(list1[-1])
+    seq_codes.extend([1] * clen())
+    seq_parts.append(".")
+    seq_codes.extend([-1] * clen())
+    # prompt
+    seq_parts.append(" " + prompt + " ")
+    seq_codes.extend([2] * clen())
+    # items2
+    for item in list2[:-1]:
+        seq_parts.append(item)
+        seq_codes.extend([3] * clen())
+        seq_parts.append(", ")
+        seq_codes.extend([-1] * clen())
+    seq_parts.append(list2[-1])
+    seq_codes.extend([3] * clen())
+    seq_parts.append(".")
+    seq_codes.extend([-1] * clen())
+    seq = "".join(seq_parts)
+    tokenized = tokenizer(seq, return_offsets_mapping=True)
+    offsets = tokenized["offset_mapping"]
+    input_ids = tokenized["input_ids"]
+
+    char_codes = np.zeros(len(seq), dtype=np.int64) - 1
+    for idx, match_ in enumerate(re.finditer(r"\w*-?\w+-?'?\w*'?", seq), 1):
+        char_codes[match_.start() : match_.end()] = idx
+
+    token_codes = []
+    word_codes = []
+    for a, b in offsets:
+        # c = -1 if a == b else seq_codes[a]
+        # print(a, b, seq[a:b], c, char_codes[a:b])
+        if a == b:
+            token_codes.append(-1)
+            word_codes.append(-1)
+        else:
+            token_strings.append(seq[a:b])
+            if seq[a] == " ":
+                a = a + 1
+            if seq[b - 1] == " ":
+                b = b - 1
+            assert b > a
+            assert all(c == seq_codes[a] for c in seq_codes[a:b])
+            token_codes.append(seq_codes[a])
+            word_codes.append(char_codes[a])
+
+    inp_seq = InputSequence()
+    inp_seq.str = seq
+    inp_seq.ids = torch.tensor(input_ids, dtype=torch.int64)
+    inp_seq.toks = token_strings
+    inp_seq.trial_ids = token_codes
+    inp_seq.subtok_ids = word_codes
+
+    return inp_seq
 
 
 def concat_and_tokenize_inputs(
@@ -111,14 +195,11 @@ def concat_and_tokenize_inputs(
     word_list1: List[str],
     word_list2: List[str],
     ngram_size: str,
-    bpe_split_marker: str,
-    marker_logic: str,
-    ismlm: bool,
     pretokenize_moses: bool = False,
     tokenizer=None,
 ) -> Tuple[List[torch.Tensor], Dict]:
-    """
-    concat_and_tokenize_inputs() concatenates and tokenizes strings as inputs for wm_suite.Experiment() class
+    """concat_and_tokenize_inputs() concatenates and tokenizes
+    strings as inputs for wm_suite.Experiment() class
 
     Parameters:
     ----------
@@ -127,17 +208,23 @@ def concat_and_tokenize_inputs(
     prompt : str
         a string that follows the second noun list
     word_list1 : list of lists
-        a list of lists, each element in the list is a list of nouns, these lists are first lists in the sequence
+        a list of lists, each element in the list is a list of nouns,
+        these lists are first lists in the sequence
     word_list2 : list
-        a list of lists, each element in the list is alist of nouns, these lists are second lists in the sequence
+        a list of lists, each element in the list is alist of nouns,
+        these lists are second lists in the sequence
     ngram_size : str
-        a string indicating number of elements in entries of word_list1 and word_list2
+        a string indicating number of elements in entries of
+        word_list1 and word_list2
     bpe_split_marker : str
-        a string that is used by HuggingFace tokenizer classes to mark tokens that were split into BPEs
+        a string that is used by HuggingFace tokenizer classes to mark
+        tokens that were split into BPEs
     marker_logic : str ("outside", "within")
-        string indicating whether bpe_split_marker indicates outer BPE tokens in split tokens (like GPT2) or inner (like BERT)
+        string indicating whether bpe_split_marker indicates outer BPE
+        tokens in split tokens (like GPT2) or inner (like BERT)
     ismlm : boolean
-        inicates whether or not the current model is a masked language model or not
+        inicates whether or not the current model is a masked language
+        model or not
 
     Returns:
     -------
@@ -147,7 +234,7 @@ def concat_and_tokenize_inputs(
         dict containing information about stimuli, it contains fields 'stimid', 'trialID', 'positionID', 'subtok', 'list_len'
 
     """
-
+    input_seqs_new = []
     metadata = {
         "stimid": [],
         "trialID": [],
@@ -156,102 +243,31 @@ def concat_and_tokenize_inputs(
         "list_len": [],
     }
 
-    # join list elements into strings for tokenizer below
-    input_seqs = [" " + ", ".join(tks) + "." for tks in word_list1]
-
-    if ismlm:
-        input_seqs2 = [" " + ", ".join(tks) + "." for tks in word_list2]
-        eos1 = "[CLS]"
-        eos2 = "[SEP]"
-    else:
-        input_seqs2 = [" " + ", ".join(tks) + "." for tks in word_list2]
-        eos1 = tokenizer.eos_token
-        eos2 = tokenizer.eos_token
-
-    logger.info(f"Using {eos1} and {eos2} as start and end eos tokens, respectively")
     if pretokenize_moses:
-        logger.info(f"Pretokenizing input sequenes with MosesTokenizer('en') ...")
-
-    # list storing outputs
-    input_seqs_tokenized = []
-    input_seqs_new = []
-
-    # pretokenize with moses and conver back to strings if need be
-    if pretokenize_moses:
+        logger.info("Pretokenizing input sequenes with MosesTokenizer('en') ...")
         with MosesTokenizer("en") as pretokenize:
-            prefix = " ".join(pretokenize(prefix))
-            input_seqs = [" " + " ".join(pretokenize(list1)) for list1 in input_seqs]
-            input_seqs2 = [" " + " ".join(pretokenize(list2)) for list2 in input_seqs2]
-            prompt = " ".join(pretokenize(prompt))
+            prefix = " ".join(pretokenize(prefix)) + " "
+            prompt = " ".join(pretokenize(prompt)) + " "
+            word_list1 = [
+                [" ".join(pretokenize(w)) for w in words] for words in word_list1
+            ]
+            word_list2 = [
+                [" ".join(pretokenize(w)) for w in words] for words in word_list2
+            ]
 
     # loop over trials
-    for i in trange(len(input_seqs), desc="sequence: "):
-        seq = InputSequence()
+    for words1, words2 in zip(word_list1, word_list2):
+        inp_seq = assemble_sequence(tokenizer, prefix, words1, prompt, words2)
 
-        seq.str = eos1 + " " + prefix + input_seqs[i] + " " + prompt + input_seqs2[i]
-
-        # tokenize strings separately to be able to construct markers for prefix, word lists etc.
-        i1 = tokenizer.encode(
-            eos1 + " " + prefix, add_special_tokens=False, return_tensors="pt"
-        )  # prefix IDs, add eos token
-        i2 = tokenizer.encode(
-            input_seqs[i], add_special_tokens=False, return_tensors="pt"
-        )
-        i3 = tokenizer.encode(
-            " " + prompt, add_special_tokens=False, return_tensors="pt"
-        )  # prompt IDs
-        i4 = tokenizer.encode(
-            input_seqs2[i] + eos2, add_special_tokens=False, return_tensors="pt"
-        )
-
-        # compose the input ids tensors
-        input_ids = torch.cat((i1, i2, i3, i4), dim=1)
-
-        input_seqs_tokenized.append(input_ids)
-        seq.ids = input_ids
-        seq.toks = [tokenizer.convert_ids_to_tokens(e) for e in input_ids]
-
-        # tokenize unmasked tokens to be able to compute loss later on
-        # if ismlm:
-        #
-        #    i4_ = tokenizer.encode(input_seqs2_[i] + eos2, add_special_tokens=False, return_tensors="pt")
-        #    input_ids_unmasked = torch.cat((i1, i2, i3, i4_), dim=1)
-        #    input_seqs_tokenized_unmasked.append(input_ids_unmasked)
-
-        # construct IDs for prefix, word lists and individual tokens
-        # useful for data vizualization etc.
-        trials = []
-        positions = []
-        split_ids = []
-
-        for j, ids in enumerate((i1, i2, i3, i4)):
-            tmp = np.zeros(shape=ids.shape[1], dtype=int)  # code the trial structure
-            tmp[:] = j
-            tmp2 = np.arange(ids.shape[1])  # create token position index
-            trials.append(tmp)
-            positions.append(tmp2)
-            split_ids.append(
-                mark_subtoken_splits(
-                    tokens=tokenizer.convert_ids_to_tokens(ids[0]),
-                    split_marker=bpe_split_marker,
-                    marker_logic=marker_logic,
-                    eos_markers=[eos1, eos2],
-                )
-            )
-
-        metadata["trialID"].append(np.concatenate(trials).tolist())
-        metadata["stimid"].append(i)
-        metadata["positionID"].append(np.concatenate(positions).tolist())
-        metadata["subtok"].append(np.concatenate(split_ids).tolist())
+        metadata["trialID"] = inp_seq.trial_ids
+        metadata["stimid"].append(len(input_seqs_new))
+        metadata["subtok"] = inp_seq.subtok_ids
         metadata["list_len"].append(ngram_size)
 
-        seq.list_len = ngram_size
-        seq.stim_id = i
-        seq.trial_ids = np.concatenate(trials).tolist()
-        seq.position_ids = np.concatenate(positions).tolist()
-        seq.subtok_ids = np.concatenate(split_ids).tolist()
+        inp_seq.list_len = ngram_size
+        inp_seq.stim_id = len(input_seqs_new)
 
-        input_seqs_new.append(seq)
+        input_seqs_new.append(inp_seq)
 
     return input_seqs_new
 
@@ -272,9 +288,10 @@ def sample_indices_by_group(groups: np.ndarray, seed: int) -> np.ndarray:
         randomized_indices : np.array
             randomly sampled indices of groups.size
 
-    Helper function that creates randomized indices form np.arange(groups.size) by following
-    the structure of group elements in group. It ensures that every
-    element groups is paired with an element outside its own group.
+    Helper function that creates randomized indices form
+    np.arange(groups.size) by following the structure of group
+    elements in group. It ensures that every element groups is paired
+    with an element outside its own group.
     """
 
     out_ids = np.zeros(groups.shape, dtype=int)
@@ -429,7 +446,7 @@ def get_input_sequences(
         input_filename = "categorized_lists.json"
 
     # load the word lists in .json files
-    fname = os.path.join(paths.data, "noun_lists", input_filename)
+    fname = os.path.join(NOUNS_PATH, input_filename)
 
     word_lists1, word_lists2 = make_word_lists(fname, condition=condition)
 
@@ -442,35 +459,9 @@ def get_input_sequences(
 
     # setup the model
     logger.info("Loading tokenizer {}".format(tokenizer_name))
-    tokenizer = GPT2TokenizerFast.from_pretrained(tokenizer_name)
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
-    # set the flag for function below
-    ismlm = False
-    # if argins.path_to_tokenizer in ['bert-base-uncased']:
-    #    ismlm=True
-
-    # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== #
-
-    # this tells the bpe split counter what symbol to look for and how it codes for splits
-    bpe_split_marker_dict = {
-        "gpt2": "Ġ",
-        "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
-        "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "Ġ",
-        "bert-base-uncased": "##",
-        "transfo-xl-wt103": None,
-    }
-
-    # this tells the bpe split counter how these symbols are used
-    marker_logic_dict = {
-        "gpt2": "outside",
-        "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "outside",
-        "/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer": "outside",
-        "bert-base-uncased": "within",
-        "transfo-xl-wt103": None,
-    }
-
-    # this routing loops over prompts and prefixes
-    # it keeps track of that in meta_data
+    # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== # this
     logger.info("Tokenizing and concatenating sequences...")
     input_sequences = concat_and_tokenize_inputs(
         prompt=prompts[scenario][prompt_key],
@@ -480,9 +471,6 @@ def get_input_sequences(
         ngram_size=list_len.strip("n"),
         pretokenize_moses=pretokenize_moses,
         tokenizer=tokenizer,
-        bpe_split_marker=bpe_split_marker_dict[tokenizer_name],
-        marker_logic=marker_logic_dict[tokenizer_name],
-        ismlm=ismlm,
     )
 
     # add information about prompt and list lengths for each sequence
@@ -508,9 +496,8 @@ first_sequence_nouns = {
 
 
 def get_query_target_indices(list_len: str, which: str) -> Tuple:
-    """
-    A helper function to get the indices of the query and target words in the input sequence.
-
+    """A helper function to get the indices of the query and target
+    words in the input sequence.
     """
 
     seqs = get_input_sequences(
@@ -523,8 +510,9 @@ def get_query_target_indices(list_len: str, which: str) -> Tuple:
         pretokenize_moses=False,
     )
 
-    # define indices based on tokens in the first sequences (has no BPE-split tokens)
-    t = np.array(seqs[0].toks[0])
+    # define indices based on tokens in the first sequences (has no
+    # BPE-split tokens)
+    t = np.array(seqs[0].toks)
 
     nouns = list(first_sequence_nouns.values())[0 : int(list_len[-1])]
     codes = list(first_sequence_nouns.keys())[0 : int(list_len[-1])]
@@ -586,14 +574,14 @@ def get_inputs_targets_path_patching(batch_size: int = 1):
         [
             i
             for i, inps in enumerate(inps1)
-            if second_colon_idx(inps.toks[0]) == colon_at_unsplit
+            if second_colon_idx(inps.toks) == colon_at_unsplit
         ]
     )  # clean
     corr_inps_ids = torch.tensor(
         [
             i
             for i, inps in enumerate(inps2)
-            if second_colon_idx(inps.toks[0]) == colon_at_unsplit
+            if second_colon_idx(inps.toks) == colon_at_unsplit
         ]
     )  # corrupted
 
@@ -621,9 +609,9 @@ def get_inputs_targets_path_patching(batch_size: int = 1):
         clean_inps_batches[nb] = orig_inps[-resid:, :]  # zero-indexing
         corr_inps_batches[nb] = corr_inps[-resid:, :]
 
-    # to construct correct/incorrect target pairs,
-    # use the indices of the first token in first list
-    # (the one we expect to be predicted)
+    # to construct correct/incorrect target pairs, use the indices of
+    # the first token in first list (the one we expect to be
+    # predicted)
     targets = {
         i // batch_size: torch.tensor(
             [
@@ -677,7 +665,6 @@ def get_args_for_dev(
 
 
 def main():
-
     sys.path.append("/home/ka2773/project/lm-mem/src/data/")
 
     # ===== INITIATIONS ===== #
@@ -768,7 +755,7 @@ def main():
 
     # setup the model
     logger.info("Loading tokenizer {}".format(argins.path_to_tokenizer))
-    tokenizer = GPT2TokenizerFast.from_pretrained(argins.path_to_tokenizer)
+    tokenizer = AutoTokenizer.from_pretrained(argins.path_to_tokenizer)
 
     # set the flag for function below
     ismlm = False
@@ -777,7 +764,8 @@ def main():
 
     # ===== CONCATENATE AND TOKENIZE INPUT SEQUENCES ===== #
 
-    # this tells the bpe split counter what symbol to look for and how it codes for splits
+    # this tells the bpe split counter what symbol to look for and how
+    # it codes for splits
     bpe_split_marker_dict = {
         "gpt2": "Ġ",
         "/home/ka2773/project/lm-mem/data/wikitext-103_tokenizer": "Ġ",
@@ -806,9 +794,6 @@ def main():
         ngram_size=argins.list_len.strip("n"),
         pretokenize_moses=argins.pretokenize_moses,
         tokenizer=tokenizer,
-        bpe_split_marker=bpe_split_marker_dict[argins.path_to_tokenizer],
-        marker_logic=marker_logic_dict[argins.path_to_tokenizer],
-        ismlm=ismlm,
     )
 
     # add information about prompt and list lengths for each sequence

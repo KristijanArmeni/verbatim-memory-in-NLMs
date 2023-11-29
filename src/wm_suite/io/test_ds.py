@@ -31,9 +31,6 @@ def get_test_data():
         word_list2=test_lists,
         ngram_size="3",
         tokenizer=GPT2TokenizerFast.from_pretrained("gpt2"),
-        bpe_split_marker="Ġ",
-        marker_logic="outside",
-        ismlm=False,
     )
 
     return test_inputs
