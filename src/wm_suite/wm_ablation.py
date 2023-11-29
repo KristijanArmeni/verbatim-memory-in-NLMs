@@ -136,14 +136,14 @@ class GPT2AttentionAblated(GPT2Attention):
         return attn_output, attn_weights
 
 
-def find_topk_attn(
-    attn: np.ndarray,
-    topk: int,
-    attn_threshold: Union[float, None],
-    tokens_of_interest: List[int],
-    seed: int,
-    bos_renormalize: bool = False,
-) -> Tuple[Dict, Dict, np.ndarray]:
+def find_topk_attn(attn: np.ndarray, 
+                   topk: int, 
+                   attn_threshold: Union[float, None],
+                   tokens_of_interest: List[int],
+                   seed: int,
+                   bos_renormalize: bool=False,
+                   ) -> Tuple[Dict, Dict, np.ndarray]:
+
     """
     Takes attn.shape = (samples, timesteps, heads, layer) of attention weights and finds <topk> heads across layers
     that have highest attention scores summed over timesteps <tokens_of_interest> and averaged over samples.
@@ -176,7 +176,9 @@ def find_topk_attn(
         logger.info("Renormalizing attention weights to exclude BOS token.")
 
         # renormalize attention weights
-        attn = attn[:, 1::, :, :] / np.sum(attn[:, 1::, :, :], axis=1, keepdims=True)
+        attn = attn[:, 1::, :, :] / np.sum(attn[:, 1::, :, :], 
+                                           axis=1, 
+                                           keepdims=True)
 
         logger.info(f"Renormalized attention weights with new shape: {attn.shape}")
         logger.info(

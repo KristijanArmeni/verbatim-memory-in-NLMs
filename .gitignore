@@ -23,6 +23,10 @@ src/models/rnn/wandb/*
 wm_suite/rnn/wandb/run-*
 hpc/lstm/wandb/offline-run*/
 hpc/lstm/wandb/run*/
+~/work
+data
+rnn/lightning_logs
+viz/.ipynb_checkpoints
 
 # Editors
 .idea
