@@ -1,14 +1,12 @@
 """
 main script invoking the .main() method in individual plotting scripts to generate figures
 """
-import os
 import argparse
 
 # own modules
-from paths import PATHS as p
-from src.wm_suite.viz.ablation import fig_attn
+from wm_suite.viz.ablation import fig_attn
 
-from src.wm_suite.viz.func import set_manuscript_style
+from wm_suite.viz.func import set_manuscript_style
 
 import argparse
 import logging

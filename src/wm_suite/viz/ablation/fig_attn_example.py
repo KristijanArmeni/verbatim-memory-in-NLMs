@@ -1,20 +1,21 @@
-import os, sys
+
+# %%
+import os
 import numpy as np
-import pandas as pd
 from matplotlib import pyplot as plt
-from matplotlib.gridspec import GridSpec
 import matplotlib.patches as patches
-from src.wm_suite.viz.ablation.fig_attn import get_data
-from src.wm_suite.viz.func import set_manuscript_style
-from src.wm_suite.viz.utils import save_png_pdf
+from wm_suite.wm_ablation import _renormalize_bos_attn
+from wm_suite.viz.ablation.fig_attn import get_data
+from wm_suite.viz.func import set_manuscript_style
+from wm_suite.viz.utils import save_png_pdf
 import logging
-from typing import List, Dict, Tuple
+from typing import Dict
 
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-
-def make_example_plot(ax: np.ndarray, x: np.ndarray, d: Dict, query_id: int, layer: int, sequence:int):
+# %%
+def make_example_plot(ax: np.ndarray, x: np.ndarray, d: Dict, query_id: int, layer: int, sequence:int, renormalize_bos:bool=False):
     """
     wrapper to plot attention weights as lineplots per layer
     
@@ -31,6 +32,12 @@ def make_example_plot(ax: np.ndarray, x: np.ndarray, d: Dict, query_id: int, lay
     fig : matplotlib figure object
     ax : matplotlib axes object
     """
+
+    tokens_slice = slice(1, query_id) if renormalize_bos else slice(0, query_id)
+
+    if renormalize_bos:
+        x = _renormalize_bos_attn(x)
+        query_id = query_id - 1  #adjust query index to account for shorter sequences
 
     i = sequence
     l = layer
@@ -59,7 +66,7 @@ def make_example_plot(ax: np.ndarray, x: np.ndarray, d: Dict, query_id: int, lay
     ax[0].spines['top'].set_visible(False)
     ax[0].spines['right'].set_visible(False)
     
-    ylabels = [s.strip("Ġ") for s in d['tokens'][i][0:query_id]]
+    ylabels = [s.strip("Ġ") for s in d['tokens'][i][tokens_slice]]
     ylabels = [s.replace("<|endoftext|>", "<eos>") for s in ylabels]
     ax[1].set_xticklabels(labels=ylabels, ha='center', rotation=90, fontsize=labelfs)
     ax[1].set_yticks(np.arange(0, 12, 2))
@@ -101,11 +108,37 @@ def make_example_plot(ax: np.ndarray, x: np.ndarray, d: Dict, query_id: int, lay
     return ax
 
 
+# %%
 def replace_nouns(x, replacements):
    d = {"patience": replacements[0], "notion": replacements[1], "movie": replacements[2]}
    return [d[e] if e in d.keys() else e for e in x]
 
 
+# %%
+
+def _plot_single_head_avg_attn(x, d, l, h, r=False) -> tuple:
+    
+    query_id = 45 if r else 46
+    token_slice = slice(1, 46) if r else slice(0, 46)
+
+    if r:
+        x = _renormalize_bos_attn(x)
+
+    xticklabels = replace_nouns([e.strip("Ġ") for e in d["tokens"][0][token_slice]], ["N1", "N2", "N2"])
+
+    fig, ax = plt.subplots(figsize=(9, 3))
+    ax.plot(np.mean(x[:, 0:query_id, h, l], axis=0), '--o')
+    ax.plot(x[np.arange(8, 20, 2), 0:query_id, h, l].T, '--', color="lightgray", alpha=1, zorder=0)
+    ax.set_xticks(np.arange(len(xticklabels)))
+    ax.set_xticklabels(xticklabels, rotation=90, fontsize=10)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.grid(visible=True, linewidth=0.5, color="lightgray", linestyle="--")
+    plt.tight_layout()
+    return fig, ax
+
+
+# %%
 def make_example_plot2(datadir):
 
     x, d = get_data(os.path.join(datadir, "attention_weights_gpt2_colon-colon-p1.npz"))
@@ -160,10 +193,19 @@ def make_example_plot2(datadir):
     return fig
 
 
-def generate_plot(datadir, layer, sequence):
+# %%
+def generate_plot(datadir, query_token, layer, sequence):
 
-    fn = "attention_weights_gpt2_colon-colon-p1.npz"
-    query_idx = 46
+    if query_token == ":":
+
+        fn = "attention_weights_gpt2_colon-colon-p1.npz"
+        query_idx = 46  # query is at index 45, but since we must include it with python slicing, we set index to 46
+
+    elif query_token == "noun_1":
+
+        fn = "attention_weights_gpt2_colon-colon-n1.npz"
+        query_idx = 47
+
     suptitle = f"Transformer attention for short-term memory"
 
     # load the data
@@ -173,7 +215,7 @@ def generate_plot(datadir, layer, sequence):
     fig, ax = plt.subplots(2, 1, figsize=(14, 5.5), sharex='col', gridspec_kw={'height_ratios': [0.9, 1.8]})
 
     # plot
-    make_example_plot(ax, x=x, d=d, query_id=query_idx, layer=layer, sequence=sequence)
+    make_example_plot(ax, x=x, d=d, query_id=query_idx, layer=layer, sequence=sequence, renormalize_bos=True)
 
     plt.suptitle(suptitle, fontsize=20, fontweight="bold")
     plt.tight_layout()
@@ -181,6 +223,7 @@ def generate_plot(datadir, layer, sequence):
     return fig
 
 
+# %%
 def main(input_args=None):
 
     import argparse
@@ -197,29 +240,49 @@ def main(input_args=None):
     set_manuscript_style()
 
     with plt.style.context("seaborn-ticks"):
-        #lay, seq = 2, 5
-        #fig = generate_plot(datadir=args.datadir, layer=lay, sequence=seq)
 
-        #if args.savedir:
-        #    save_png_pdf(fig, savename=os.path.join(args.savedir, f"attn_weights_example_{lay}-{seq}"))
-
-        lay, seq = 10, 5
-        fig = generate_plot(datadir=args.datadir, layer=lay, sequence=seq)
+        lay, seq = 2, 5
+        fig = generate_plot(datadir=args.datadir, query_token=":", layer=lay, sequence=seq)
 
         if args.savedir:
             save_png_pdf(fig, savename=os.path.join(args.savedir, f"attn_weights_example_{lay}-{seq}"))
 
-        fig = make_example_plot2(args.datadir)
+        lay, seq = 2, 5
+        fig = generate_plot(datadir=args.datadir, query_token="noun_1", layer=lay, sequence=seq)
 
         if args.savedir:
-            save_png_pdf(fig, savename=os.path.join(args.savedir, f"attn_weights_avg_layer-1-5-11"))
+            save_png_pdf(fig, savename=os.path.join(args.savedir, f"attn_weights_example_{lay}-{seq}"))
+
+        lay, seq = 10, 5
+        fig = generate_plot(datadir=args.datadir, query_token=":", layer=lay, sequence=seq)
+
+        if args.savedir:
+            save_png_pdf(fig, savename=os.path.join(args.savedir, f"attn_weights_example_{lay}-{seq}"))
+
+        lay, seq = 10, 5
+        fig = generate_plot(datadir=args.datadir, query_token="noun_1", layer=lay, sequence=seq)
+
+        if args.savedir:
+            save_png_pdf(fig, savename=os.path.join(args.savedir, f"attn_weights_example_{lay}-{seq}_noun_1"))
+
+
+        #fig = make_example_plot2(args.datadir)
+
+        #if args.savedir:
+            #save_png_pdf(fig, savename=os.path.join(args.savedir, f"attn_weights_avg_layer-1-5-11"))
 
         plt.show()
 
     return 0
 
 
+# %%
 if __name__ == "__main__":
 
-
     main()
+
+
+# %%
+
+#main(["--datadir", "C:\\users\\karmeni1\\project\\lm-mem\\data\\ablation"])
+# %%
