@@ -18,20 +18,14 @@ def transformer_test_data():
     # make some input sentences
     test_lists = [["window", "cannon", "apple"], 
                 ["village", "shipping", "beauty"],
-                ["resort", "rival", "village"],
-                ["research", "resort", "rival"],
-                ["lumber", "research", "resort"],
                 ]
 
     test_inputs = concat_and_tokenize_inputs(prefix=prefixes["sce1"]["1"],
-                                                       prompt=prompts["sce1"]["1"],
-                                                       word_list1=test_lists,
-                                                       word_list2=test_lists,
-                                                       ngram_size="3",
-                                                       tokenizer=GPT2TokenizerFast.from_pretrained("gpt2"),
-                                                       bpe_split_marker="Ġ",
-                                                       marker_logic="outside",
-                                                       ismlm=False)
+                                             prompt=prompts["sce1"]["1"],
+                                             word_list1=test_lists,
+                                             word_list2=test_lists,
+                                             ngram_size="3",
+                                             tokenizer=GPT2TokenizerFast.from_pretrained("gpt2"))
 
 
     return test_inputs
@@ -42,9 +36,6 @@ def transformer_wt103_test_data():
     # make some input sentences
     test_lists = [["window", "cannon", "apple"], 
                 ["village", "shipping", "beauty"],
-                ["resort", "rival", "village"],
-                ["research", "resort", "rival"],
-                ["lumber", "research", "resort"],
                 ]
 
     test_inputs = concat_and_tokenize_inputs(prefix=prefixes["sce1"]["1"],
@@ -52,10 +43,7 @@ def transformer_wt103_test_data():
                                              word_list1=test_lists,
                                              word_list2=test_lists,
                                              ngram_size="3",
-                                             tokenizer=GPT2TokenizerFast.from_pretrained("/home/ka2773/project/lm-mem/data/wikitext-103_v2/tokenizer"),
-                                             bpe_split_marker="Ġ",
-                                             marker_logic="outside",
-                                             ismlm=False)
+                                             tokenizer=GPT2TokenizerFast.from_pretrained("gpt2"))
 
 
     return test_inputs

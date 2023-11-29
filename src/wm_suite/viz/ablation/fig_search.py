@@ -16,8 +16,8 @@ from wm_suite.viz.func import set_manuscript_style
 PATHS = get_paths()
 # %%
 
-def load_json(fname:str) -> Dict:
 
+def load_json(fname: str) -> Dict:
     with open(fname, "r") as f:
         data = json.load(f)
 
@@ -27,18 +27,18 @@ def load_json(fname:str) -> Dict:
 # %%
 def label2coord(label:str) -> Tuple[int, int]:
 
+def label2coord(label: str) -> Tuple[int, int]:
     s1, s2 = label.split(".")
 
     return (int(s1.strip("L")), int(s2.strip("H")))
 
 
+
 # %%
 def make_matrix(labels: List) -> np.ndarray:
-
     x = np.zeros(shape=(12, 12), dtype=bool)
 
     for label in labels:
-        
         xy = label2coord(label)
         x[xy[0], xy[1]] = True
 
@@ -46,43 +46,49 @@ def make_matrix(labels: List) -> np.ndarray:
 
 # %%
 def get_membership_dict(datain: Tuple) -> Dict:
-
     lh_list, members = datain
 
     return {s: idx for s, idx in zip(lh_list, members)}
 
 
+
 # %%
 def reformat_str(s:str) -> str:
 
+def reformat_str(s: str) -> str:
     s1, s2 = s.split(".")
     return f"L{int(s1.strip('L'))+1}.H{int(s2.strip('H'))+1}"
 
 
 # %%
 def plot_heads(axis, labels, member_cols, member_dict):
-
     # image plot
     imd = make_matrix(labels)
     axis.imshow(imd, cmap=plt.cm.Greys, origin="lower")
 
     coords = [label2coord(l) for l in labels]
     for i, c in enumerate(coords):
-
         if i < 9:
             xind = c[1] - 0.25
         else:
             xind = c[1] - 0.5
-        axis.text(x=xind, y=c[0]-0.25, s=f"{i+1}", color="white", fontweight="semibold")
+        axis.text(
+            x=xind, y=c[0] - 0.25, s=f"{i+1}", color="white", fontweight="semibold"
+        )
         patch_color = member_cols[member_dict[labels[i]]]
-        axis.add_patch(Rectangle((c[1]-0.5, c[0]-0.5), 1, 1, fill=False, edgecolor=patch_color, lw=2))
+        axis.add_patch(
+            Rectangle(
+                (c[1] - 0.5, c[0] - 0.5), 1, 1, fill=False, edgecolor=patch_color, lw=2
+            )
+        )
 
     return axis
 
+
 # %%
 
-def plot_search_trajectory(data: Dict, member_dict: Dict, member_cols: Dict = None):
 
+def plot_search_trajectory(data: Dict, member_dict: Dict, member_cols: Dict = None):
     fig = plt.figure(figsize=(7, 6))
 
     gs = GridSpec(2, 3, figure=fig, width_ratios=[1, 2, 1])
@@ -110,17 +116,16 @@ def plot_search_trajectory(data: Dict, member_dict: Dict, member_cols: Dict = No
     ax1.set_ylabel("Median repeat surprisal\n(%)")
 
     if member_cols is None:
-        member_cols = {0:'tab:green', 1:'tab:blue', 2:'tab:orange'}
+        member_cols = {0: "tab:green", 1: "tab:blue", 2: "tab:orange"}
     for i, l in enumerate(ax1.xaxis.get_ticklabels()):
         if l.get_text() != "":
             lab = data["best_labels"][-1][i]
             l.set_color(member_cols[member_dict[lab]])
 
-
     ax2 = plot_heads(ax2, data["best_labels"][-1], member_cols, member_dict)
 
     ax2.set_xticks(np.arange(0, 12, 1))
-    ax2.set_xticklabels([i if i % 2 != 0 else ""for i in range(1, 13)])
+    ax2.set_xticklabels([i if i % 2 != 0 else "" for i in range(1, 13)])
     ax2.set_yticks(np.arange(0, 12, 1))
     ax2.set_yticklabels([i if i % 2 != 0 else "" for i in range(1, 13)])
     ax2.set_ylabel("Layer")
@@ -130,13 +135,12 @@ def plot_search_trajectory(data: Dict, member_dict: Dict, member_cols: Dict = No
     ax1.spines["right"].set_visible(False)
     ax1.grid(visible=True, axis="both", linestyle="--", alpha=0.5)
     ax2.grid(visible=True, axis="both", linestyle="--", alpha=0.5)
-    
+
     return fig, (ax1, ax2)
 
 
 # %%
 def get_random_search_results(files):
-
     rnd, rnd_lab = [], []
     for f in files:
         with open(os.path.join(PATHS.search, f), "r") as fh:
@@ -145,11 +149,14 @@ def get_random_search_results(files):
             rnd_lab.append(dct["best_labels"])
 
     n_possible_searches = 43
-    rnd_mat = np.full(shape=(len(rnd), n_possible_searches), fill_value=np.nan, dtype=float)
+    rnd_mat = np.full(
+        shape=(len(rnd), n_possible_searches), fill_value=np.nan, dtype=float
+    )
     for i, r in enumerate(rnd):
-        rnd_mat[i, :len(r)] = r
+        rnd_mat[i, : len(r)] = r
 
     return rnd_mat, rnd_lab
+
 
 
 # %%
@@ -202,9 +209,10 @@ def make_plot(datadir, which:str):
 
 
     if which == "attention_based_with_random":
-
         data5 = load_json(os.path.join(datadir, files["topk_n2_n3_orig"]))
-        data4_ = load_json(os.path.join(datadir, files["topk_n1_list_orig"]))   # aggregated across 3-tokens etc.
+        data4_ = load_json(
+            os.path.join(datadir, files["topk_n1_list_orig"])
+        )  # aggregated across 3-tokens etc.
         membership3 = get_membership_dict((data4_["lh_list"], data4_["members"]))
 
         data_rnd, _ = get_random_search_results(files["random_neg"])
@@ -218,7 +226,9 @@ def make_plot(datadir, which:str):
         all_n1_n2 = load_json(os.path.join(PATHS.search, files["n2_n3_ablate-all"]))
 
         data6 = load_json(os.path.join(PATHS.search, files["all_n2_n3"]))
-        data4_ = load_json(os.path.join(datadir, files["topk_n1_list_orig"]))   # aggregated across 3-tokens etc.
+        data4_ = load_json(
+            os.path.join(datadir, files["topk_n1_list_orig"])
+        )  # aggregated across 3-tokens etc.
         membership3 = get_membership_dict((data4_["lh_list"], data4_["members"]))
 
         fig, axes = search_across_all_heads(data=data6, rand_init=rand_n1_n2, ablate_all=all_n1_n2, membership=membership3)
@@ -229,8 +239,8 @@ def make_plot(datadir, which:str):
 
 # %%
 
+
 def main(input_args=None):
-    
     import argparse
 
     parser = argparse.ArgumentParser(description="Plot search results")
@@ -266,5 +276,4 @@ def main(input_args=None):
 # %%
 
 if __name__ == "__main__":
-
     main()

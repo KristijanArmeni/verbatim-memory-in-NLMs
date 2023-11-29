@@ -1,6 +1,6 @@
 import os
 import torch
-from transformers import GPT2LMHeadModel, GPT2TokenizerFast
+from transformers import GPT2LMHeadModel, GPT2TokenizerFast, GPT2Config
 import numpy as np
 from wm_suite.wm_ablation import ablate_attn_module
 from typing import Tuple, Dict, List
@@ -67,23 +67,29 @@ def plot_head_attentions(data, layer:int, heads:List, ticklabels:List):
 
 def test_attn_ablation():
 
-    model = GPT2LMHeadModel.from_pretrained("gpt2")
-    model0 = GPT2LMHeadModel.from_pretrained("gpt2")
-    model1 = GPT2LMHeadModel.from_pretrained("gpt2")
-    model2 = GPT2LMHeadModel.from_pretrained("gpt2")
+    torch.manual_seed(54321)
+
+    model = GPT2LMHeadModel(GPT2Config(n_layers=3, n_head=4, n_embd=32, seed=54321))
+    model0 = GPT2LMHeadModel(GPT2Config(n_layers=3, n_head=4, n_embd=32, seed=54321))
+    model1 = GPT2LMHeadModel(GPT2Config(n_layers=3, n_head=4, n_embd=32, seed=54321))
+    model2 = GPT2LMHeadModel(GPT2Config(n_layers=3, n_head=4, n_embd=32, seed=54321))
+
+    model0.load_state_dict(model.state_dict())
+    model1.load_state_dict(model.state_dict())
+    model2.load_state_dict(model.state_dict())
 
     tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
 
     test_input = "A cat and a dog walk into a bar. The dog said hello."
     inputs = torch.tensor(tokenizer.encode(test_input))
 
-    layer = 11
-    heads = list(range(12))
+    layer = 1
+    heads = list(range(4))
     lh_dict = {layer: heads}
     model0 = ablate_attn_module(model0, layer_head_dict=lh_dict, ablation_type="zero")
     model1 = ablate_attn_module(model1, layer_head_dict=lh_dict, ablation_type="shuffle")
     
-    lh_dict = {5: heads}
+    lh_dict = {2: heads}
     model2 = ablate_attn_module(model2, layer_head_dict=lh_dict, ablation_type="zero")
 
     # test that model parameters are not modified by ablations (only attention activations) etc.
@@ -107,120 +113,121 @@ def test_attn_ablation():
         data.append(outputs.attentions)
 
     # check that attentions are zeroed as expected
-    ablated_attentions_L11 = data[1][11]     # layer 12
-    ablated_attentions_L5 = data[3][5]       # layer 5
-    nonablated_attentions_L0 = data[1][0]    # layer 1
+    ablated_attentions_L11 = data[1][1]     # ablated layer 2
+    ablated_attentions_L5 = data[3][2]      # ablated layer 3
+    nonablated_attentions_L0 = data[1][0]   # ablated layer 2 (layer 1 non-ablated)
 
+    # check that all attentions scores are at 0
     assert torch.all(ablated_attentions_L11 == 0)
     assert torch.all(ablated_attentions_L5 == 0)
     assert torch.any(nonablated_attentions_L0 != 0)
 
     # check hidden states
-    h, h6, h11 = hs[0][1::], hs[3][1::], hs[1][1::]  # grab non-initial elements, the first elements are embeddings
-    intact_vs_6 = []
-    intact_vs_11 = []
+    h, h3, h2 = hs[0][1::], hs[3][1::], hs[1][1::]  # grab non-initial elements, the first elements are embeddings
+    intact_vs_2 = []
+    intact_vs_3 = []
     for l in range(12):
-        intact_vs_6.append(torch.any(h[l] != h6[l]).item())   # there should be at least some non equal entries (i.e. hiddens states should not be exactly equal)
-        intact_vs_11.append(torch.any(h[l] != h11[l]).item())
+        intact_vs_2.append(torch.any(h[l] != h2[l]).item())   # there should be at least some non equal entries (i.e. hiddens states should not be exactly equal)
+        intact_vs_3.append(torch.any(h[l] != h3[l]).item())
 
     # inequality from layer 5 onwards should hold
-    assert np.all(np.array(intact_vs_6)[5::])              # only hidden states after layer 5 should be different from intact model
-    assert np.where(np.array(intact_vs_11))[0][0] == 11    # only hidden states at layer eleven should be different from intact model
+    assert np.all(np.array(intact_vs_2)[1::])            # only hidden states after layer 2 should be different from intact model
+    assert np.where(np.array(intact_vs_3))[0][0] == 2    # only hidden states at layer 3 should be different from intact model
 
     # ===== PLOTS ===== #
-    savedir = "/home/ka2773/project/lm-mem/src/tests/fig"
+    #savedir = "/home/ka2773/project/lm-mem/src/tests/fig"
 
-    ticklabels = [e.strip("Ġ") for e in tokenizer.convert_ids_to_tokens(inputs)]
+    #ticklabels = [e.strip("Ġ") for e in tokenizer.convert_ids_to_tokens(inputs)]
 
-    l, h = 11, 8
-    fig = plot_attentions(data, layer=l, head=h, ticklabels=ticklabels)
-    fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
+    #l, h = 11, 8
+    #fig = plot_attentions(data, layer=l, head=h, ticklabels=ticklabels)
+    #fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
 
-    l, h = 6, 8
-    fig = plot_attentions(data, layer=l, head=h, ticklabels=ticklabels)
-    fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
+    #l, h = 6, 8
+    #fig = plot_attentions(data, layer=l, head=h, ticklabels=ticklabels)
+    #fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
 
-    l, h = 2, 8
-    fig = plot_attentions(data, layer=l, head=h, ticklabels=ticklabels)
-    fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
+    #l, h = 2, 8
+    #fig = plot_attentions(data, layer=l, head=h, ticklabels=ticklabels)
+    #fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
 
-    plt.close("all")
+    #plt.close("all")
 
     del model, model0, model1, model2, data
 
 
     # ===== TEST INDIVIDUAL HEAD ABLATIONS ===== #
 
-    model = GPT2LMHeadModel.from_pretrained("gpt2")
-    model2 = GPT2LMHeadModel.from_pretrained("gpt2")
-    model3 = GPT2LMHeadModel.from_pretrained("gpt2")
+    #model = GPT2LMHeadModel.from_pretrained("gpt2")
+    #model2 = GPT2LMHeadModel.from_pretrained("gpt2")
+    #model3 = GPT2LMHeadModel.from_pretrained("gpt2")
 
 
-    layer = 1
-    lh_dict = {layer: list(range(12))}
-    model2 = ablate_attn_module(model2, layer_head_dict=lh_dict, ablation_type="zero")
-    model3 = ablate_attn_module(model3, layer_head_dict=lh_dict, ablation_type="shuffle")
+    #ayer = 1
+    #lh_dict = {layer: list(range(12))}
+    #model2 = ablate_attn_module(model2, layer_head_dict=lh_dict, ablation_type="zero")
+    #model3 = ablate_attn_module(model3, layer_head_dict=lh_dict, ablation_type="shuffle")
 
-    data2 = []
-    for m in (model, model2, model3):
-        m.eval()
-        data2.append(m(inputs, output_attentions=True).attentions)
+    #data2 = []
+    #for m in (model, model2, model3):
+    #    m.eval()
+    #    data2.append(m(inputs, output_attentions=True).attentions)
 
-    l, h = 11, 8
-    fig = plot_attentions(data2, layer=l, head=h, ticklabels=ticklabels)
-    fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
+    #l, h = 11, 8
+    #fig = plot_attentions(data2, layer=l, head=h, ticklabels=ticklabels)
+    #fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
 
-    plt.close()
+    #plt.close()#
 
-    l, h = 6, 8
-    fig = plot_attentions(data2, layer=l, head=h, ticklabels=ticklabels)
-    fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
+    #l, h = 6, 8
+    #fig = plot_attentions(data2, layer=l, head=h, ticklabels=ticklabels)
+    #fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
 
-    plt.close()
+    #plt.close()
 
-    l, h = 1, 8
-    fig = plot_attentions(data2, layer=l, head=h, ticklabels=ticklabels)
-    fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
+    #l, h = 1, 8
+    #fig = plot_attentions(data2, layer=l, head=h, ticklabels=ticklabels)
+    #fig.suptitle(f"Comparing two different attention ablation methods (abl. L.{int(layer)+1}-H.{heads[0]+1}-{heads[-1]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_abl-{int(layer)+1}-{heads[0]-heads[-1]}_L{l+1}-H{h+1}.png"), dpi=300)
 
-    plt.close()
+    #plt.close()
 
-    del model, model2, model3, data2
+    #del model, model2, model3, data2
 
 
     # ===== TEST INDIVIDUAL HEAD ABLATIONS ===== #
 
-    model1 = GPT2LMHeadModel.from_pretrained("gpt2")
-    model2 = GPT2LMHeadModel.from_pretrained("gpt2")
+    #model1 = GPT2LMHeadModel.from_pretrained("gpt2")
+    #model2 = GPT2LMHeadModel.from_pretrained("gpt2")
 
-    layer = 0
-    lh_dict = {layer: [0]}
-    model1 = ablate_attn_module(model1, layer_head_dict=lh_dict, ablation_type="zero")
+    #layer = 0
+    #lh_dict = {layer: [0]}
+    #model1 = ablate_attn_module(model1, layer_head_dict=lh_dict, ablation_type="zero")
 
-    data3 = []
-    for m in (model1, model2):
-        m.eval()
-        data3.append(m(inputs, output_attentions=True).attentions)
+    #data3 = []
+    #for m in (model1, model2):
+    #    m.eval()
+    #    data3.append(m(inputs, output_attentions=True).attentions)
 
-    fig = plot_head_attentions(data3[0], layer=0, heads=[0, 1, 2], ticklabels=ticklabels)
-    fig.suptitle(f"Single head ablation (abl. L.{int(layer)+1}-H.{heads[0]+1})")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"attn_head-abl-{int(layer)+1}-{heads[0]}.png"), dpi=300)
+    #fig = plot_head_attentions(data3[0], layer=0, heads=[0, 1, 2], ticklabels=ticklabels)
+    #fig.suptitle(f"Single head ablation (abl. L.{int(layer)+1}-H.{heads[0]+1})")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"attn_head-abl-{int(layer)+1}-{heads[0]}.png"), dpi=300)
 
-    fig = plot_head_attentions(data3[1], layer=0, heads=[0, 1, 2], ticklabels=ticklabels)
-    fig.suptitle(f"Unablated heads")
-    plt.tight_layout()
-    fig.savefig(os.path.join(savedir, f"unablated_heads-{int(layer)+1}-{heads[0]}.png"), dpi=300)
+    #fig = plot_head_attentions(data3[1], layer=0, heads=[0, 1, 2], ticklabels=ticklabels)
+    #fig.suptitle(f"Unablated heads")
+    #plt.tight_layout()
+    #fig.savefig(os.path.join(savedir, f"unablated_heads-{int(layer)+1}-{heads[0]}.png"), dpi=300)
 
-    plt.close()
+    #plt.close()

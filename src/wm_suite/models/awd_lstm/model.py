@@ -1,13 +1,9 @@
 import torch
 import torch.nn as nn
-import sys
-sys.path.append("/home/ka2773/project/lm-mem/src/src/wm_suite")
-sys.path.append("/home/ka2773/project/lm-mem/src/models")
-sys.path.append("/home/ka2773/project/lm-mem/src/models/awd_lstm")
 
-from embed_regularize import embedded_dropout
-from locked_dropout import LockedDropout
-from weight_drop import WeightDrop
+from .embed_regularize import embedded_dropout
+from .locked_dropout import LockedDropout
+from .weight_drop import WeightDrop
 
 class RNNModel(nn.Module):
     

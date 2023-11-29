@@ -25,9 +25,11 @@ def test_filter_and_aggregate():
     # create other variables expected in the dataframe
     stimid = np.repeat([1, 2, 3], len(t1))
     marker = np.tile([0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3], 3)
-    marker_pos_rel = np.tile([-3, -2, -1, np.nan, 0, 1, 2, np.nan, -4, -3, -2, -1, 0, 1, 2, np.nan], 3)
+    marker_pos_rel1 = np.tile([-3, -2, -1, np.nan, 0, 1, 2, np.nan, 3, 4, 5, 6, 7, 8, 9, np.nan], 3)
+    marker_pos_rel2 = np.tile([-10, -9, -8, np.nan, -7, -6, -5, np.nan, -4, -3, -2, -1, 0, 1, 2, np.nan], 3)
 
-    rec = {"token": t1 + t2 + t3, "surp": v1 + v2 + v3, "stimid": stimid, "marker": marker, "marker_pos_rel": marker_pos_rel}
+    rec = {"token": t1 + t2 + t3, "surp": v1 + v2 + v3, "stimid": stimid, "marker": marker,
+           "marker_pos_rel1": marker_pos_rel1, "marker_pos_rel2": marker_pos_rel2}
     df = pd.DataFrame(rec)
 
     # add other expected columns in df
@@ -37,7 +39,6 @@ def test_filter_and_aggregate():
     df['prompt_len'] = 8
     df["list_len"] = 3
     df['context'] = "intact"
-    df['model_id'] = "test"
 
     # grad the first time step (technically, mean computation is applied, but no effective here)
     variables = [{"list_len": [3]},
@@ -47,10 +48,12 @@ def test_filter_and_aggregate():
 
     # run the tested function
     data1, dagg_ = filter_and_aggregate(df, 
-                                    model="gpt2", 
-                                    model_id=df.model_id.unique().item(), 
-                                    groups=variables, 
-                                    aggregating_metric="mean")
+                                        independent_var="list_len",
+                                        list_len_val=[3],
+                                        prompt_len_val=[8],
+                                        context_val=["intact"],
+                                        list_positions=[0, 1, 2],
+                                        aggregating_metric="mean")
 
     repeat_surp = data1.x_perc.to_numpy()
 
@@ -67,9 +70,11 @@ def test_filter_and_aggregate():
 
     # run the tested function
     data2, dagg_ = filter_and_aggregate(df, 
-                                        model="gpt2", 
-                                        model_id=df.model_id.unique().item(), 
-                                        groups=variables, 
+                                        independent_var="list_len",
+                                        list_len_val=[3],
+                                        prompt_len_val=[8],
+                                        context_val=["intact"],
+                                        list_positions=[0],
                                         aggregating_metric="mean")
 
     repeat_surp = data2.x_perc.to_numpy()
@@ -94,9 +99,11 @@ def test_filter_and_aggregate():
     # create other variables expected in the dataframe
     stimid = np.repeat([1, 2, 3], len(t1))
     marker = np.tile([0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3], 3)
-    marker_pos_rel = np.tile([-3, -2, -1, np.nan, 0, 1, 2, np.nan, -4, -3, -2, -1, 0, 1, 2, np.nan], 3)
+    marker_pos_rel1 = np.tile([-3, -2, -1, np.nan, 0, 1, 2, np.nan, 3, 4, 5, 6, 7, 8, 9, np.nan], 3)
+    marker_pos_rel2 = np.tile([-10, -9, -8, np.nan, -7, -6, -5, np.nan, -4, -3, -2, -1, 0, 1, 2, np.nan], 3)
 
-    rec = {"token": t1 + t2 + t3, "surp": v1 + v2 + v3, "stimid": stimid, "marker": marker, "marker_pos_rel": marker_pos_rel}
+    rec = {"token": t1 + t2 + t3, "surp": v1 + v2 + v3, "stimid": stimid, "marker": marker, 
+           "marker_pos_rel1": marker_pos_rel1, "marker_pos_rel2": marker_pos_rel2}
     df2 = pd.DataFrame(rec)
 
     # add other expected columns in df
@@ -106,7 +113,6 @@ def test_filter_and_aggregate():
     df2['prompt_len'] = 8
     df2["list_len"] = 3
     df2['context'] = "intact"
-    df2['model_id'] = "test"
 
     # grad the first time step (technically, mean computation is applied, but not effective here)
     variables = [{"list_len": [3]},
@@ -117,9 +123,11 @@ def test_filter_and_aggregate():
     # run the tested function
         # run the tested function
     data1, dagg_ = filter_and_aggregate(df2, 
-                                        model="gpt2", 
-                                        model_id=df.model_id.unique().item(), 
-                                        groups=variables, 
+                                        independent_var="list_len",
+                                        list_len_val=[3],
+                                        prompt_len_val=[8],
+                                        context_val=["intact"],
+                                        list_positions=[0],
                                         aggregating_metric="mean")
 
     repeat_surp = data1.x_perc.to_numpy()
@@ -138,9 +146,11 @@ def test_filter_and_aggregate():
     
     # run the tested function
     data2, dagg_ = filter_and_aggregate(df2, 
-                                        model="gpt2", 
-                                        model_id=df.model_id.unique().item(), 
-                                        groups=variables, 
+                                        independent_var="list_len",
+                                        list_len_val=[3],
+                                        prompt_len_val=[8],
+                                        context_val=["intact"],
+                                        list_positions=[1],
                                         aggregating_metric="mean")
 
     repeat_surp = data2.x_perc.to_numpy()
@@ -157,10 +167,12 @@ def test_filter_and_aggregate():
     
     # run the tested function
     data3, dagg_ = filter_and_aggregate(df2, 
-                                      model="gpt2", 
-                                      model_id=df.model_id.unique().item(), 
-                                      groups=variables, 
-                                      aggregating_metric="mean")
+                                        independent_var="list_len",
+                                        list_len_val=[3],
+                                        prompt_len_val=[8],
+                                        context_val=["intact"],
+                                        list_positions=[2],
+                                        aggregating_metric="mean")
 
     repeat_surp = data3.x_perc.to_numpy()
 

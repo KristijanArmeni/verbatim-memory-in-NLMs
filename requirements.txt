@@ -1,5 +1,5 @@
-python >= 3.7
 numpy >= 1.21.2
+scipy >= 1.7.1
 pandas >= 1.2.4
 torch >= 1.10.1
 transformers >= 4.6.1
@@ -8,3 +8,4 @@ matplotlib >= 3.4.2
 seaborn >= 0.11.1
 tqdm >= 4.59.0
 mosestokenizer >= 1.2.1
+pytest

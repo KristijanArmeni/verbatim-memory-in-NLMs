@@ -1,4 +1,4 @@
-#%%
+# %%
 
 import os
 import json
@@ -98,16 +98,13 @@ class GreedyOutput(object):
 
 # load the search results
 def load_json(filenames: List) -> Tuple:
-
     y, y_ci = [], []
     x1, x1_ci = [], []
     x2, x2_ci = [], []
     x, xlab = [], []
 
     for f in filenames:
-
         with open(f, "r") as fh:
-
             d = json.load(fh)
             y.append(d["rs"]["scores"])
             y_ci.append(d["rs"]["ci"])
@@ -157,7 +154,8 @@ fn = os.path.join(PATHS.search, "gpt2_sce1_llen3_plen1_repeat_random.json")
 with open(fn, "r") as fh:
     y_unab = json.load(fh)
 
-#%%
+# %%
+
 
 def plot_search(greedy_output: GreedyOutput, ctrl_tup=None, rand_tup=None, abl_all_tup=None):
 
@@ -306,9 +304,27 @@ def plot_search_x1x2(greedy_output: GreedyOutput, y3tup=None, y4tup=None):
     ax[0].plot(xarr[1, :], x1arr[1, :], "s--", label="Postmatch", color=clrs.blue)
     ax[0].plot(xarr[2, :], x1arr[2, :], "^--", label="Recent-tokens", color=clrs.orange)
 
-    ax[0].fill_between(xarr[0, :], y1=x1_ciarr[0, :, 0], y2=x1_ciarr[0, :, 1], color=clrs.green, alpha=0.3)
-    ax[0].fill_between(xarr[1, :], y1=x1_ciarr[1, :, 0], y2=x1_ciarr[1, :, 1], color=clrs.blue, alpha=0.3)
-    ax[0].fill_between(xarr[2, :], y1=x1_ciarr[2, :, 0], y2=x1_ciarr[2, :, 1], color=clrs.orange, alpha=0.3)
+    ax[0].fill_between(
+        xarr[0, :],
+        y1=x1_ciarr[0, :, 0],
+        y2=x1_ciarr[0, :, 1],
+        color=clrs.green,
+        alpha=0.3,
+    )
+    ax[0].fill_between(
+        xarr[1, :],
+        y1=x1_ciarr[1, :, 0],
+        y2=x1_ciarr[1, :, 1],
+        color=clrs.blue,
+        alpha=0.3,
+    )
+    ax[0].fill_between(
+        xarr[2, :],
+        y1=x1_ciarr[2, :, 0],
+        y2=x1_ciarr[2, :, 1],
+        color=clrs.orange,
+        alpha=0.3,
+    )
 
     ax[1].plot(xarr[0, :], x2arr[0, :], "o--", label="Matching", color=clrs.green)
     ax[1].plot(xarr[1, :], x2arr[1, :], "s--", label="Postmatch", color=clrs.blue)
@@ -328,7 +344,9 @@ def plot_search_x1x2(greedy_output: GreedyOutput, y3tup=None, y4tup=None):
         ax[1].hlines(x2ctrl, 2.5, 20.5, linestyle="--", color="black", label="Unablated")
         ax[1].fill_between(unabl_x, y1=x2ctrl_ci[0], y2=x2ctrl_ci[1], color="black", alpha=0.3)
 
-    fig.supxlabel("Number of heads ablated (combination with largest effect on repeat surprisal)")
+    fig.supxlabel(
+        "Number of heads ablated (combination with largest effect on repeat surprisal)"
+    )
     ax[0].set_ylabel("Median surprisal (95% CI)")
 
     for a in ax:

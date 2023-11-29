@@ -29,18 +29,24 @@ import os
 from types import SimpleNamespace
 import yaml
 import logging
+from pathlib import Path
 
 logger = logging.getLogger("wm_suite.utils")
 
 
+DATA_PATH = Path(__file__).parent.parent.parent / "data"
+NOUNS_PATH = DATA_PATH / "noun_lists"
+
 def add_pathsconfig_to_environ():
-
     if "PATHSCONFIG" not in os.environ:
+        path_to_config_toml = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "pathconfig.yaml"
+        )
 
-        path_to_config_toml = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pathconfig.yaml")
-
-        logger.info(f"Adding {path_to_config_toml} to os.environ['PATHSCONFIG'] variable")
-        os.environ['PATHSCONFIG'] = path_to_config_toml
+        logger.info(
+            f"Adding {path_to_config_toml} to os.environ['PATHSCONFIG'] variable"
+        )
+        os.environ["PATHSCONFIG"] = path_to_config_toml
 
 
 def get_paths(path_to_config: str = None) -> SimpleNamespace:
@@ -60,7 +66,7 @@ def get_paths(path_to_config: str = None) -> SimpleNamespace:
 
     if path_to_config is None:
         add_pathsconfig_to_environ()
-        path_to_config = os.environ['PATHSCONFIG']
+        path_to_config = os.environ["PATHSCONFIG"]
 
     with open(path_to_config, "r") as f:
         cfg = yaml.safe_load(f)
@@ -69,15 +75,14 @@ def get_paths(path_to_config: str = None) -> SimpleNamespace:
 
 
 def add_data_to_syspath():
-
     paths = get_paths()
 
     if paths.data not in sys.path:
         logger.info(f"Adding {paths.data} to pythonpath")
         sys.path.append(paths.data)
 
-def main():
 
+def main():
     paths = get_paths()
 
     if paths.src not in sys.path:
@@ -92,5 +97,4 @@ def main():
 
 
 if __name__ == "__main__":
-
     main()
