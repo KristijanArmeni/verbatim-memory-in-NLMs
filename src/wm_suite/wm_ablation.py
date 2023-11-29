@@ -130,6 +130,29 @@ class GPT2AttentionAblated(GPT2Attention):
         return attn_output, attn_weights
 
 
+def _renormalize_bos_attn(attn: np.ndarray) -> np.ndarray:
+
+    """
+    Renormalize attention weights to exclude the BOS token.
+
+    Parameters
+    ----------
+    attn : np.ndarray
+        array of attention weights (shape = (n_samples, n_timesteps, heads, layer))
+
+    Returns
+    -------
+    np.ndarray
+        array of renormalized attention weights (shape = (n_samples, n_timesteps-1, heads, layer))
+    """
+
+    # renormalize attention weights
+    attn = attn[:, 1::, :, :] / np.sum(attn[:, 1::, :, :], 
+                                       axis=1, 
+                                       keepdims=True)
+
+    return attn
+
 def find_topk_attn(attn: np.ndarray, 
                    topk: int, 
                    attn_threshold: Union[float, None],
@@ -171,9 +194,7 @@ def find_topk_attn(attn: np.ndarray,
         logger.info("Renormalizing attention weights to exclude BOS token.")
 
         # renormalize attention weights
-        attn = attn[:, 1::, :, :] / np.sum(attn[:, 1::, :, :], 
-                                           axis=1, 
-                                           keepdims=True)
+        attn = _renormalize_bos_attn(attn)
 
         logger.info(f"Renormalized attention weights with new shape: {attn.shape}")
         logger.info("Shifting tokens of interest by - 1 to account for dropped BOS token.")
