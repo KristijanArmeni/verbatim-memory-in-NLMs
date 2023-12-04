@@ -482,18 +482,23 @@ def get_input_sequences(
 
 
 first_sequence_nouns = {
-    "n1": "Ġpatience",
-    "n2": "Ġnotion",
-    "n3": "Ġmovie",
-    "n4": "Ġwomen",
-    "n5": "Ġcanoe",
-    "n6": "Ġnovel",
-    "n7": "Ġfolly",
-    "n8": "Ġsilver",
-    "n9": "Ġeagle",
-    "n10": "Ġcenter",
+    "n1": " patience",
+    "n2": " notion",
+    "n3": " movie",
+    "n4": " women",
+    "n5": " canoe",
+    "n6": " novel",
+    "n7": " folly",
+    "n8": " silver",
+    "n9": " eagle",
+    "n10": " center",
 }
 
+# we expect colons and first noun to be at these indices
+# if there are no BOS tokens and BPE splits
+FIRST_COLON_IDX = 12
+SECOND_COLON_IDX = 44
+FIRST_NOUN_IDX = 13
 
 def get_query_target_indices(list_len: str, which: str) -> Tuple:
     """A helper function to get the indices of the query and target
@@ -568,8 +573,11 @@ def get_inputs_targets_path_patching(batch_size: int = 1):
     indices = get_query_target_indices(list_len="n3", which="match")
     colon_at_unsplit = indices["queries"]["n1"][-1] - 1
 
-    second_colon_idx = lambda x: np.where(np.array(x) == ":")[0][-1]
+    def second_colon_idx(x):
+        return np.where(np.array(x) == ":")[0][-1]
 
+    # only consider inputs that do not have tokens split by BPE 
+    # by looking at the position of the second colon
     orig_inps_ids = torch.tensor(
         [
             i
@@ -587,15 +595,15 @@ def get_inputs_targets_path_patching(batch_size: int = 1):
 
     # chunk inputs at second colon and stack into single tensor
     orig_inps = torch.stack(
-        [inps1[i].ids[0][0 : colon_at_unsplit + 1] for i in orig_inps_ids]
+        [inps1[i].ids[0 : colon_at_unsplit + 1] for i in orig_inps_ids]
     )
     corr_inps = torch.stack(
-        [inps2[i].ids[0][0 : colon_at_unsplit + 1] for i in corr_inps_ids]
+        [inps2[i].ids[0 : colon_at_unsplit + 1] for i in corr_inps_ids]
     )
 
     nb = len(orig_inps_ids) // batch_size
     resid = len(orig_inps_ids) % batch_size
-    print(nb)
+
     clean_inps_batches = {
         i // batch_size: orig_inps[i : i + batch_size, :]
         for i in range(0, nb * batch_size, batch_size)
@@ -615,7 +623,7 @@ def get_inputs_targets_path_patching(batch_size: int = 1):
     targets = {
         i // batch_size: torch.tensor(
             [
-                [ids1[14].item(), ids2[14].item()]
+                [ids1[FIRST_NOUN_IDX].item(), ids2[FIRST_NOUN_IDX].item()]
                 for ids1, ids2 in zip(
                     orig_inps[i : i + batch_size], corr_inps[i : i + batch_size]
                 )
@@ -627,7 +635,7 @@ def get_inputs_targets_path_patching(batch_size: int = 1):
     if resid > 0:
         targets[nb] = torch.tensor(
             [
-                [ids1[14], ids2[14]]
+                [ids1[FIRST_NOUN_IDX], ids2[FIRST_NOUN_IDX]]
                 for ids1, ids2 in zip(orig_inps[-resid:, :], corr_inps[-resid:, :])
             ]
         )  # zero-indexing
