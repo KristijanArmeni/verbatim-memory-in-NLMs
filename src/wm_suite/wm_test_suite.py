@@ -292,13 +292,16 @@ class Experiment(object):
         with torch.no_grad():
             for start_pos, end_pos in positions_to_evaluate:
                 output = self.model(input_ids[:, start_pos:end_pos])
-                shift_logits = output.logits[:, :-1, :].contiguous()
-                labels = input_ids[:, start_pos + 1 : end_pos].contiguous()
+                shift_logits = output.logits[:, :-1, :].contiguous()       # adjust length of logits
+                targets = targets[:, start_pos + 1 : end_pos].contiguous() # shit targets t+1 forward
                 losses = loss_fn(
-                    shift_logits.transpose(1, -1).contiguous(), labels.contiguous()
-                )
+                    shift_logits.transpose(1, -1).contiguous(), targets.contiguous()
+                )  # output length is N-1
+
+                # padded position have a loss of 0.0 we can trim that
+                # by using the values in <seq_lens> (adjusted by -1)
                 for ix in range(batch_size):
-                    nlls[ix].extend(losses[ix].cpu().numpy().tolist())
+                    nlls[ix].extend(losses[ix, 0:seq_lens[ix]-1].cpu().numpy().tolist())
         ppl = [np.exp(np.nanmean(nll)).item() for nll in nlls]
         return ppl, nlls
 
