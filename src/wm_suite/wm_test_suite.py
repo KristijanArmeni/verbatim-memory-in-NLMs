@@ -1116,6 +1116,8 @@ def main(input_args: List = None, devtesting: bool = False):
 
         # or save the aggregatec metrics in json
         elif isinstance(output, dict):
+            if not outpath.endswith(".json"):
+                logger.warning("Saving a .json file, but --output_filename does not end with .json!")
             with open(outpath, "w") as fh:
                 json.dump(output, fh, indent=4)
 
