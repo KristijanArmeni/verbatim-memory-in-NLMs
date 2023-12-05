@@ -8,7 +8,7 @@ from wm_suite.experiment import Dataset, read_marker_file
 from models.awd_lstm.model import RNNModel as AWD_RNNModel
 from models.awd_lstm.splitcross import SplitCrossEntropyLoss
 
-from transformers import GPT2TokenizerFast
+from transformers import GPT2TokenizerFast, AutoTokenizer
 from nltk import word_tokenize
 
 
@@ -29,6 +29,34 @@ def transformer_test_data():
 
 
     return test_inputs
+
+@pytest.fixture
+def transformer_test_data_with_split_token():
+
+    # make some input sentences
+    # we know that <prairie> will be split into <pra-irie>
+    # by gpt2 and pythia tokenizers
+    test_lists = [["window", "cannon", "apple"], 
+                 ["village", "prairie", "beauty"],
+                 ]
+
+    test_inputs_gpt2 = concat_and_tokenize_inputs(prefix=prefixes["sce1"]["1"],
+                                             prompt=prompts["sce1"]["1"],
+                                             word_list1=test_lists,
+                                             word_list2=test_lists,
+                                             ngram_size="3",
+                                             tokenizer=GPT2TokenizerFast.from_pretrained("gpt2"))
+
+    test_inputs_pythia = concat_and_tokenize_inputs(prefix=prefixes["sce1"]["1"],
+                                             prompt=prompts["sce1"]["1"],
+                                             word_list1=test_lists,
+                                             word_list2=test_lists,
+                                             ngram_size="3",
+                                             tokenizer=AutoTokenizer.from_pretrained("EleutherAI/pythia-70m"))
+
+
+    return test_inputs_gpt2, test_inputs_pythia
+
 
 @pytest.fixture
 def transformer_wt103_test_data():
