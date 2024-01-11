@@ -33,7 +33,7 @@ from pathlib import Path
 
 logger = logging.getLogger("wm_suite.utils")
 
-
+ROOT_PATH = Path(__file__).parent
 DATA_PATH = Path(__file__).parent.parent.parent / "data"
 NOUNS_PATH = DATA_PATH / "noun_lists"
 
