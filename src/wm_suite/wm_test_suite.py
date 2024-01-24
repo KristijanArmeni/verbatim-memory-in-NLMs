@@ -11,13 +11,13 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm, trange
 from transformers import AutoModelForCausalLM, AutoTokenizer, GPT2Config
 
-from wm_suite.io.prepare_transformer_inputs import get_input_sequences
-from wm_suite.io.test_ds import get_test_data
-from wm_suite.io.wt103.dataset import WikiTextDataset
-from wm_suite.paths import get_paths
-from wm_suite.utils import logger, set_cuda_if_available
-from wm_suite.viz.func import filter_and_aggregate
-from wm_suite.wm_ablation import (
+from .io.prepare_transformer_inputs import get_input_sequences
+from .io.test_ds import get_test_data
+from .io.wt103.dataset import WikiTextDataset
+from .paths import get_paths
+from .utils import logger, set_cuda_if_available
+from .viz.func import filter_and_aggregate
+from .wm_ablation import (
     ablate_attn_module,
     find_topk_attn,
     find_topk_intersection,
