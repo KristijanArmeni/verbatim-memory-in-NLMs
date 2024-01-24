@@ -1,6 +1,7 @@
 import requests, zipfile, io
 import logging
 import argparse
+import torch
 
 # Armeni et al, 2022
 OSF_FILES_URL = "https://osf.io/5gy7x/files/osfstorage"
@@ -12,6 +13,17 @@ AWD_LSTM_RESULTS_OSF_URL = "https://osf.io/download/yu7m3/"
 OSF_URL_ATTN_WEIGHTS_ZIP_TMP = "https://osf.io/download/pm6wq/"  # temporary link on
 OSF_URL_SVA_EXP_ZIP_TMP = "https://osf.io/download/jgdt6/"
 OSF_URL_WT103_EXP = "https://osf.io/download/db3ht/"
+
+
+def set_cuda_if_available(device: str="cuda" or "cpu") -> torch.device:
+    
+    if device == "cuda" and not torch.cuda.is_available():
+        logger.warning("CUDA is not available, falling back to CPU!")
+        device = torch.device("cpu")
+    else:
+        device = torch.device(device)
+    
+    return device
 
 
 def get_wm_logger(name: str) -> logging.Logger:

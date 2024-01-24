@@ -5,6 +5,7 @@ import numpy as np
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config
 from test_data import transformer_test_data
 from src.wm_suite.wm_test_suite import Experiment
+from wm_suite.utils import check_device
 
 def test_transformer_experiment(transformer_test_data):
 
@@ -15,7 +16,7 @@ def test_transformer_experiment(transformer_test_data):
     # set to evaluation mode
     model.eval()
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = check_device("cuda")
 
     #initialize experiment class
     experiment = Experiment(model=model, 

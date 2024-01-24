@@ -4,7 +4,7 @@ from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config
 from test_data import transformer_test_data
 from wm_suite.wm_test_suite import Experiment
 from models.transformer.train_gpt2_ import compute_perplexity
-import logging
+from wm_suite.utils import check_device
 
 #from wm_suite.io.wt103.dataset import WikiTextDataset
 
@@ -18,7 +18,7 @@ def test_compute_perplexity(transformer_test_data):
     # set to evaluation mode
     model.eval()
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = check_device("cuda")
 
     #initialize experiment class
     experiment = Experiment(model=model, 
@@ -51,7 +51,8 @@ def test_compute_perplexity(transformer_test_data):
     # using experiment.ppl()
     ppl2 = []
     for inp in inputs:
-        ppl2.append(experiment.ppl(input_ids=inp.ids.unsqueeze(0), context_len=1024, stride=1)[0])
+        ppl2.append(experiment.ppl(input_ids=inp.ids.unsqueeze(0).to(device),
+                                   context_len=1024, stride=1)[0])
 
     # using compute_perplexity()
     ppl = []
@@ -75,6 +76,4 @@ def test_compute_perplexity(transformer_test_data):
 
     values1 = ppl
     values2 = ppl2
-    logging.info(values1)
-    logging.info(values2)
     assert_allclose(values1, values2, rtol=1e-6)
