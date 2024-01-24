@@ -15,7 +15,7 @@ from wm_suite.io.prepare_transformer_inputs import get_input_sequences
 from wm_suite.io.test_ds import get_test_data
 from wm_suite.io.wt103.dataset import WikiTextDataset
 from wm_suite.paths import get_paths
-from .utils import logger, set_cuda_if_available
+from wm_suite.utils import logger, set_cuda_if_available
 from wm_suite.viz.func import filter_and_aggregate
 from wm_suite.wm_ablation import (
     ablate_attn_module,
