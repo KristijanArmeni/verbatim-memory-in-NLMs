@@ -77,7 +77,7 @@ def filter_and_aggregate(
         (datain.list_len.isin(list_len_val))
         & (datain.prompt_len.isin(prompt_len_val))
         & (datain.second_list.isin(["repeat", "permute", "control"]))
-        & (datain.list.isin(["random", "categorized"]))
+        & (datain.list.isin(["random", "categorized", "abstract", "concrete"]))
         & (datain.context.isin(context_val))
         & (datain.marker.isin([1, 3]))
         & (positions)
@@ -115,12 +115,13 @@ def filter_and_aggregate(
 
     target_colname = "surp_" + aggregating_metric
     ## Compute metric
+
     dataout = relative_change_wrapper(
         df_agg=dagg,
         groups=[
             {independent_var: groups[independent_var]},  # this is the manipulated variable
-            {"second_list": ["repeat", "permute", "control"]},
-            {"list": ["categorized", "random"]},
+            {"second_list": datain.second_list.unique().tolist()},
+            {"list": datain.list.unique().tolist()},
         ],
         compared_col=target_colname,
     )
