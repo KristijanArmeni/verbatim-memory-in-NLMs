@@ -222,7 +222,7 @@ def get_noun_lists_toronto(which:str, list_length:int=10):
     return out_dict
 
 
-def get_noun_lists_concrete_abstract(which:str, list_length:int):
+def load_noun_lists_concrete_abstract(which:str):
 
     if which == "concrete":
         filename = "nouns_500_conc.txt"
@@ -234,10 +234,30 @@ def get_noun_lists_concrete_abstract(which:str, list_length:int):
     df = pd.read_csv(fn, sep="\t", header=None)
     df.columns = ["word", "conc", "freq"]
 
-    nouns = df.word.tolist()
+    return df.word.tolist()
 
+
+def chunk_lists_and_circular_shift(noun_list: list, list_length:int=10) -> dict:
+    """
+    Take a list of nouns and chunk them into lists of length <list_length> and
+    then circularly shift each list such that all list items occur in all serial positoins.
+    
+    Parameters
+    ----------
+    noun_list : list
+        list of nouns
+    list_length : int
+        length of the lists to be generated
+    
+    Returns
+    -------
+    dict
+        dictionary with keys "n<list_len>", and values lists of lists
+    
+    """
+    # generate n_list lists of `list_len` random nouns
     lists_of_nouns = sample_tokens(
-        token_list=nouns,
+        token_list=noun_list,
         step_size=list_length, 
         window_size=list_length,
     )
@@ -253,11 +273,7 @@ def get_noun_lists_concrete_abstract(which:str, list_length:int):
     # make sure all are the same length (we drop residual, shorter lists)
     lists_of_tokens_shifted = [e for e in lists_of_tokens_shifted if len(e) == list_length]
 
-    # generate lists of length 3, 5, 7 and 10
-    # now create subsets of the original list
-    #subsets = [3, 5, 7, 10]
-
-    # first sample angain the random noun pool
+    # return a dict
     return {"n{}".format(list_length): lists_of_tokens_shifted}    
 
 
@@ -277,7 +293,8 @@ def main():
 
     if argins.which in ["concrete", "abstract"]:
 
-        out_dict = get_noun_lists_concrete_abstract(which=argins.which, list_length=3)
+        nouns = load_noun_lists_concrete_abstract(which=argins.which)
+        out_dict = chunk_lists_and_circular_shift(nouns, list_length=10)
 
             # now save the lists to .json files
         filename = f"nouns_{argins.which}.json"
