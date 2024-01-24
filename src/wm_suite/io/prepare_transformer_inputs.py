@@ -439,11 +439,14 @@ def get_input_sequences(
     )
 
     # ===== DATA MANAGEMENT ===== #
-
     if list_type == "random":
         input_filename = "random_lists.json"
     elif list_type == "categorized":
         input_filename = "categorized_lists.json"
+    elif list_type == "abstract":
+        input_filename = "nouns_abstract.json"
+    elif list_type == "concrete":
+        input_filename = "nouns_concrete.json"
 
     # load the word lists in .json files
     fname = os.path.join(NOUNS_PATH, input_filename)

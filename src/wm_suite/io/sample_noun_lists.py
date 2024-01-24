@@ -14,18 +14,7 @@ import numpy as np
 import json
 import argparse
 import warnings
-
-# input arguments
-parser = argparse.ArgumentParser()
-parser.add_argument("--which", type=str, choices=["random", "categorized", 
-                                                  "ngram-random", "ngram-categorized",
-                                                  "ngram-distractors"],
-                    help="specifies which stimulus set to build")
-parser.add_argument("--output_filename", type=str)
-
-argins = parser.parse_args()
-
-home_dir = os.environ["homepath"]
+from ..paths import DATA_PATH, ROOT_PATH
 
 
 # define w convenience function
@@ -140,11 +129,9 @@ def load_and_sample_noun_pool(path, which, model_vocab, n_items=None, n_lists=20
     return token_lists
 
 
-# ===== RUN CODE ===== #
+def get_noun_lists_toronto(which:str, list_length:int=10):
 
-if __name__ == "__main__":
-
-    vocab_file=os.path.join(home_dir, 'project', 'lm-mem', 'src', 'rnn', "vocab.txt")
+    vocab_file=os.path.join(ROOT_PATH, 'src', 'rnn', "vocab.txt")
 
     # read rnn vocab
     with open(vocab_file, 'r', encoding='utf-8') as f:
@@ -154,28 +141,24 @@ if __name__ == "__main__":
     rnn_vocab = [line.strip("\n") for line in lines]
 
     # datadir with noun pool .txt files
-    path = os.path.join(home_dir, "project", "lm-mem", "src", "data")
-
-    # call load_and_sample_noun_pool repeatedly for each list size and
-    # store output list in a dict
-    which = argins.which
+    path = os.path.join(ROOT_PATH, "src", "data")
         
     # construct distractors from random noun pools
-    if argins.which == "ngram-distractors" or argins.which == "ngram-random":
+    if which == "ngram-distractors" or which == "ngram-random":
         which = "random"
-    elif argins.which == "ngram-categorized":
+    elif which == "ngram-categorized":
         which = "categorized"
 
     # ===== CREATE WORD LISTS AND N-GRAM SUBSETS ===== #
     lists_of_tokens = load_and_sample_noun_pool(path=path, 
-                                                n_items=10, 
+                                                n_items=list_length, 
                                                 n_lists=23,
                                                 which=which, 
                                                 model_vocab=rnn_vocab, 
                                                 seed=12345)
 
     # create circular shifts of the lists
-    cshifts = list(np.arange(0, 10))
+    cshifts = list(np.arange(0, list_length))
 
     lists_of_tokens_shifted = [np.roll(np.asarray(alist), s).tolist() for alist in lists_of_tokens
                             for s in cshifts]
@@ -192,7 +175,7 @@ if __name__ == "__main__":
     n_reps = 5
 
     # for ngram lists sample the created lists repeatedly
-    if argins.which in ["ngram-random", "ngram-categorized"] or argins.which=="ngram-distractors":
+    if which in ["ngram-random", "ngram-categorized"] or which=="ngram-distractors":
             
         # sample repeated ngram sequences from the lists of 10 items
         tmp = {"n{}".format(n_gram): [list(chunk(np.tile(alist[0:n_gram], reps=n_reps).tolist(), n_gram, n_gram)) 
@@ -200,7 +183,7 @@ if __name__ == "__main__":
                                         for n_gram in n_grams}
 
     # for ngram lists sample the created lists repeatedly
-    elif argins.which == "ngram-control":
+    elif which == "ngram-control":
         
         
         
@@ -212,7 +195,7 @@ if __name__ == "__main__":
         
         out_dict = tmp
 
-    elif argins.which == "ngram-distractors":
+    elif which == "ngram-distractors":
         
         # create extra 4 lists which will be used for the
         # interleaved items
@@ -231,17 +214,92 @@ if __name__ == "__main__":
         ngram_reps = 5
         n_reps_distractors = ngram_reps - 1
 
-        max_size = 7
-        
         # sample repeated ngram sequences from the lists of 10 items
         out_dict = {"n{}".format(size): [list(chunk(thelist[0:(n_reps_distractors*7)], size, 7)) 
                                                 for thelist in [distractor_set]]
                                                 for size in [2, 3, 5, 7]}
-        
 
-    # ===== SAVE .JSON OUTPUT ===== #
+    return out_dict
 
-    # now save the lists to .json files
-    with open(argins.output_filename, "w") as f:
-        print("Writing {}".format(argins.output_filename))
-        json.dump(out_dict, f)
+
+def get_noun_lists_concrete_abstract(which:str, list_length:int):
+
+    if which == "concrete":
+        filename = "nouns_500_conc.txt"
+    elif which == "abstract":
+        filename = "nouns_500_abst.txt"
+
+    # ===== CREATE WORD LISTS AND N-GRAM SUBSETS ===== #
+    fn = os.path.join(DATA_PATH, "abst-conc", "abst-conc-extremes", filename)
+    df = pd.read_csv(fn, sep="\t", header=None)
+    df.columns = ["word", "conc", "freq"]
+
+    nouns = df.word.tolist()
+
+    lists_of_nouns = sample_tokens(
+        token_list=nouns,
+        step_size=list_length, 
+        window_size=list_length,
+    )
+
+    # create circular shifts of the lists
+    cshifts = list(np.arange(0, list_length))
+
+    lists_of_tokens_shifted = [
+        np.roll(np.asarray(alist), s).tolist() for alist in lists_of_nouns
+        for s in cshifts
+    ]
+
+    # make sure all are the same length (we drop residual, shorter lists)
+    lists_of_tokens_shifted = [e for e in lists_of_tokens_shifted if len(e) == list_length]
+
+    # generate lists of length 3, 5, 7 and 10
+    # now create subsets of the original list
+    #subsets = [3, 5, 7, 10]
+
+    # first sample angain the random noun pool
+    return {"n{}".format(list_length): lists_of_tokens_shifted}    
+
+
+def main():
+    """
+    main function
+    """
+    # input arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--which", type=str, choices=["random", "categorized", 
+                                                    "ngram-random", "ngram-categorized",
+                                                    "ngram-distractors", "concrete", "abstract"],
+                        help="specifies which stimulus set to build")
+    parser.add_argument("--output_dir", type=str)
+
+    argins = parser.parse_args()
+
+    if argins.which in ["concrete", "abstract"]:
+
+        out_dict = get_noun_lists_concrete_abstract(which=argins.which, list_length=3)
+
+            # now save the lists to .json files
+        filename = f"nouns_{argins.which}.json"
+        fn = os.path.join(argins.output_dir, filename)
+        with open(fn, "w") as f:
+            print(f"Writing {fn}")
+            json.dump(out_dict, f)
+
+
+    elif argins.which in ["random", "categorized", "ngram-random", "ngram-categorized", "ngram-distractors"]:
+
+        out_dict = get_noun_lists_toronto(which=argins.which, list_length=3)
+
+        # now save the lists to .json files
+        fn = os.path.join(argins.output_dir, "nouns_{}.json".format(argins.which))
+        with open(fn, "w") as f:
+            print(f"Writing {fn}")
+            json.dump(out_dict, f)
+
+
+if __name__ == "__main__":
+
+   main()
+
+

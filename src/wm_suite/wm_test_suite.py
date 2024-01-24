@@ -11,13 +11,13 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm, trange
 from transformers import AutoModelForCausalLM, AutoTokenizer, GPT2Config
 
-from wm_suite.io.prepare_transformer_inputs import get_input_sequences
-from wm_suite.io.test_ds import get_test_data
-from wm_suite.io.wt103.dataset import WikiTextDataset
-from wm_suite.paths import get_paths
-from wm_suite.utils import logger
-from wm_suite.viz.func import filter_and_aggregate
-from wm_suite.wm_ablation import (
+from .io.prepare_transformer_inputs import get_input_sequences
+from .io.test_ds import get_test_data
+from .io.wt103.dataset import WikiTextDataset
+from .paths import get_paths
+from .utils import logger, set_cuda_if_available
+from .viz.func import filter_and_aggregate
+from .wm_ablation import (
     ablate_attn_module,
     find_topk_attn,
     find_topk_intersection,
@@ -268,7 +268,6 @@ class Experiment(object):
         """
 
         batch_size = len(seq_lens)
-
         assert batch_size == self.batch_size
         assert not self.ismlm
 
@@ -361,11 +360,11 @@ class Experiment(object):
 
         for input_ids, sequence_lengths, targets in sequence_iterator:
             ppls, surprisals = self.ppl_batched(
-                input_ids=input_ids,
+                input_ids=input_ids.to(self.device),
                 context_len=self.context_len,
                 stride=self.stride,
                 seq_lens=sequence_lengths,
-                targets=targets,
+                targets=targets.to(self.device),
             )
 
             # store the outputs and
@@ -511,27 +510,21 @@ def get_input_args_for_testing():
         "--condition",
         "repeat",
         "--list_type",
-        "random",
+        "abstract",
         "--list_len",
         "3",
         "--prompt_len",
         "1",
         "--model_type",
-        "ablated",
+        "pretrained",
         "--model_id",
-        "ablate_1-5",
-        "--ablate_layer_head_dict",
-        "{1: [0, 1, 2], 5: [5, 6]}",
-        "--ablation_type",
-        "zero",
+        "EleutherAI/pythia-160m",
         "--checkpoint",
-        "gpt2",
+        "EleutherAI/pythia-160m",
         "--tokenizer",
-        "gpt2",
+        "EleutherAI/pythia-160m",
         "--model_seed",
         "12345",
-        "--noun_list_file",
-        "/home/ka2773/project/lm-mem/src/data/noun_lists/random_lists.json",
         "--output_dir",
         "./",
         "--output_filename",
@@ -565,7 +558,7 @@ def main(input_args: List = None, devtesting: bool = False):
     )
     parser.add_argument("--list_len", type=str, choices=["3", "5", "7", "10"])
     parser.add_argument("--prompt_len", type=str, choices=["1", "2", "3", "4", "5"])
-    parser.add_argument("--list_type", type=str, choices=["random", "categorized"])
+    parser.add_argument("--list_type", type=str, choices=["random", "categorized", "abstract", "concrete"])
     parser.add_argument("--pretokenize_moses", action="store_true")
     parser.add_argument("--noun_list_file", type=str, help="json file with noun lists")
     parser.add_argument(
@@ -683,11 +676,7 @@ def main(input_args: List = None, devtesting: bool = False):
     # ===== INITIATE MODEL AND TOKANIZER CLASS ===== #
 
     # declare device and paths
-    if argins.device == "cuda" and not torch.cuda.is_available():
-        logger.warning("CUDA is not available, falling back to CPU!")
-        device = torch.device("cpu")
-    else:
-        device = torch.device(argins.device)
+    device = set_cuda_if_available(argins.device)
 
     # setup the model
     logger.info("Loading tokenizer {}".format(argins.tokenizer))
@@ -818,14 +807,11 @@ def main(input_args: List = None, devtesting: bool = False):
         input_sequences = get_test_data()
 
     else:
-        # fname = os.path.join(data_dir, argins.input_filename)
 
         input_sequences = get_input_sequences(
             condition=argins.condition,
             scenario=argins.scenario,
-            list_type="random"
-            if argins.noun_list_file == "random_lists.json"
-            else "categorized",
+            list_type=argins.list_type,
             list_len=f"n{argins.list_len}",
             prompt_key=argins.prompt_len,
             tokenizer_name=argins.checkpoint,
