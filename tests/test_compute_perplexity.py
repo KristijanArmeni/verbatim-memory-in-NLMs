@@ -4,7 +4,7 @@ from transformers import GPT2TokenizerFast, GPT2LMHeadModel, GPT2Config
 from test_data import transformer_test_data
 from wm_suite.wm_test_suite import Experiment
 from models.transformer.train_gpt2_ import compute_perplexity
-from wm_suite.utils import check_device
+from wm_suite.utils import set_cuda_if_available
 
 #from wm_suite.io.wt103.dataset import WikiTextDataset
 
@@ -18,7 +18,7 @@ def test_compute_perplexity(transformer_test_data):
     # set to evaluation mode
     model.eval()
 
-    device = check_device("cuda")
+    device = set_cuda_if_available("cuda")
 
     #initialize experiment class
     experiment = Experiment(model=model, 

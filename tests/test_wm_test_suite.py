@@ -10,12 +10,13 @@ def test_wm_test_suite():
                         "--tokenizer", "gpt2", 
                         "--checkpoint", "gpt2", 
                         "--aggregate_output", 
-                        "--aggregate_positions", "[0, 1, 2]"])
+                        "--aggregate_positions", "[0, 1, 2]",
+                        "--device", "cuda"])
     
     # test a different checkpoint
     wm_test_suite.main(["--test_run", 
                         "--tokenizer", "EleutherAI/pythia-14m", 
                         "--checkpoint", "EleutherAI/pythia-14m", 
                         "--aggregate_output", 
-                        "--aggregate_positions", "[0, 1, 2]"])
-    
+                        "--aggregate_positions", "[0, 1, 2]",
+                        "--device", "cuda"])
