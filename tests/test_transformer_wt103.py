@@ -1,13 +1,11 @@
 from typing import Dict
-#import os
 import torch
 import numpy as np
 from transformers import GPT2TokenizerFast, GPT2LMHeadModel
 from test_data import transformer_wt103_test_data
 from wm_suite.wm_test_suite import Experiment
 #from wm_suite.paths import DATA_PATH
-#from wm_suite.utils import logger
-#from wm_suite.io.wt103.dataset import WikiTextDataset
+from wm_suite.utils import set_cuda_if_available
 
 
 def test_transformer_wt103_experiment(transformer_wt103_test_data):
@@ -19,7 +17,7 @@ def test_transformer_wt103_experiment(transformer_wt103_test_data):
     # set to evaluation mode
     model.eval()
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = set_cuda_if_available("cuda")
 
     #initialize experiment class
     experiment = Experiment(model=model, 
