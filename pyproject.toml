@@ -38,6 +38,7 @@ universal = true
 
 [tool.setuptools.package-data]
 wm_suite = ["*.yaml"]
+"wm_suite.viz" = ["*.yaml"]
 
 [tool.pytest.ini_options]
 pythonpath = ["./", "src", "src/wm_suite", "data", "models"]
