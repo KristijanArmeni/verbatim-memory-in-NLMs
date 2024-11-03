@@ -11,8 +11,9 @@ from scipy.stats import trim_mean, bootstrap
 from wm_suite.paths import ROOT_PATH, DATA_PATH
 from wm_suite.viz.utils import save_png_pdf, logger
 import seaborn as sns
+from tqdm import tqdm
 
-from .fig_mem import N_TOKENS_PER_BATCH, plot_lines
+from fig_mem import N_TOKENS_PER_BATCH, plot_lines
 
 # %%
 STEPS = [
@@ -37,7 +38,7 @@ STEPS = [
 ]
 
 # %%
-def load_abstract_concrete_data() -> dict:
+def load_abstract_concrete_data(step:int=143000) -> dict:
     models = ["pythia-14m",
               "pythia-31m",
             "pythia-70m",
@@ -54,11 +55,11 @@ def load_abstract_concrete_data() -> dict:
     datadir = os.path.join(ROOT_PATH.parent.parent.parent, "data", "abst-conc")
 
     dftmp = {k: [] for k in ["model", "rs", "cond"]}
-    for tup in list(product(models, conditions)):
+    for tup in tqdm(list(product(models, conditions)), desc='checkpoint'):
 
         model, cond = tup
 
-        fn = os.path.join(datadir, model, f"pythia_{model}_step-143000_{cond}_repeat_mem.json")
+        fn = os.path.join(datadir, model, f"pythia_{model}_step-{step}_{cond}_repeat_mem.json")
 
         with open(fn, 'r') as f:
             mem = json.load(f)
@@ -77,10 +78,16 @@ def load_timecourse_data(datadir:str, which:str) -> dict:
         "pythia-14m": STEPS,
         "pythia-31m": STEPS,
         "pythia-70m": STEPS,
-        "pythia-160m": STEPS
+        "pythia-160m": STEPS,
+        "pythia-410m": STEPS,
+        "pythia-1b": STEPS,
+        "pythia-1.4b": STEPS,
+        "pythia-2.8b": STEPS,
+        "pythia-6.9b": STEPS,
+        "pythia-12b": STEPS,
     }
 
-    for ckp, ckp_steps in ckp_steps_dict.items():
+    for ckp, ckp_steps in tqdm(ckp_steps_dict.items(), desc='checkpoint'):
 
         out[ckp] = {"step": [], "step_n_toks": [], "mem": []}
         
@@ -89,9 +96,7 @@ def load_timecourse_data(datadir:str, which:str) -> dict:
         for step in ckp_steps:
             step = step.replace("step", "step-")
 
-            print(f"Loading {ckp}, step {step}")
             fn = os.path.join(datadir, ckp, f"pythia_{ckp}_{step}_{suffix}")
-            print(f"Loading {fn}")
             with open(fn, 'r') as f:
                 mem = json.load(f)
             
@@ -146,7 +151,7 @@ def make_abstract_concrete_plot():
     }
 
 
-    fig, ax = plt.subplots(figsize=(6, 4.5))
+    fig, ax = plt.subplots(figsize=(7.5, 5))
 
     width = 0.4
     multiplier = 0
@@ -168,18 +173,18 @@ def make_abstract_concrete_plot():
 
     # plot legend outside of the plot
     ax.legend(title="Noun type", loc="upper left",
-              #bbox_to_anchor=(1, 0.5),
-              frameon=False, fontsize=12, title_fontsize=12)
+              frameon=False, fontsize=16, title_fontsize=16)
 
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.grid(visible=True, which="both", axis="y", linestyle="--", linewidth=0.5, alpha=0.8)
 
     ax.set_xticks(x + width / 2)
-    ax.set_xticklabels(model_labels)
+    ax.set_xticklabels(model_labels, fontsize=14, rotation=25)
+    ax.tick_params(axis="both", which="major", labelsize=16)
 
-    ax.set_ylabel("Repeat loss change (%)", fontsize=14)
-    ax.set_xlabel("\n\nModel size (Nr. of parameters)", fontsize=14)
+    ax.set_ylabel("Repeat loss change (%)", fontsize=18)
+    ax.set_xlabel("Model size (Nr. of parameters)", fontsize=18)
 
     plt.tight_layout()  
 
@@ -323,6 +328,123 @@ def make_timecourse_noun_type_plot(datadir:str):
     return fig
 
 # %%
+
+def plot_lines2(data_dict, clrs, marks, ax):
+
+    i = 0
+    # plot the performance
+    for check_point, data in data_dict.items():
+        
+        x = np.array([int(s.strip("step"))*N_TOKENS_PER_BATCH for s in data["step"]])+1
+        d = data["mem"]  # shape (training_step, checkpoints, list_position)
+
+        y = np.mean(d[:, :], axis=-1)  # shape (training_step, timepoints)
+        #y_mean = trim_mean(y, proportiontocut=0.1, axis=1)  # trim 20% extreme values
+        
+        #def _my_statistic(data):
+        #    return trim_mean(data, proportiontocut=0.1)
+
+        #time_steps = range(y.shape[0])
+
+        #ci_all = [
+        #    bootstrap(
+        #        data=(y[i, :],), 
+        #        statistic=_my_statistic,
+        #        n_resamples=2000,
+        #        confidence_level=0.95)
+        #    for i in time_steps
+        #    ]
+
+        # plot ci error bars
+        #ci = np.array([(ci.confidence_interval.low, ci.confidence_interval.high)
+        #              for ci in ci_all]).T
+        
+        #ax.fill_between(x, ci[0], ci[1], color=clrs[i], alpha=0.25)
+
+        # plot the data
+        ax.plot(x, y, 
+                f"{marks[i]}", color=clrs[i],
+                markeredgecolor="white",
+                markersize=10,
+                linewidth=2.5,
+                label=check_point.strip("pythia-").upper())
+        
+        i += 1
+
+    return ax
+
+# %%
+def make_difference_timecourse(datadir:str):
+
+    abstract = load_timecourse_data(datadir, "abstract")
+    concrete = load_timecourse_data(datadir, "concrete")
+
+    fig, ax = plt.subplots(1, 1, figsize=(8, 4.5))
+
+    # set fontsize
+    fs = 16
+
+    # compute the difference between concrete and abstract
+    data_dict = {}
+    for k in abstract.keys():
+        data_dict[k] = {
+            "step": abstract[k]["step"],
+            "mem": trim_mean(concrete[k]["mem"], proportiontocut=0.1, axis=1) - trim_mean(abstract[k]["mem"], proportiontocut=0.1, axis=1),
+        }
+
+    clrs = plt.cm.viridis_r(np.linspace(0, 1, len(data_dict)))
+    marks = ["--o", "--s", "--v", "--^", "--D", "--P", "--X", "--d", "--p", "--*"]
+
+    _ = plot_lines2(data_dict, clrs, marks, ax)
+
+    d = list(data_dict.items())[0][1]
+    x = np.array([int(s.strip("step"))*N_TOKENS_PER_BATCH for s in d["step"]])+1
+    x_total = int(d["step"][-1].strip("step"))*N_TOKENS_PER_BATCH
+
+    ax.set_xscale("log")
+    ax.set_xlim(1e8, x_total*1.1)
+    ax.set_xlabel("Training step (Nr. and % total training tokens elapsed)", fontsize=fs)
+    ylab = "Concreteness advantage ($\Delta$%)\n($L^{r}_{concrete}-L^{r}_{abstract}$)"
+    ax.set_ylabel(ylab, fontsize=fs)
+
+    ax.legend(
+        title="Model size", loc="upper left", frameon=False, 
+        fontsize=12, title_fontsize=14, ncol=2)
+
+    ax.vlines(x_total, 0, ax.get_ylim()[-1], colors="black", linestyles="--", linewidth=1, alpha=0.8)
+    ax.text(x[-1], 0, f"{int(x_total/1e9)}B\n(100%)", fontsize=10, verticalalignment="bottom", horizontalalignment="right")
+
+    # format human-friendly x-axis labels
+    def _get_percent(x):
+        return round(x / x_total * 100, 2)
+    
+    xlabs = [f"{int(x/1e6)}M\n({_get_percent(x)}%)" if (x/1e9)<1 else f"{int(x/1e9)}B\n({_get_percent(x)}%)" for x in ax.get_xticks()]
+    ax.set_xticklabels(xlabs)
+
+    ax.tick_params(axis="both", which="major", labelsize=fs)
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.grid(visible=True, which="both", axis="both", linestyle="--", linewidth=0.5, alpha=0.8)
+
+    # add a vertical arrow along y-axis that says "better retrieval of concrete nouns"
+    #ax.annotate(
+    #    "", xy=(-0.11, 0.85), xytext=(-0.11, 0.15),
+    #    xycoords="axes fraction", textcoords="axes fraction",
+    #    arrowprops=dict(arrowstyle="->", lw=1.5, color="gray")
+    #)
+    # add texte along the arrow
+    #ax.text(-0.13, 0.5, "Better retrieval of concrete nouns",
+    #        fontsize=12, verticalalignment="center", horizontalalignment="center", rotation=90, color="gray",
+    #    transform=ax.transAxes
+    #)
+
+    plt.tight_layout()
+
+    return fig
+
+
+# %%
 def make_dist_plot():
 
     dct = load_abstract_concrete_data()
@@ -422,9 +544,13 @@ def main(input_args:list=None):
 
     fig1 = make_abstract_concrete_plot()
 
-    fig2 = make_timecourse_noun_type_plot(args.datadir)
+    #fig2 = make_timecourse_noun_type_plot(args.datadir)
 
-    fig3 = make_dist_plot()
+    fig2 = make_difference_timecourse(args.datadir)
+
+    plt.show()
+
+    #fig3 = make_dist_plot()
 
     if args.savedir is not None:
         
@@ -432,13 +558,13 @@ def main(input_args:list=None):
         logger.info(f"Saving figure to {fn} ...")
         save_png_pdf(fig1, fn)
 
-        fn = os.path.join(args.savedir, "fig_mem_abst-conc_timecourse")
+        fn = os.path.join(args.savedir, "fig_mem_abst-conc_diff-timecourse")
         logger.info(f"Saving figure to {fn} ...")
         save_png_pdf(fig2, fn)
 
-        fn = os.path.join(args.savedir, "fig_mem_abst-conc_dist")
-        logger.info(f"Saving figure to {fn} ...")
-        save_png_pdf(fig3, fn)
+       # fn = os.path.join(args.savedir, "fig_mem_abst-conc_dist")
+       # logger.info(f"Saving figure to {fn} ...")
+       #save_png_pdf(fig3, fn)
 
 
 # %%

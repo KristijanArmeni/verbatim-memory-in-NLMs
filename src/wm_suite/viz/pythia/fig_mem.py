@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 import pandas as pd
 from scipy.stats import trim_mean, bootstrap
 from wm_suite.paths import DATA_PATH
-from wm_suite.viz.utils import save_png_pdf
+from wm_suite.viz.utils import save_png_pdf, logger
 from tqdm import tqdm
 
 # %%
@@ -116,13 +116,12 @@ def plot_lines(data_dict, clrs, marks, ax):
     return ax
 
 
-# %%
 def plot_learning_curve(data_dict, cmap:str="viridis") -> tuple:
 
     fig, ax = plt.subplots(figsize=(7.5, 4.5))
 
     # set fontsize
-    fs = 14
+    fs = 16
 
     if cmap == "viridis":
         clrs = plt.cm.viridis_r(np.linspace(0, 1, len(data_dict)))
@@ -146,7 +145,7 @@ def plot_learning_curve(data_dict, cmap:str="viridis") -> tuple:
     #                 fontsize=fs)
 
     ax.vlines(x_total, 0, 100, colors="black", linestyles="--", linewidth=1, alpha=0.8)
-    ax.text(x[-1], 0, f"{int(x_total/1e9)}B\n(100%)", fontsize=10, verticalalignment="bottom", horizontalalignment="right")
+    ax.text(x[-1], 0, f"{int(x_total/1e9)}B\n(100%)", fontsize=fs, verticalalignment="bottom", horizontalalignment="right")
 
     # format human-friendly x-axis labels
     def _get_percent(x):
@@ -159,33 +158,18 @@ def plot_learning_curve(data_dict, cmap:str="viridis") -> tuple:
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
-    ax.legend(title="Model size", loc="upper left", frameon=False, fontsize=12, title_fontsize=12, ncol=2)
+    ax.legend(title="Model size", loc="upper left", frameon=False, fontsize=12, title_fontsize=14, ncol=2)
 
     ax.tick_params(axis="both", which="major", labelsize=fs)
 
     return fig, ax
 
-# %%
-def make_plot(datadir:str, condition: str="repeat") -> tuple:
 
-    out = _load_data(datadir, which=condition)
-
-    fig1, ax = plot_learning_curve(data_dict=out)
-
-    plt.tight_layout()
-
-    fig2, ax = plot_per_word_position(datadict=out)
-
-    plt.tight_layout()
-
-    return fig1, fig2
-
-# %%
 def plot_curve_per_list_position(datadir:str, condition: str="repeat") -> tuple:
 
     out = _load_data(datadir, which=condition)
 
-    fig, ax = plt.subplots(1, 3, figsize=(15, 4), sharex=True, sharey=True)
+    fig, ax = plt.subplots(1, 3, figsize=(15, 4.5), sharex=True, sharey=True)
 
     # fondsizes etc.
     fs = 14
@@ -197,7 +181,7 @@ def plot_curve_per_list_position(datadir:str, condition: str="repeat") -> tuple:
     # plot the performance
     for check_point, data in out.items():
         
-        x = np.array([int(s.strip("step"))*N_TOKENS_PER_BATCH for s in data["step"]])+1
+        x = np.array([int(s.strip("step"))*N_TOKENS_PER_BATCH for s in data["step"]])
         d = data["mem"]  # shape (training_step, samples, list_position)
 
         for idx, k in enumerate(range(d.shape[-1])):
@@ -256,14 +240,15 @@ def plot_curve_per_list_position(datadir:str, condition: str="repeat") -> tuple:
 
     return fig, ax
 
-# %%
 
-def plot_per_word_position(datadict) -> tuple:
+def plot_per_word_position(datadict: dict) -> tuple:
+
+    logger.info("Plotting repeat loss change per word position.")
 
     fig, ax = plt.subplots(1, 1, figsize=(3.8, 4.5), sharex=True, sharey=True)
 
     # fondsizes etc.
-    fs = 14
+    fs = 16
 
     clrs = plt.cm.viridis_r(np.linspace(0, 1, len(datadict)))
     marks = ["o", "s", "v", "^", "D", "P", "X", "d"] #"p", "h", "8", "H", "*", ">", "<", "1", "2", "
@@ -302,10 +287,8 @@ def plot_per_word_position(datadict) -> tuple:
         
         i += 1
 
-    ax.set_xlabel("Word position in repeated list", fontsize=fs)
+    ax.set_xlabel("Word position in list", fontsize=fs)
     ax.set_ylabel("Repeat loss change (%)", fontsize=fs)
-
-    # add an arrow here
     
     ax.set_ylim([50, 100])
 
@@ -316,9 +299,9 @@ def plot_per_word_position(datadict) -> tuple:
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
-    ax.legend(title="Model size", loc="best", frameon=False, fontsize=12, title_fontsize=12, ncol=2)
+    ax.legend(title="Model size", loc="best", frameon=False, fontsize=12, title_fontsize=14, ncol=2)
 
-    ax.tick_params(axis="both", which="major", labelsize=14)
+    ax.tick_params(axis="both", which="major", labelsize=fs)
 
     plt.tight_layout()
 
@@ -357,17 +340,18 @@ def main(input_args:list=None):
 
     args.datadir = os.path.join(DATA_PATH.parent.parent, "data", "pythia") if args.datadir is None else args.datadir
 
-    fig1, fig2 = make_plot(datadir=args.datadir, condition=args.condition)
+    out = _load_data(args.datadir, which=args.condition)
+
+    fig1, ax = plot_learning_curve(data_dict=out)
+
+    plt.tight_layout()
+
+    fig2, ax = plot_per_word_position(datadict=out)
+    if args.condition == "control":
+        ax.set_ylim([-10, 100])
+    plt.tight_layout()
 
     plt.show()
-
-    #fig2, ax2 = plot_curve_per_list_position(datadir=args.datadir, condition=args.condition)
-
-    #plt.show()
-
-    #fig3, ax3 = plot_per_word_position(datadir=args.datadir, condition=args.condition)
-
-    #plt.show()
 
     if args.savedir is not None:
 
@@ -376,9 +360,6 @@ def main(input_args:list=None):
 
         fn = os.path.join(args.savedir, f"fig_mem_{args.condition}_per_position")
         save_png_pdf(fig2, fn)
-
-        #fn2 = os.path.join(args.savedir, f"fig_mem_per_timestep_{args.condition}")
-        #save_png_pdf(fig2, fn2)
 
         #fn = os.path.join(args.savedir, f"pythia_mem_{args.condition}.csv")
         #df.to_csv(fn, index=False, sep="\t")
