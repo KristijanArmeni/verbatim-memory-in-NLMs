@@ -14,7 +14,6 @@ OSF_URL_ATTN_WEIGHTS_ZIP_TMP = "https://osf.io/download/pm6wq/"  # temporary lin
 OSF_URL_SVA_EXP_ZIP_TMP = "https://osf.io/download/jgdt6/"
 OSF_URL_WT103_EXP = "https://osf.io/download/db3ht/"
 
-
 def set_cuda_if_available(device: str="cuda" or "cpu") -> torch.device:
     
     if device == "cuda" and not torch.cuda.is_available():
@@ -55,11 +54,11 @@ def set_logger_level(level: str) -> logging.Logger:
 
 
 def download_raw_data_zip(zipurl: str, path: str):
-    logging.info(f"Fetching data from {zipurl} ...")
+    logger.info(f"Fetching data from {zipurl} ...")
     r = requests.get(zipurl)
     z = zipfile.ZipFile(io.BytesIO(r.content))
 
-    logging.info(f"Extracting .zip to {path} ...")
+    logger.info(f"Extracting .zip to {path} ...")
     z.extractall(path)
 
     logging.info("Done!")
@@ -118,19 +117,3 @@ def download_data():
     return None
 
 
-# download the data for Armeni et al, 2023
-def download_data2():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--which",
-        type=str,
-        choices=["attention_weights", "ablation_experiment"],
-        required=True,
-    )
-    parser.add_argument("--path", type=str, required=True)
-
-    args = parser.parse_args()
-
-    get_data(which=args.which, path=args.path)
-
-    return None
